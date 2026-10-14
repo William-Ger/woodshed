@@ -74,6 +74,10 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/MainComponent.cpp
         Source/app/ControlBar.cpp
         Source/app/ArrangeView.cpp
+        Source/app/ArrangeHeader.cpp
+        Source/app/ArrangeRuler.cpp
+        Source/app/ArrangeLanes.cpp
+        Source/app/ArrangeWaveforms.cpp
         Source/app/MixerView.cpp
         Source/app/RigPanel.cpp
         ${WOODSHED_RIG_SOURCES}
