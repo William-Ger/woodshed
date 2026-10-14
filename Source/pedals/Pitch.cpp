@@ -72,9 +72,13 @@ struct ToneFilter
     that best lines its waveform up with the tap currently playing, which takes
     most of the comb/warble out of the crossfades.
 
-    At a ratio of exactly one the voice parks: it fades to a single tap at the
-    centre delay, which is sample-identical to a dry signal delayed by
-    centre(), so a pitch pedal at rest is transparent.
+    At a ratio of exactly one the voice parks: it crossfades (20 ms) to the
+    undelayed input, so a voice at unison is sample-identical to the dry signal
+    and a pitch pedal at rest is transparent with no added latency. Leaving
+    unison crossfades back into the grains, which restart from the centre delay.
+
+    The shifted output trails the input by roughly centre() samples on average;
+    the dry path is never delayed, so pedals using this report zero latency.
 */
 class GrainVoice
 {
@@ -102,7 +106,7 @@ public:
         glide = 1.0f - std::exp (-1.0f / juce::jmax (1.0f, ms * 0.001f * (float) sr));
     }
 
-    /** Integer delay a parked voice sits at; delay dry by this to stay aligned. */
+    /** Average delay of the shifted output, in samples. */
     int centre() const                          { return minDelay + search + window / 2; }
 
     /** Delay-line length this voice needs, plus any extra delay it will be asked for. */
@@ -137,13 +141,13 @@ public:
         const bool unity = isUnity (st);
         park = unity ? juce::jmin (1.0f, park + parkStep) : juce::jmax (0.0f, park - parkStep);
 
-        const float centreTap = park > 0.0f ? b.read ((float) centre() + extra) : 0.0f;
+        const float input = park > 0.0f ? tapAt (b, 0) : 0.0f;
 
         if (park >= 1.0f)
         {
             phase = 0.5f;
             offA = offB = 0.0f;
-            return centreTap;
+            return input;
         }
 
         const float prev = phase;
@@ -168,7 +172,7 @@ public:
         const float wA = 0.5f - 0.5f * std::cos (twoPi * phase);
         const float grain = wA * b.read (dA) + (1.0f - wA) * b.read (dB);
 
-        return park > 0.0f ? park * centreTap + (1.0f - park) * grain : grain;
+        return park > 0.0f ? park * input + (1.0f - park) * grain : grain;
     }
 
 private:
@@ -246,7 +250,7 @@ private:
     std::array<float, segPoints> refSeg {};
 };
 
-// Grain size for the shifter-based pedals: centre delay = 4 + 256 + 672 = 932 samples (19.4 ms) at 48 kHz.
+// Grain size for the shifter-based pedals: shifted voices trail the dry by ~932 samples (19.4 ms) at 48 kHz.
 constexpr float shiftWindowMs = 28.0f;
 constexpr float shiftSearchMs = 5.333f;
 
@@ -281,7 +285,6 @@ public:
             c.line.setMaxSamples (c.voices[0].span());
             for (auto& g : c.gains) g.reset (sampleRate, 0.03);
         }
-        latency = channels[0].voices[0].centre();
     }
 
     void reset() override
@@ -295,8 +298,6 @@ public:
         }
         fresh = true;
     }
-
-    int getLatencySamples() const override      { return latency; }
 
     void update() override
     {
@@ -321,7 +322,8 @@ public:
 
         for (int i = 0; i < n; ++i)
         {
-            c.line.push (x[i]);
+            const float in = x[i];
+            c.line.push (in);
             float wet = 0.0f;
 
             for (size_t v = 0; v < c.voices.size(); ++v)
@@ -331,7 +333,7 @@ public:
                     wet += g * c.voices[v].process (c.line);
             }
 
-            const float dry = c.gains[3].getNextValue() * tapAt (c.line, latency);
+            const float dry = c.gains[3].getNextValue() * in;
             x[i] = dry + c.tone.process (wet);
         }
     }
@@ -348,7 +350,6 @@ private:
     };
 
     std::array<Channel, 2> channels;
-    int latency = 0;
     bool fresh = true;
 };
 
@@ -475,7 +476,6 @@ public:
             c.line.setMaxSamples (c.voice.span());
             c.mix.reset (sampleRate, 0.03);
         }
-        latency = channels[0].voice.centre();
     }
 
     void reset() override
@@ -488,8 +488,6 @@ public:
         }
         fresh = true;
     }
-
-    int getLatencySamples() const override      { return latency; }
 
     void update() override
     {
@@ -512,11 +510,12 @@ public:
 
         for (int i = 0; i < n; ++i)
         {
-            c.line.push (x[i]);
+            const float in = x[i];
+            c.line.push (in);
             const float wet = c.tone.process (c.voice.process (c.line));
             float dg, wg;
             mixGains (c.mix.getNextValue(), c.voice.semitones(), dg, wg);
-            x[i] = dg * tapAt (c.line, latency) + wg * wet;
+            x[i] = dg * in + wg * wet;
         }
     }
 
@@ -530,7 +529,6 @@ private:
     };
 
     std::array<Channel, 2> channels;
-    int latency = 0;
     bool fresh = true;
 };
 
@@ -545,10 +543,7 @@ public:
     void prepared() override
     {
         for (auto& v : voices) v.prepare (sampleRate, shiftWindowMs, shiftSearchMs);
-        latency = voices[0].centre();
         mono.setMaxSamples (voices[0].span());
-        dryL.setMaxSamples (latency + 8);
-        dryR.setMaxSamples (latency + 8);
 
         for (auto* s : { &level1L, &level1R, &level2L, &level2R, &dryGain })
             s->reset (sampleRate, 0.04);
@@ -556,14 +551,12 @@ public:
 
     void reset() override
     {
-        mono.clear(); dryL.clear(); dryR.clear();
+        mono.clear();
         for (auto& v : voices) v.reset();
         toneL.reset (sampleRate);
         toneR.reset (sampleRate);
         fresh = true;
     }
-
-    int getLatencySamples() const override      { return latency; }
 
     void update() override
     {
@@ -612,8 +605,6 @@ public:
         {
             const float inL = left[i], inR = right[i];
             mono.push (0.5f * (inL + inR));
-            dryL.push (inL);
-            dryR.push (inR);
 
             const float g1L = level1L.getNextValue(), g1R = level1R.getNextValue();
             const float g2L = level2L.getNextValue(), g2R = level2R.getNextValue();
@@ -621,17 +612,16 @@ public:
             const float v2 = (g2L + g2R > 1.0e-5f || level2L.isSmoothing()) ? voices[1].process (mono) : 0.0f;
             const float d = dryGain.getNextValue();
 
-            left[i] = d * tapAt (dryL, latency) + toneL.process (g1L * v1 + g2L * v2);
-            if (! aliased) right[i] = d * tapAt (dryR, latency) + toneR.process (g1R * v1 + g2R * v2);
+            left[i] = d * inL + toneL.process (g1L * v1 + g2L * v2);
+            if (! aliased) right[i] = d * inR + toneR.process (g1R * v1 + g2R * v2);
         }
     }
 
 private:
-    dsp::DelayBuffer mono, dryL, dryR;
+    dsp::DelayBuffer mono;
     std::array<GrainVoice, 2> voices;
     juce::SmoothedValue<float> level1L, level1R, level2L, level2R, dryGain;
     ToneFilter toneL, toneR;
-    int latency = 0;
     bool fresh = true, secondOn = false;
 };
 
@@ -742,7 +732,6 @@ public:
             c.line.setMaxSamples (c.voice.span());
             c.mix.reset (sampleRate, 0.03);
         }
-        latency = channels[0].voice.centre();
     }
 
     void reset() override
@@ -754,8 +743,6 @@ public:
         }
         fresh = true;
     }
-
-    int getLatencySamples() const override      { return latency; }
 
     void update() override
     {
@@ -777,11 +764,12 @@ public:
 
         for (int i = 0; i < n; ++i)
         {
-            c.line.push (x[i]);
+            const float in = x[i];
+            c.line.push (in);
             const float wet = c.voice.process (c.line);
             float dg, wg;
             mixGains (c.mix.getNextValue(), c.voice.semitones(), dg, wg);
-            x[i] = dg * tapAt (c.line, latency) + wg * wet;
+            x[i] = dg * in + wg * wet;
         }
     }
 
@@ -794,7 +782,6 @@ private:
     };
 
     std::array<Channel, 2> channels;
-    int latency = 0;
     bool fresh = true;
 };
 
@@ -824,17 +811,14 @@ public:
     void prepared() override
     {
         voice.prepare (sampleRate, shiftWindowMs, shiftSearchMs);
-        latency = voice.centre();
         mono.setMaxSamples (voice.span());
-        dryL.setMaxSamples (latency + 8);
-        dryR.setMaxSamples (latency + 8);
         mix.reset (sampleRate, 0.03);
         gateCoeff = dsp::onePoleCoeff (60.0f, sampleRate);
     }
 
     void reset() override
     {
-        mono.clear(); dryL.clear(); dryR.clear();
+        mono.clear();
         voice.reset();
         tone.reset (sampleRate);
         clock = 0.0;
@@ -843,8 +827,6 @@ public:
         rng.setSeed (0x5eed);
         fresh = true;
     }
-
-    int getLatencySamples() const override      { return latency; }
 
     void update() override
     {
@@ -887,14 +869,12 @@ public:
 
             const float inL = left[i], inR = right[i];
             mono.push (0.5f * (inL + inR));
-            dryL.push (inL);
-            dryR.push (inR);
 
             float d, wg;
             mixGains (mix.getNextValue(), voice.semitones(), d, wg);
             const float w = wg * gateEnv * tone.process (voice.process (mono));
-            left[i] = d * tapAt (dryL, latency) + w;
-            if (! aliased) right[i] = d * tapAt (dryR, latency) + w;
+            left[i] = d * inL + w;
+            if (! aliased) right[i] = d * inR + w;
         }
     }
 
@@ -914,14 +894,14 @@ private:
         return p.length == 0 ? randomSemis : p.steps[(size_t) (step % p.length)];
     }
 
-    dsp::DelayBuffer mono, dryL, dryR;
+    dsp::DelayBuffer mono;
     GrainVoice voice;
     juce::SmoothedValue<float> mix;
     ToneFilter tone;
     juce::Random rng;
     double clock = 0.0;
     float rateHz = 5.0f, gate = 0.8f, gateEnv = 1.0f, gateCoeff = 0.01f, randomSemis = 12.0f;
-    int pattern = 1, step = 0, latency = 0;
+    int pattern = 1, step = 0;
     bool fresh = true;
 };
 
