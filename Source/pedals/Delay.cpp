@@ -230,6 +230,8 @@ public:
         {
             c.line.setMaxSamples ((int) (sampleRate * 1.1));
             c.time.setTime (0.25f, sampleRate);   // slow motor: pitch glide when Time moves
+            c.fbG.setTime (0.02f, sampleRate);
+            c.wetG.setTime (0.02f, sampleRate);
         }
         wowRate = 0.55f; flutterRate = 6.3f;
     }
@@ -239,7 +241,7 @@ public:
         for (size_t ch = 0; ch < channels.size(); ++ch)
         {
             auto& c = channels[ch];
-            c.line.clear(); c.tone.reset(); c.lowCut.reset(); c.drift = 0.0f; c.time.reset();
+            c.line.clear(); c.tone.reset(); c.lowCut.reset(); c.drift = 0.0f; c.time.reset(); c.fbG.reset(); c.wetG.reset();
             c.wow.setPhase (ch == 0 ? 0.0f : 1.9f);
             c.flutter.setPhase (ch == 0 ? 0.0f : 0.7f);
             c.noise.state = ch == 0 ? 0x1234567u : 0x7654321u;
@@ -284,6 +286,9 @@ public:
     void processChannel (int ch, float* x, int n) override
     {
         auto& c = channels[(size_t) ch];
+        c.fbG.set (feedback);
+        c.wetG.set (mix * makeup * outNorm);
+
         for (int i = 0; i < n; ++i)
         {
             const float dry = x[i];
@@ -299,10 +304,10 @@ public:
             }
 
             // Record path: saturating, small-signal unity, worn-head filtering.
-            const float rec = c.lowCut.process (c.tone.process (dry + feedback * play));
+            const float rec = c.lowCut.process (c.tone.process (dry + c.fbG.next() * play));
             c.line.push (fastTanh (driveGain * rec) / driveGain);
 
-            x[i] = dry + mix * makeup * outNorm * play;
+            x[i] = dry + c.wetG.next() * play;
         }
     }
 
@@ -310,7 +315,7 @@ private:
     struct Channel
     {
         dsp::DelayBuffer line;
-        Glide time;
+        Glide time, fbG, wetG;
         std::array<Glide, 3> headGain;
         OnePoleLP tone;
         OnePoleHP lowCut;
@@ -402,6 +407,8 @@ public:
         {
             c.echo.line.setMaxSamples ((int) (sampleRate * 3.2));
             c.chunk.setTime (0.1f, sampleRate);
+            c.fbG.setTime (0.02f, sampleRate);
+            c.wetG.setTime (0.02f, sampleRate);
         }
         maxDelay = (float) (sampleRate * 3.1);
     }
@@ -410,7 +417,7 @@ public:
     {
         for (auto& c : channels)
         {
-            c.echo.reset(); c.chunk.reset();
+            c.echo.reset(); c.chunk.reset(); c.fbG.reset(); c.wetG.reset();
             c.current = 0; c.age = 0.0f; c.fadeLen = 1.0f;
             c.delay = { 2.0f, 2.0f };
         }
@@ -431,6 +438,9 @@ public:
     void processChannel (int ch, float* x, int n) override
     {
         auto& c = channels[(size_t) ch];
+        c.fbG.set (feedback);
+        c.wetG.set (mix);
+
         for (int i = 0; i < n; ++i)
         {
             const float dry = x[i];
@@ -456,8 +466,8 @@ public:
             c.delay[old] = juce::jmin (maxDelay, c.delay[old] + 2.0f);
             c.age += 1.0f;
 
-            c.echo.write (dry + feedback * wet);
-            x[i] = dry + mix * wet;
+            c.echo.write (dry + c.fbG.next() * wet);
+            x[i] = dry + c.wetG.next() * wet;
         }
     }
 
@@ -465,7 +475,7 @@ private:
     struct Channel
     {
         EchoLine echo;
-        Glide chunk;
+        Glide chunk, fbG, wetG;
         int current = 0;
         float age = 0.0f, fadeLen = 1.0f;
         std::array<float, 2> delay { 2.0f, 2.0f };
@@ -588,6 +598,8 @@ public:
         {
             c.line.setMaxSamples ((int) (sampleRate * 0.25));
             c.time.setTime (0.06f, sampleRate);
+            c.fbG.setTime (0.02f, sampleRate);
+            c.wetG.setTime (0.02f, sampleRate);
         }
     }
 
@@ -596,7 +608,7 @@ public:
         for (size_t ch = 0; ch < channels.size(); ++ch)
         {
             auto& c = channels[ch];
-            c.line.clear(); c.tone.reset(); c.lowCut.reset(); c.time.reset();
+            c.line.clear(); c.tone.reset(); c.lowCut.reset(); c.time.reset(); c.fbG.reset(); c.wetG.reset();
             c.wobble.setPhase (ch == 0 ? 0.0f : 1.3f);
         }
     }
@@ -618,20 +630,22 @@ public:
     void processChannel (int ch, float* x, int n) override
     {
         auto& c = channels[(size_t) ch];
+        c.fbG.set (feedback);
+        c.wetG.set (level * (0.85f + 0.15f * grit));
         const float wobbleDepth = 0.0006f * (float) sampleRate / (twoPi * 0.9f);
 
         for (int i = 0; i < n; ++i)
         {
             const float dry = x[i];
             const float slap = c.line.read (juce::jmax (2.0f, c.time.next() + wobbleDepth * c.wobble.next()));
-            const float rec = c.lowCut.process (c.tone.process (dry + feedback * slap));
+            const float rec = c.lowCut.process (c.tone.process (dry + c.fbG.next() * slap));
             c.line.push (fastTanh (grit * rec) / grit);
-            x[i] = dry + level * slap * (0.85f + 0.15f * grit);
+            x[i] = dry + c.wetG.next() * slap;
         }
     }
 
 private:
-    struct Channel { dsp::DelayBuffer line; Glide time; OnePoleLP tone; OnePoleHP lowCut; Lfo wobble; };
+    struct Channel { dsp::DelayBuffer line; Glide time, fbG, wetG; OnePoleLP tone; OnePoleHP lowCut; Lfo wobble; };
     std::array<Channel, 2> channels;
     float level = 0.5f, feedback = 0.0f, grit = 1.0f;
 };
@@ -647,6 +661,8 @@ public:
         {
             c.echo.line.setMaxSamples ((int) (sampleRate * 1.25));
             c.time.setTime (0.08f, sampleRate);
+            c.fbG.setTime (0.02f, sampleRate);
+            c.wetG.setTime (0.02f, sampleRate);
         }
     }
 
@@ -655,7 +671,7 @@ public:
         for (size_t ch = 0; ch < channels.size(); ++ch)
         {
             auto& c = channels[ch];
-            c.echo.reset(); c.time.reset(); c.depth.reset();
+            c.echo.reset(); c.time.reset(); c.depth.reset(); c.fbG.reset(); c.wetG.reset();
             c.lfo.setPhase (ch == 0 ? 0.0f : pi * 0.5f);
         }
     }
@@ -680,18 +696,21 @@ public:
     void processChannel (int ch, float* x, int n) override
     {
         auto& c = channels[(size_t) ch];
+        c.fbG.set (feedback);
+        c.wetG.set (mix);
+
         for (int i = 0; i < n; ++i)
         {
             const float dry = x[i];
             const float dep = c.depth.next();
             const float wet = c.echo.read (c.time.next() + dep * (1.0f + c.lfo.next()));
-            c.echo.write (dry + feedback * wet);
-            x[i] = dry + mix * wet;
+            c.echo.write (dry + c.fbG.next() * wet);
+            x[i] = dry + c.wetG.next() * wet;
         }
     }
 
 private:
-    struct Channel { EchoLine echo; Glide time, depth; Lfo lfo; };
+    struct Channel { EchoLine echo; Glide time, depth, fbG, wetG; Lfo lfo; };
     std::array<Channel, 2> channels;
     float feedback = 0.0f, mix = 0.0f;
 };
@@ -707,6 +726,8 @@ public:
         {
             c.line.setMaxSamples ((int) (sampleRate * 1.6));
             c.time.setTime (0.1f, sampleRate);
+            c.fbG.setTime (0.02f, sampleRate);
+            c.wetG.setTime (0.02f, sampleRate);
         }
     }
 
@@ -715,7 +736,7 @@ public:
         for (size_t ch = 0; ch < channels.size(); ++ch)
         {
             auto& c = channels[ch];
-            c.line.clear(); c.time.reset(); c.lowCut.reset(); c.antiAlias.reset(); c.post.reset(); c.drift = 0.0f;
+            c.line.clear(); c.time.reset(); c.fbG.reset(); c.wetG.reset(); c.lowCut.reset(); c.antiAlias.reset(); c.post.reset(); c.drift = 0.0f;
             c.held = 0.0f; c.holdPhase = 1.0f;
             c.noise.state = ch == 0 ? 0xabcdef1u : 0x1fedcbau;
             c.warble.setPhase (ch == 0 ? 0.0f : 2.1f);
@@ -748,6 +769,9 @@ public:
     void processChannel (int ch, float* x, int n) override
     {
         auto& c = channels[(size_t) ch];
+        c.fbG.set (feedback);
+        c.wetG.set (mix);
+
         for (int i = 0; i < n; ++i)
         {
             const float dry = x[i];
@@ -756,7 +780,7 @@ public:
             const float wet = c.post.process (c.line.read (juce::jmax (2.0f, c.time.next() + mod - 1.0f))).low;
 
             // Degrade what goes onto the line: band-limit, sample & hold, truncate toward zero.
-            const float in = c.antiAlias.process (c.lowCut.process (dry + feedback * wet)).low;
+            const float in = c.antiAlias.process (c.lowCut.process (dry + c.fbG.next() * wet)).low;
             c.holdPhase += holdInc;
             if (c.holdPhase >= 1.0f)
             {
@@ -765,7 +789,7 @@ public:
             }
             c.line.push (c.held);
 
-            x[i] = dry + mix * wet;
+            x[i] = dry + c.wetG.next() * wet;
         }
     }
 
@@ -773,7 +797,7 @@ private:
     struct Channel
     {
         dsp::DelayBuffer line;
-        Glide time;
+        Glide time, fbG, wetG;
         OnePoleHP lowCut;
         dsp::Svf antiAlias, post;
         Lfo warble;
@@ -797,13 +821,15 @@ public:
         {
             c.echo.line.setMaxSamples ((int) (sampleRate * 1.6));
             c.time.setTime (0.08f, sampleRate);
+            c.fbG.setTime (0.02f, sampleRate);
+            c.wetG.setTime (0.02f, sampleRate);
         }
         attack = 1.0f - std::exp (-1.0f / (0.004f * (float) sampleRate));
     }
 
     void reset() override
     {
-        for (auto& c : channels) { c.echo.reset(); c.time.reset(); c.env = 0.0f; }
+        for (auto& c : channels) { c.echo.reset(); c.time.reset(); c.fbG.reset(); c.wetG.reset(); c.env = 0.0f; }
     }
 
     void update() override
@@ -823,6 +849,8 @@ public:
     void processChannel (int ch, float* x, int n) override
     {
         auto& c = channels[(size_t) ch];
+        c.fbG.set (feedback);
+        c.wetG.set (mix);
         constexpr float lo = 0.004f, hi = 0.04f;   // about -48 dBFS to -28 dBFS of peak level
 
         for (int i = 0; i < n; ++i)
@@ -834,13 +862,13 @@ public:
             const float duck = dsp::dbToGain (-duckDb * amount);
 
             const float wet = c.echo.read (c.time.next());
-            c.echo.write (dry + feedback * wet);
-            x[i] = dry + mix * duck * wet;
+            c.echo.write (dry + c.fbG.next() * wet);
+            x[i] = dry + c.wetG.next() * duck * wet;
         }
     }
 
 private:
-    struct Channel { EchoLine echo; Glide time; float env = 0.0f; };
+    struct Channel { EchoLine echo; Glide time, fbG, wetG; float env = 0.0f; };
     std::array<Channel, 2> channels;
     float feedback = 0.0f, mix = 0.0f, duckDb = 0.0f, attack = 0.1f, release = 0.001f;
 };

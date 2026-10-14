@@ -728,6 +728,7 @@ public:
         fdn.scale.set (0.6f + 0.8f * knob (1));
         fdn.setDecay (rate * (1.0f - f), rate / (1.0f - 0.92f * knob (2)) * (1.0f - f));
         fdn.depth.set (knob (3) * 40.0f * (float) (sampleRate / 48000.0));
+        input.set (12.0f, 90.0f, sampleRate);     // low cut keeps sub-bass and DC out of the endless loop
         out.set (knob (5), 0.3f);
     }
 
