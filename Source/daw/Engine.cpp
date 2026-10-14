@@ -693,7 +693,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         }
 
         if (isPlaying && (snap.click || (isRec && pos < recordStart.load())))
-            Mixer::addClick (snap, b, 0.3f);
+            Mixer::addClick (snap, b, clickLevel.load (std::memory_order_relaxed));
 
         for (int i = 0; i < n; ++i)
         {

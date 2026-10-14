@@ -42,9 +42,25 @@ juce::ValueTree Project::createState (double sampleRate)
     return s;
 }
 
+namespace
+{
+juce::File& projectsFolderOverride()
+{
+    static juce::File folder;
+    return folder;
+}
+}
+
 juce::File Project::defaultProjectsFolder()
 {
+    if (projectsFolderOverride() != juce::File())
+        return projectsFolderOverride();
     return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Woodshed Projects");
+}
+
+void Project::setDefaultProjectsFolder (const juce::File& folder)
+{
+    projectsFolderOverride() = folder;
 }
 
 std::unique_ptr<Project> Project::createIn (const juce::File& folder, double sampleRate)

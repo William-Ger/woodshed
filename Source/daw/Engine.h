@@ -136,6 +136,10 @@ public:
     Levels takeTrackLevels (int trackId);
     Levels takeMasterLevels();
 
+    /** Metronome loudness, linear (Settings). */
+    void setClickLevel (float level)                        { clickLevel = level; }
+    float getClickLevel() const                             { return clickLevel.load(); }
+
     double getSampleRate() const                            { return sampleRate; }
     int getBlockSize() const                                { return blockSize; }
     int getRecordLatencySamples() const;
@@ -205,6 +209,7 @@ private:
     std::atomic<juce::int64> position { 0 }, recordStart { 0 };
     std::atomic<juce::int64> requestedPosition { -1 };
     std::atomic<float> masterPeakLeft { 0.0f }, masterPeakRight { 0.0f };
+    std::atomic<float> clickLevel { 0.3f };
     Levels masterShown;
     std::atomic<juce::uint64> callbackCount { 0 };
 

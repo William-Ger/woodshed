@@ -1,4 +1,5 @@
 #include "Studio.h"
+#include "SettingsWindow.h"
 #include "../PluginProcessor.h"
 
 namespace woodshed::app
@@ -38,9 +39,16 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
 
     initialiseAudio();
 
+    // Preferences from the Settings window.
+    auto* prefs = appSettings.getUserSettings();
+    if (const juce::File folder (prefs->getValue ("projectsFolder")); folder.isDirectory())
+        daw::Project::setDefaultProjectsFolder (folder);
+    engineInstance->setClickLevel (juce::Decibels::decibelsToGain ((float) prefs->getDoubleValue ("clickDb", -10.5), -36.0f));
+    const bool reopen = prefs->getBoolValue ("reopenLast", true);
+
     // Reopen the last project (or the one a test launch names); otherwise start a fresh one.
     auto test = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_PROJECT", {});
-    const juce::File last (test.isNotEmpty() ? test : appSettings.getUserSettings()->getValue ("lastProject"));
+    const juce::File last (test.isNotEmpty() ? test : reopen ? prefs->getValue ("lastProject") : juce::String());
     std::unique_ptr<daw::Project> p;
     if (last.exists())
         p = daw::Project::load (last);
@@ -52,6 +60,7 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
 Studio::~Studio()
 {
     stopTimer();
+    settingsWindow = nullptr;
     saveProject();
     saveAudioSettings();
     engineInstance->setProject (nullptr);
@@ -82,18 +91,17 @@ void Studio::saveAudioSettings()
     appSettings.saveIfNeeded();
 }
 
-void Studio::showAudioSettings()
+void Studio::showSettings()
 {
-    auto* selector = new juce::AudioDeviceSelectorComponent (deviceManager, 1, 2, 2, 2, false, false, false, false);
-    selector->setSize (520, 420);
+    if (settingsWindow == nullptr)
+        settingsWindow = std::make_unique<SettingsWindow> (*this);
+    settingsWindow->toFront (true);
+}
 
-    juce::DialogWindow::LaunchOptions o;
-    o.content.setOwned (selector);
-    o.dialogTitle = "Audio";
-    o.dialogBackgroundColour = juce::Colour (0xff1c1a17);
-    o.useNativeTitleBar = true;
-    o.resizable = false;
-    o.launchAsync();
+void Studio::closeSettings()
+{
+    // Called from the window's own close button, so let it finish before it goes.
+    juce::MessageManager::callAsync ([this] { settingsWindow = nullptr; });
 }
 
 //==============================================================================

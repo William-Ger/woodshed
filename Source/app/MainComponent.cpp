@@ -95,7 +95,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::saveProjectAs:   info.setInfo ("Save As...", {}, "File", 0); info.addDefaultKeypress ('s', cmdKey | shift); break;
         case cmd::bounce:          info.setInfo ("Bounce to WAV...", {}, "File", 0); info.addDefaultKeypress ('b', cmdKey);
                                    info.setActive (! studio.engine().isBouncing()); break;
-        case cmd::audioSettings:   info.setInfo ("Audio Settings...", {}, "File", 0); info.addDefaultKeypress (',', cmdKey); break;
+        case cmd::audioSettings:   info.setInfo ("Settings...", {}, "File", 0); info.addDefaultKeypress (',', cmdKey); break;
 
         case cmd::undo:            info.setInfo ("Undo " + p.undo.getUndoDescription(), {}, "Edit", 0); info.addDefaultKeypress ('z', cmdKey);
                                    info.setActive (p.undo.canUndo()); break;
@@ -248,8 +248,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::saveProjectAs);
             m.addSeparator();
             m.addCommandItem (cm, cmd::bounce);
+           #if ! JUCE_MAC
             m.addSeparator();
-            m.addCommandItem (cm, cmd::audioSettings);
+            m.addCommandItem (cm, cmd::audioSettings);     // on the Mac it's in the app menu
+           #endif
             break;
         }
         case 1:

@@ -16,7 +16,10 @@ public:
         setContentOwned (content, false);
 
        #if JUCE_MAC
-        juce::MenuBarModel::setMacMainMenu (content);
+        // Settings... sits in the app menu, under About, like every Mac app.
+        juce::PopupMenu appMenu;
+        appMenu.addCommandItem (&studio.commands, cmd::audioSettings);
+        juce::MenuBarModel::setMacMainMenu (content, &appMenu);
        #else
         setMenuBar (content);
        #endif

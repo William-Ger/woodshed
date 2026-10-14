@@ -72,6 +72,8 @@ public:
     static std::unique_ptr<Project> createIn (const juce::File& folder, double sampleRate);
     static std::unique_ptr<Project> load (const juce::File& projectFileOrFolder);
     static juce::File defaultProjectsFolder();
+    /** Where new projects go (Settings); empty restores Documents/Woodshed Projects. */
+    static void setDefaultProjectsFolder (const juce::File&);
 
     bool save();
     /** Copies the project (and its audio) to a new folder and switches to it. */

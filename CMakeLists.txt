@@ -81,6 +81,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/MixerView.cpp
         Source/app/ChannelStrip.cpp
         Source/app/RigPanel.cpp
+        Source/app/SettingsWindow.cpp
         ${WOODSHED_RIG_SOURCES}
         ${WOODSHED_ENGINE_SOURCES}
         ${WOODSHED_DAW_SOURCES})

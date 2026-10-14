@@ -6,6 +6,8 @@
 namespace woodshed::app
 {
 
+class SettingsWindow;
+
 /** Every menu and keyboard command in the studio. MainComponent routes them. */
 namespace cmd
 {
@@ -52,7 +54,10 @@ public:
     /** Opens the audio interface: the saved setup, else a Scarlett/Focusrite at 64 samples, 48 kHz. */
     void initialiseAudio();
     void saveAudioSettings();
-    void showAudioSettings();
+    void showAudioSettings()                                { showSettings(); }
+    /** The Settings window (app menu > Settings..., Cmd+,). */
+    void showSettings();
+    void closeSettings();
 
     // Project lifecycle (message thread). Async dialogs call back into these.
     void newProject();
@@ -101,6 +106,7 @@ private:
     std::unique_ptr<daw::Engine> engineInstance;
     std::unique_ptr<daw::Project> currentProject;
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<SettingsWindow> settingsWindow;
 
     juce::ListenerList<ProjectSwapListener> swapListeners;
     juce::Array<int> selectedRegions;
