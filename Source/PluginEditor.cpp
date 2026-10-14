@@ -903,7 +903,8 @@ void LibraryPanel::paint (juce::Graphics& g)
 
 void LibraryPanel::resized()
 {
-    panelBounds = getLocalBounds().reduced (juce::jmax (30, getWidth() / 14), 36);
+    // Short hosts (the studio's rig pane) get slimmer margins so more of the library shows.
+    panelBounds = getLocalBounds().reduced (juce::jmax (30, getWidth() / 14), getHeight() < 560 ? 14 : 36);
     auto r = panelBounds.reduced (24, 18);
     r.removeFromTop (38);
 
@@ -1092,7 +1093,8 @@ void WoodshedEditor::paint (juce::Graphics& g)
     g.fillAll (palette::board);
 
     // Stage floor under everything, darkened towards the edges like a pool of stage light.
-    const auto stage = getLocalBounds().withTrimmedTop (72).withTrimmedBottom (24).toFloat();
+    const int barH = topBarHeight();
+    const auto stage = getLocalBounds().withTrimmedTop (barH).withTrimmedBottom (24).toFloat();
     g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
     g.drawImage (Art::get().floor, stage, juce::RectanglePlacement::fillDestination);
     juce::ColourGradient vignette (juce::Colours::transparentBlack, stage.getCentreX(), stage.getCentreY() - stage.getHeight() * 0.1f,
@@ -1100,22 +1102,49 @@ void WoodshedEditor::paint (juce::Graphics& g)
     g.setGradientFill (vignette);
     g.fillRect (stage);
 
-    auto bar = getLocalBounds().removeFromTop (72);
+    auto bar = getLocalBounds().removeFromTop (barH);
     g.setColour (palette::topBar);
     g.fillRect (bar);
     g.setColour (juce::Colour (0xff2c2925));
     g.fillRect (bar.removeFromBottom (1));
 
-    g.setColour (palette::text);
-    g.setFont (juce::FontOptions (25.0f, juce::Font::bold).withKerningFactor (0.22f));
-    g.drawText ("WOODSHED", 24, 10, 220, 34, juce::Justification::centredLeft);
+    if (embedded)
+    {
+        // The wordmark, then the track whose rig this is.
+        const juce::Font mark (juce::FontOptions (20.0f, juce::Font::bold).withKerningFactor (0.22f));
+        const int markW = juce::GlyphArrangement::getStringWidthInt (mark, "WOODSHED") + 4;
+        g.setColour (palette::text);
+        g.setFont (mark);
+        g.drawText ("WOODSHED", 20, 0, markW, barH, juce::Justification::centredLeft);
 
-    g.setColour (palette::dimText);
-    g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.15f));
-    g.drawText ("IN", inputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
-    g.drawText ("OUT", outputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
-    g.drawText ("INPUT", inputGain.getBounds().withY (56).withHeight (12), juce::Justification::centred);
-    g.drawText ("MASTER", master.getBounds().withY (56).withHeight (12), juce::Justification::centred);
+        if (trackName.isNotEmpty())
+        {
+            const int x = 20 + markW + 12;
+            const int w = inputGain.getX() - 16 - x;
+            g.setColour (juce::Colour (0xff3a3631));
+            g.fillRect (x, barH / 2 - 9, 1, 18);
+            g.setColour (palette::accent);
+            g.setFont (juce::FontOptions (15.0f, juce::Font::bold));
+            g.drawFittedText (trackName, x + 12, 0, juce::jmax (0, w - 12), barH, juce::Justification::centredLeft, 1, 0.8f);
+        }
+
+        g.setColour (palette::dimText);
+        g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.15f));
+        g.drawText ("INPUT", inputMeter.getBounds().withY (inputMeter.getY() - 15).withHeight (12), juce::Justification::centredLeft);
+    }
+    else
+    {
+        g.setColour (palette::text);
+        g.setFont (juce::FontOptions (25.0f, juce::Font::bold).withKerningFactor (0.22f));
+        g.drawText ("WOODSHED", 24, 10, 220, 34, juce::Justification::centredLeft);
+
+        g.setColour (palette::dimText);
+        g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.15f));
+        g.drawText ("IN", inputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
+        g.drawText ("OUT", outputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
+        g.drawText ("INPUT", inputGain.getBounds().withY (56).withHeight (12), juce::Justification::centred);
+        g.drawText ("MASTER", master.getBounds().withY (56).withHeight (12), juce::Justification::centred);
+    }
 
     auto footer = getLocalBounds().removeFromBottom (24);
     g.setColour (palette::topBar);
@@ -1128,7 +1157,8 @@ void WoodshedEditor::paint (juce::Graphics& g)
 
     footer.reduce (16, 0);
     const auto hints = juce::String (onBoard) + " / " + juce::String (WoodshedProcessor::boardSpots)
-                     + juce::String::fromUTF8 (" spots   \u00b7   1-0 stomp   \u00b7   \u2190 \u2192 presets   \u00b7   T tuner   \u00b7   F full screen   \u00b7   A add pedal   \u00b7   drag to rearrange");
+                     + (embedded ? juce::String::fromUTF8 (" spots   \u00b7   1-0 stomp   \u00b7   \u2190 \u2192 presets   \u00b7   T tuner   \u00b7   A add pedal   \u00b7   drag to rearrange")
+                                 : juce::String::fromUTF8 (" spots   \u00b7   1-0 stomp   \u00b7   \u2190 \u2192 presets   \u00b7   T tuner   \u00b7   F full screen   \u00b7   A add pedal   \u00b7   drag to rearrange"));
     g.drawText (hints, footer.removeFromLeft (juce::jmin (footer.getWidth() / 2, 560)), juce::Justification::centredLeft);
 
     if (presetCaption.isNotEmpty() && statusLabel.getText().isEmpty())
@@ -1144,45 +1174,52 @@ void WoodshedEditor::resized()
     library.setBounds (r);
     tuner.setBounds (r);
 
-    auto bar = r.removeFromTop (72).reduced (16, 0);
+    auto bar = r.removeFromTop (topBarHeight()).reduced (16, 0);
 
-    auto brand = bar.removeFromLeft (230);
-    latencyLabel.setBounds (brand.withTrimmedTop (42).withHeight (18).withTrimmedLeft (8));
-
-    inputChoice.setBounds (bar.removeFromLeft (100).withSizeKeepingCentre (100, 28));
-    bar.removeFromLeft (8);
-    inputGain.setBounds (bar.removeFromLeft (52).withTrimmedTop (8).withHeight (48));
-    bar.removeFromLeft (8);
-    inputMeter.setBounds (bar.removeFromLeft (90).withTrimmedTop (28).withHeight (20));
-
-    master.setBounds (bar.removeFromRight (52).withTrimmedTop (8).withHeight (48));
-    bar.removeFromRight (8);
-    outputMeter.setBounds (bar.removeFromRight (90).withTrimmedTop (28).withHeight (20));
-    bar.removeFromRight (18);
-
-    auto button = [&bar] (juce::Component& c, int w)
+    if (embedded)
     {
-        if (c.isVisible())
-        {
-            c.setBounds (bar.removeFromRight (w).withSizeKeepingCentre (w, 28));
-            bar.removeFromRight (8);
-        }
-    };
+        layOutEmbeddedBar (bar);
+    }
+    else
+    {
+        auto brand = bar.removeFromLeft (230);
+        latencyLabel.setBounds (brand.withTrimmedTop (42).withHeight (18).withTrimmedLeft (8));
 
-    button (captureButton, 76);
-    button (audioSetupButton, 64);
-    button (libraryButton, 116);
-    button (tunerButton, 64);
-    bar.removeFromRight (8);
-    button (savePresetButton, 56);
-    nextPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
-    bar.removeFromRight (4);
-    // The preset box takes whatever the bar has left, within reason.
-    const int presetWidth = juce::jlimit (130, 260, bar.getWidth() - 28 - 4 - 16);
-    presetChoice.setBounds (bar.removeFromRight (presetWidth).withSizeKeepingCentre (presetWidth, 28));
-    bar.removeFromRight (4);
-    prevPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
-    bar.removeFromRight (8);
+        inputChoice.setBounds (bar.removeFromLeft (100).withSizeKeepingCentre (100, 28));
+        bar.removeFromLeft (8);
+        inputGain.setBounds (bar.removeFromLeft (52).withTrimmedTop (8).withHeight (48));
+        bar.removeFromLeft (8);
+        inputMeter.setBounds (bar.removeFromLeft (90).withTrimmedTop (28).withHeight (20));
+
+        master.setBounds (bar.removeFromRight (52).withTrimmedTop (8).withHeight (48));
+        bar.removeFromRight (8);
+        outputMeter.setBounds (bar.removeFromRight (90).withTrimmedTop (28).withHeight (20));
+        bar.removeFromRight (18);
+
+        auto button = [&bar] (juce::Component& c, int w)
+        {
+            if (c.isVisible())
+            {
+                c.setBounds (bar.removeFromRight (w).withSizeKeepingCentre (w, 28));
+                bar.removeFromRight (8);
+            }
+        };
+
+        button (captureButton, 76);
+        button (audioSetupButton, 64);
+        button (libraryButton, 116);
+        button (tunerButton, 64);
+        bar.removeFromRight (8);
+        button (savePresetButton, 56);
+        nextPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
+        bar.removeFromRight (4);
+        // The preset box takes whatever the bar has left, within reason.
+        const int presetWidth = juce::jlimit (130, 260, bar.getWidth() - 28 - 4 - 16);
+        presetChoice.setBounds (bar.removeFromRight (presetWidth).withSizeKeepingCentre (presetWidth, 28));
+        bar.removeFromRight (4);
+        prevPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
+        bar.removeFromRight (8);
+    }
 
     // Status messages show in the footer, over the preset caption.
     statusLabel.setBounds (getLocalBounds().removeFromBottom (24).withTrimmedLeft (getWidth() / 2).withTrimmedRight (16));
@@ -1191,13 +1228,107 @@ void WoodshedEditor::resized()
     r.reduce (14, 14);
 
     const int rigWidth = juce::jlimit (300, 400, (int) ((float) r.getWidth() * 0.27f));
+
+    if (embedded)
+    {
+        // A wide, short pane: keep the board and the stack together in the middle of the stage
+        // instead of leaving the board stranded on the left and the amp on the far right.
+        const auto& image = woodshed::Art::get().board;
+        const int boardW = (int) std::ceil ((float) r.getHeight() * (float) image.getWidth() / (float) image.getHeight()) + 4;
+        const int needed = boardW + 14 + rigWidth;
+        if (r.getWidth() > needed)
+            r = r.withSizeKeepingCentre (needed, r.getHeight());
+    }
+
     rig.setBounds (r.removeFromRight (rigWidth));
     r.removeFromRight (14);
     board.setBounds (r);
 }
 
+void WoodshedEditor::layOutEmbeddedBar (juce::Rectangle<int> bar)
+{
+    // Wordmark and track name are painted on the left; the studio owns the interface, the
+    // master level and the meters on the output side.
+    bar.removeFromLeft (juce::jmin (380, bar.getWidth() / 3));
+    inputGain.setBounds (bar.removeFromLeft (40).withSizeKeepingCentre (40, 40));
+    bar.removeFromLeft (10);
+    inputMeter.setBounds (bar.removeFromLeft (90).withTrimmedTop (27).withHeight (14));
+
+    auto button = [&bar] (juce::Component& c, int w)
+    {
+        c.setBounds (bar.removeFromRight (w).withSizeKeepingCentre (w, 28));
+        bar.removeFromRight (8);
+    };
+
+    button (libraryButton, 116);
+    button (tunerButton, 64);
+    bar.removeFromRight (8);
+    button (savePresetButton, 56);
+    nextPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
+    bar.removeFromRight (4);
+    const int presetWidth = juce::jlimit (130, 300, bar.getWidth() - 28 - 4 - 16);
+    presetChoice.setBounds (bar.removeFromRight (presetWidth).withSizeKeepingCentre (presetWidth, 28));
+    bar.removeFromRight (4);
+    prevPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
+}
+
+void WoodshedEditor::setEmbedded (bool shouldBeEmbedded)
+{
+    if (embedded == shouldBeEmbedded)
+        return;
+
+    embedded = shouldBeEmbedded;
+
+    for (juce::Component* c : { (juce::Component*) &inputChoice, (juce::Component*) &master, (juce::Component*) &outputMeter,
+                                (juce::Component*) &captureButton, (juce::Component*) &latencyLabel })
+        c->setVisible (! embedded);
+
+    if (embedded)
+    {
+        audioSetupButton.setVisible (false);
+        setResizable (false, false);
+        keepControlsFromTakingFocus (*this);
+    }
+
+    resized();
+    repaint();
+}
+
+void WoodshedEditor::setTrackName (const juce::String& name)
+{
+    if (trackName == name)
+        return;
+
+    trackName = name;
+    repaint (getLocalBounds().removeFromTop (topBarHeight()));
+}
+
+void WoodshedEditor::keepControlsFromTakingFocus (juce::Component& parent)
+{
+    // In the studio a clicked button or knob must not keep the keyboard focus, or space would
+    // press it again instead of starting playback. Focus falls through to the editor instead.
+    for (auto* child : parent.getChildren())
+    {
+        if (dynamic_cast<juce::TextEditor*> (child) != nullptr)
+            continue;
+
+        if (dynamic_cast<juce::Button*> (child) != nullptr || dynamic_cast<juce::ComboBox*> (child) != nullptr
+            || dynamic_cast<juce::Slider*> (child) != nullptr)
+        {
+            child->setWantsKeyboardFocus (false);
+            child->setMouseClickGrabsKeyboardFocus (false);
+        }
+
+        keepControlsFromTakingFocus (*child);
+    }
+}
+
 bool WoodshedEditor::keyPressed (const juce::KeyPress& key)
 {
+    // In the studio, chords (Cmd+A, Cmd+T, Cmd+1...) belong to the studio's commands.
+    if (embedded && (key.getModifiers().isCommandDown() || key.getModifiers().isCtrlDown() || key.getModifiers().isAltDown()))
+        return false;
+
     const auto c = key.getTextCharacter();
 
     if (c >= '0' && c <= '9')
@@ -1215,7 +1346,7 @@ bool WoodshedEditor::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
-    if (c == 'f' || c == 'F')
+    if ((c == 'f' || c == 'F') && ! embedded)
     {
         if (auto* window = findParentComponentOfClass<juce::ResizableWindow>())
             window->setFullScreen (! window->isFullScreen());
@@ -1278,6 +1409,10 @@ void WoodshedEditor::changeListenerCallback (juce::ChangeBroadcaster*)
 {
     board.rebuild();
     rig.rebuild();
+
+    if (embedded)
+        keepControlsFromTakingFocus (*this);
+
     repaint();
 }
 
@@ -1423,11 +1558,12 @@ void WoodshedEditor::timerCallback()
     inputMeter.setLevel (woodshedProcessor.inputPeak.exchange (0.0f));
     outputMeter.setLevel (woodshedProcessor.outputPeak.exchange (0.0f));
 
-    if (++frame % 15 == 0)
+    if (++frame % 15 == 0 && ! embedded)
     {
         updateLatencyText();
 
         // Keep the stomp shortcuts working: if the window is active but nothing has focus, take it.
+        // (Not in the studio: there the focus belongs to whatever the player last clicked.)
         if (auto* peer = getPeer(); peer != nullptr && peer->isFocused() && ! hasKeyboardFocus (true) && ! tuner.isVisible())
             grabKeyboardFocus();
 

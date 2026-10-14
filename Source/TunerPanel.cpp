@@ -225,7 +225,9 @@ void TunerPanel::paint (juce::Graphics& g)
 
 void TunerPanel::resized()
 {
-    panelBounds = getLocalBounds().withSizeKeepingCentre (juce::jmin (760, getWidth() - 80), juce::jmin (540, getHeight() - 60));
+    // Short hosts (the studio's rig pane) get slimmer margins so the gauge keeps its size.
+    const int margin = getHeight() < 560 ? 20 : 60;
+    panelBounds = getLocalBounds().withSizeKeepingCentre (juce::jmin (760, getWidth() - 80), juce::jmin (540, getHeight() - margin));
 
     auto bottom = panelBounds.reduced (40, 24).removeFromBottom (32);
     closeButton.setBounds (bottom.removeFromRight (90));

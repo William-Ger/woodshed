@@ -184,6 +184,20 @@ public:
     void resized() override;
     bool keyPressed (const juce::KeyPress&) override;
 
+    /** Studio mode: the rig sits in a pane of the studio, which owns the audio interface, the
+        master level, full screen and keyboard focus. Hides those controls, stops the editor
+        taking focus on its own and lets keys it doesn't use reach the studio. */
+    void setEmbedded (bool shouldBeEmbedded);
+    bool isEmbedded() const                                  { return embedded; }
+    /** Shown beside the wordmark in studio mode. */
+    void setTrackName (const juce::String&);
+
+    void toggleTuner();
+    bool isTunerShowing() const                              { return tuner.isVisible(); }
+
+    /** In studio mode the pane scales the editor down below this rather than crowding it. */
+    static constexpr int embeddedMinWidth = 1000, embeddedMinHeight = 420;
+
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
@@ -194,7 +208,9 @@ private:
     void presetChosen (int id);
     void savePresetAs();
     void showLibrary (int targetSpot = -1, const juce::String& category = {});
-    void toggleTuner();
+    void keepControlsFromTakingFocus (juce::Component&);
+    void layOutEmbeddedBar (juce::Rectangle<int> bar);
+    int topBarHeight() const                                 { return embedded ? 52 : 72; }
     void pickFromLibrary (const juce::String& type);
     void flash (const juce::String& message);
 
@@ -223,6 +239,8 @@ private:
     juce::File captureDir, captureRequestFile;
     juce::String pendingCaptureName;
     int statusFrames = 0, frame = 0;
+    bool embedded = false;
+    juce::String trackName;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WoodshedEditor)
 };
