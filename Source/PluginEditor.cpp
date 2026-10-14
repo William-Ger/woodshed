@@ -1037,6 +1037,10 @@ void WoodshedEditor::timerCallback()
     {
         updateLatencyText();
 
+        // Keep the stomp shortcuts working: if the window is active but nothing has focus, take it.
+        if (auto* peer = getPeer(); peer != nullptr && peer->isFocused() && ! hasKeyboardFocus (true))
+            grabKeyboardFocus();
+
         // A dropped-in request file arms a capture (lets a script trigger one while you play).
         if (captureRequestFile.existsAsFile() && ! woodshedProcessor.captureRunning())
         {
