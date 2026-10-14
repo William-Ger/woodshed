@@ -10,6 +10,7 @@
 // costs more than 100 us per 64-sample stereo block.
 
 #include "../../Source/engine/Chain.h"
+#include "../../Source/engine/PitchDetector.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 
 using namespace woodshed;
@@ -320,6 +321,37 @@ int main (int argc, char* argv[])
                       << t.info.name.paddedRight (' ', 14) << t.info.subtitle << "\n";
         std::cout << registry.all().size() << " pedals\n";
         return 0;
+    }
+
+    if (args[0] == "tuner")
+    {
+        // Pitch detector accuracy: pure and harmonic-rich tones across the guitar range.
+        PitchDetector detector;
+        float worstCents = 0.0f;
+
+        for (float hz : { 30.87f, 41.2f, 82.41f, 110.0f, 146.83f, 196.0f, 246.94f, 329.63f, 440.0f, 659.26f, 987.77f })
+        {
+            for (int harmonic = 0; harmonic < 2; ++harmonic)
+            {
+                Signal s ((size_t) PitchDetector::windowSize);
+                for (size_t i = 0; i < s.size(); ++i)
+                {
+                    const float ph = juce::MathConstants<float>::twoPi * hz * (float) i / (float) sampleRate;
+                    s[i] = harmonic == 0 ? 0.3f * std::sin (ph)
+                                         : 0.1f * std::sin (ph) + 0.25f * std::sin (2 * ph) + 0.15f * std::sin (3 * ph) + 0.1f * std::sin (5 * ph);
+                }
+
+                const auto r = detector.analyse (s.data(), sampleRate);
+                const float cents = r.frequency > 0 ? 1200.0f * std::log2 (r.frequency / hz) : 9999.0f;
+                worstCents = juce::jmax (worstCents, std::abs (cents));
+                std::cout << juce::String (hz, 2).paddedLeft (' ', 8) << (harmonic ? " rich " : " sine ")
+                          << juce::String (r.frequency, 2).paddedLeft (' ', 9) << " Hz  "
+                          << juce::String (cents, 2).paddedLeft (' ', 7) << " cents  clarity " << juce::String (r.clarity, 2) << "\n";
+            }
+        }
+
+        std::cout << "worst error " << juce::String (worstCents, 2) << " cents\n";
+        return worstCents < 1.0f ? 0 : 1;
     }
 
     if (args[0] != "run")

@@ -50,6 +50,7 @@ if(NOT WOODSHED_BENCH_ONLY)
     target_sources(Woodshed PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
+        Source/TunerPanel.cpp
         Source/StandaloneApp.cpp
         ${WOODSHED_ENGINE_SOURCES})
 

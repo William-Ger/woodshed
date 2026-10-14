@@ -991,7 +991,8 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
       masterAttachment (p.params, "master", master),
       board (p),
       rig (p),
-      library ([this] (const juce::String& type) { pickFromLibrary (type); })
+      library ([this] (const juce::String& type) { pickFromLibrary (type); }),
+      tuner (p)
 {
     using namespace woodshed;
     setLookAndFeel (&lookAndFeel);
@@ -1078,6 +1079,12 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
     library.onClose = [this] { library.setVisible (false); grabKeyboardFocus(); };
     addChildComponent (library);
 
+    tunerButton.setTooltip ("Chromatic tuner (T)");
+    tunerButton.onClick = [this] { toggleTuner(); };
+    addAndMakeVisible (tunerButton);
+    tuner.onClose = [this] { toggleTuner(); };
+    addChildComponent (tuner);
+
     captureDir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
                #if JUCE_MAC
                      .getChildFile ("Application Support")
@@ -1133,7 +1140,7 @@ void WoodshedEditor::paint (juce::Graphics& g)
         onBoard += spot >= 0 ? 1 : 0;
 
     g.drawText (juce::String (onBoard) + " / " + juce::String (WoodshedProcessor::boardSpots)
-                    + " spots   ·   1-0 stomp   ·   click an empty spot or press A to add   ·   drag pedals to rearrange   ·   double-click a knob to reset",
+                    + " spots   ·   1-0 stomp   ·   T tuner   ·   click an empty spot or press A to add   ·   drag pedals to rearrange   ·   double-click a knob to reset",
                 footer.reduced (16, 0), juce::Justification::centredLeft);
 }
 
@@ -1141,6 +1148,7 @@ void WoodshedEditor::resized()
 {
     auto r = getLocalBounds();
     library.setBounds (r);
+    tuner.setBounds (r);
 
     auto bar = r.removeFromTop (72).reduced (16, 0);
 
@@ -1170,6 +1178,7 @@ void WoodshedEditor::resized()
     button (captureButton, 76);
     button (audioSetupButton, 64);
     button (libraryButton, 116);
+    button (tunerButton, 64);
     bar.removeFromRight (8);
     button (savePresetButton, 56);
     button (presetChoice, 170);
@@ -1204,6 +1213,12 @@ bool WoodshedEditor::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
+    if (c == 't' || c == 'T')
+    {
+        toggleTuner();
+        return true;
+    }
+
     return false;
 }
 
@@ -1213,6 +1228,19 @@ void WoodshedEditor::showLibrary (int targetSpot, const juce::String& category)
     library.showCategory (category.isEmpty() ? "All" : category);
     library.setVisible (true);
     library.toFront (true);
+}
+
+void WoodshedEditor::toggleTuner()
+{
+    const bool show = ! tuner.isVisible();
+    library.setVisible (false);
+    tuner.setVisible (show);
+    tunerButton.setToggleState (show, juce::dontSendNotification);
+
+    if (show)
+        tuner.toFront (true);
+    else
+        grabKeyboardFocus();
 }
 
 void WoodshedEditor::pickFromLibrary (const juce::String& type)
@@ -1322,7 +1350,7 @@ void WoodshedEditor::timerCallback()
         updateLatencyText();
 
         // Keep the stomp shortcuts working: if the window is active but nothing has focus, take it.
-        if (auto* peer = getPeer(); peer != nullptr && peer->isFocused() && ! hasKeyboardFocus (true))
+        if (auto* peer = getPeer(); peer != nullptr && peer->isFocused() && ! hasKeyboardFocus (true) && ! tuner.isVisible())
             grabKeyboardFocus();
 
         // A dropped-in request file arms a capture (lets a script trigger one while you play).

@@ -541,6 +541,13 @@ void WoodshedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         for (int i = 0; i < n; ++i)
             inPeak = juce::jmax (inPeak, std::abs (left[i]));
 
+        if (tunerOpen.load (std::memory_order_relaxed))
+        {
+            const auto scope = tunerFifo.write (juce::jmin (n, tunerFifo.getFreeSpace()));
+            if (scope.blockSize1 > 0) std::copy (left, left + scope.blockSize1, tunerRing.begin() + scope.startIndex1);
+            if (scope.blockSize2 > 0) std::copy (left + scope.blockSize1, left + scope.blockSize1 + scope.blockSize2, tunerRing.begin() + scope.startIndex2);
+        }
+
         const bool capturing = captureState.load() == CaptureState::recording;
         const int captureCount = capturing ? juce::jmin (n, captureLength - capturePos) : 0;
         if (capturing)
@@ -550,6 +557,12 @@ void WoodshedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             current->process (left, right, scratch.getWritePointer (0), scratch.getWritePointer (1), n);
         else
             juce::FloatVectorOperations::copy (right, left, n);
+
+        if (tunerOpen.load (std::memory_order_relaxed) && tunerMutes.load (std::memory_order_relaxed))
+        {
+            juce::FloatVectorOperations::clear (left, n);
+            juce::FloatVectorOperations::clear (right, n);
+        }
 
         for (int i = 0; i < n; ++i)
         {
@@ -585,6 +598,15 @@ void WoodshedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
 
     inputPeak.store (juce::jmax (inputPeak.load(), inPeak));
     outputPeak.store (juce::jmax (outputPeak.load(), outPeak));
+}
+
+//==============================================================================
+int WoodshedProcessor::readTunerInput (float* dest, int maxSamples)
+{
+    const auto scope = tunerFifo.read (juce::jmin (maxSamples, tunerFifo.getNumReady()));
+    std::copy (tunerRing.begin() + scope.startIndex1, tunerRing.begin() + scope.startIndex1 + scope.blockSize1, dest);
+    std::copy (tunerRing.begin() + scope.startIndex2, tunerRing.begin() + scope.startIndex2 + scope.blockSize2, dest + scope.blockSize1);
+    return scope.blockSize1 + scope.blockSize2;
 }
 
 //==============================================================================

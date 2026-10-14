@@ -76,6 +76,12 @@ public:
     // Peak levels since the editor last read them (linear gain).
     std::atomic<float> inputPeak { 0.0f }, outputPeak { 0.0f };
 
+    // Tuner: while open, the audio thread copies the dry input into a FIFO the tuner reads,
+    // and (optionally) mutes the output like a tuner pedal.
+    std::atomic<bool> tunerOpen { false }, tunerMutes { true };
+    int readTunerInput (float* dest, int maxSamples);       // message thread
+    double getCurrentSampleRate() const                    { return currentSampleRate; }
+
     // Debug capture: records dry input (ch 0) and processed left output (ch 1).
     void armCapture (double seconds);
     bool captureFinished() const                           { return captureState.load() == CaptureState::done; }
@@ -116,6 +122,9 @@ private:
     juce::AbstractFifo retireFifo { 64 };
     std::array<woodshed::Chain*, 64> retired {};
     void freeRetiredChains();
+
+    juce::AbstractFifo tunerFifo { 1 << 15 };
+    std::vector<float> tunerRing = std::vector<float> ((size_t) (1 << 15));
 
     juce::AudioBuffer<float> work, scratch;
     juce::SmoothedValue<float> inputGain, masterGain;

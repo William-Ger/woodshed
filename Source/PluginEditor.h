@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "TunerPanel.h"
 
 namespace woodshed
 {
@@ -185,6 +186,7 @@ private:
     void refreshPresetList();
     void savePresetAs();
     void showLibrary (int targetSpot = -1, const juce::String& category = {});
+    void toggleTuner();
     void pickFromLibrary (const juce::String& type);
     void flash (const juce::String& message);
 
@@ -198,11 +200,12 @@ private:
     woodshed::Meter inputMeter, outputMeter;
     juce::Label latencyLabel, statusLabel;
     juce::TextButton audioSetupButton { "Audio" }, captureButton { "Capture" }, savePresetButton { "Save" },
-                     libraryButton { "+ Add Pedal" };
+                     libraryButton { "+ Add Pedal" }, tunerButton { "Tuner" };
 
     woodshed::BoardView board;
     woodshed::RigStack rig;
     woodshed::LibraryPanel library;
+    TunerPanel tuner;
     int libraryTargetSpot = -1;
 
     juce::Array<juce::File> presetFiles;
