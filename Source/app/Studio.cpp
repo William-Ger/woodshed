@@ -99,6 +99,7 @@ void Studio::showAudioSettings()
 //==============================================================================
 void Studio::adopt (std::unique_ptr<daw::Project> next)
 {
+    swapListeners.call ([] (ProjectSwapListener& l) { l.projectAboutToBeReplaced(); });
     engineInstance->setProject (nullptr);
     if (currentProject != nullptr)
         currentProject->state.removeListener (this);

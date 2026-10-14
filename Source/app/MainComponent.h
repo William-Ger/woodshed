@@ -40,6 +40,7 @@ private:
     ArrangeView arrange;
     MixerView mixer;
     RigPanel rig;
+    juce::TooltipWindow tooltips { this, 600 };
 
     juce::StretchableLayoutManager layout;
     std::unique_ptr<juce::StretchableLayoutResizerBar> divider;

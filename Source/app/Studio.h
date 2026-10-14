@@ -32,6 +32,16 @@ public:
     explicit Studio (juce::ApplicationProperties&);
     ~Studio() override;
 
+    /** Told just before the project (and with it every track's rig) is replaced, so views can
+        let go of anything that belongs to the old one. The change message comes after. */
+    struct ProjectSwapListener
+    {
+        virtual ~ProjectSwapListener() = default;
+        virtual void projectAboutToBeReplaced() = 0;
+    };
+    void addProjectSwapListener (ProjectSwapListener* l)    { swapListeners.add (l); }
+    void removeProjectSwapListener (ProjectSwapListener* l) { swapListeners.remove (l); }
+
     juce::AudioDeviceManager deviceManager;
     juce::ApplicationCommandManager commands;
 
@@ -92,6 +102,7 @@ private:
     std::unique_ptr<daw::Project> currentProject;
     std::unique_ptr<juce::FileChooser> chooser;
 
+    juce::ListenerList<ProjectSwapListener> swapListeners;
     juce::Array<int> selectedRegions;
     Pane pane = Pane::rig;
     bool dirty = false;

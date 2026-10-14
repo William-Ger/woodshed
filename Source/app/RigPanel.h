@@ -17,6 +17,7 @@ class RigPanel final : public juce::Component,
                        private juce::ChangeListener,
                        private juce::ValueTree::Listener,
                        private juce::ApplicationCommandManagerListener,
+                       private Studio::ProjectSwapListener,
                        private juce::Timer
 {
 public:
@@ -36,6 +37,7 @@ private:
     void valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree&, int) override;
     void applicationCommandInvoked (const juce::ApplicationCommandTarget::InvocationInfo&) override;
     void applicationCommandListChanged() override {}
+    void projectAboutToBeReplaced() override;
     void timerCallback() override;
 
     /** Brings the shown editor in line with the selection, the track's rig switch and the engine. */

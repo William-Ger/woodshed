@@ -38,6 +38,7 @@ RigPanel::RigPanel (Studio& s) : studio (s)
     studio.addChangeListener (this);
     studio.engine().addChangeListener (this);
     studio.commands.addListener (this);
+    studio.addProjectSwapListener (this);
     sync();
     startTimerHz (10);
 }
@@ -47,6 +48,7 @@ RigPanel::~RigPanel()
     stopTimer();
     dropEditor();
     studio.commands.removeListener (this);
+    studio.removeProjectSwapListener (this);
     studio.engine().removeChangeListener (this);
     studio.removeChangeListener (this);
     watchedState.removeListener (this);
@@ -305,6 +307,12 @@ void RigPanel::applicationCommandInvoked (const juce::ApplicationCommandTarget::
         lastModalTime = juce::Time::getMillisecondCounter();
         repaint();
     }
+}
+
+void RigPanel::projectAboutToBeReplaced()
+{
+    // Every rig belongs to the project being replaced; the editor must go while they're alive.
+    dropEditor();
 }
 
 } // namespace woodshed::app

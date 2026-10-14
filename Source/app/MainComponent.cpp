@@ -12,9 +12,9 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (rig);
 
     // Tracks above, the pane below; the divider between them can be dragged.
-    layout.setItemLayout (0, 120, -1.0, -0.42);
+    layout.setItemLayout (0, 120, -1.0, -0.36);
     layout.setItemLayout (1, 6, 6, 6);
-    layout.setItemLayout (2, 160, -1.0, -0.58);
+    layout.setItemLayout (2, 160, -1.0, -0.64);
     divider = std::make_unique<juce::StretchableLayoutResizerBar> (&layout, 1, false);
     addAndMakeVisible (*divider);
 

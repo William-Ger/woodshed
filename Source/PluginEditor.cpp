@@ -290,12 +290,13 @@ void PedalView::paint (juce::Graphics& g)
 
         // Name badge on the grille cloth, like a script logo.
         const auto grille = Art::regionIn (all, isAmp ? art.ampGrille : art.cabGrille);
-        const auto badge = grille.withSizeKeepingCentre (grille.getWidth() * 0.6f, juce::jmin (grille.getHeight(), 46.0f));
-        g.setFont (juce::FontOptions (juce::jlimit (16.0f, 30.0f, badge.getHeight() * 0.62f), juce::Font::bold).withKerningFactor (0.16f));
+        const auto badge = grille.withSizeKeepingCentre (grille.getWidth() * 0.56f, juce::jmin (grille.getHeight(), 46.0f));
+        const float byWidth = badge.getWidth() / ((float) juce::jmax (4, info.name.length()) * 0.82f);
+        g.setFont (juce::FontOptions (juce::jlimit (9.0f, 30.0f, juce::jmin (badge.getHeight() * 0.62f, byWidth)), juce::Font::bold).withKerningFactor (0.16f));
         g.setColour (juce::Colours::black.withAlpha (0.6f));
-        g.drawText (info.name, badge.translated (1.0f, 2.0f), juce::Justification::centred);
+        g.drawFittedText (info.name, badge.translated (1.0f, 2.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
         g.setColour (palette::piping.brighter (0.25f));
-        g.drawText (info.name, badge, juce::Justification::centred);
+        g.drawFittedText (info.name, badge.toNearestInt(), juce::Justification::centred, 1, 0.6f);
 
         // Pilot light.
         const auto pilot = juce::Rectangle<float> (18.0f, 18.0f).withCentre ({ grille.getX() + 22.0f, grille.getCentreY() });
@@ -311,7 +312,7 @@ void PedalView::paint (juce::Graphics& g)
     g.drawImage (art.enclosure (info.body), all);
 
     // LED in its chrome bezel.
-    const float ledSize = juce::jlimit (14.0f, 22.0f, body.getWidth() * 0.11f);
+    const float ledSize = juce::jlimit (8.0f, 22.0f, juce::jmin (body.getWidth() * 0.11f, body.getHeight() * 0.07f));
     const auto led = juce::Rectangle<float> (ledSize, ledSize).withCentre ({ body.getCentreX(), body.getY() + body.getHeight() * 0.53f });
     if (on)
     {
@@ -324,12 +325,12 @@ void PedalView::paint (juce::Graphics& g)
 
     // Silkscreened name and subtitle.
     auto plate = body.withTrimmedTop (body.getHeight() * 0.585f).withHeight (body.getHeight() * 0.16f);
-    const float nameSize = juce::jlimit (12.0f, 24.0f, body.getWidth() / (float) juce::jmax (4, info.name.length()) * 1.3f);
+    const float nameSize = juce::jlimit (8.0f, 24.0f, body.getWidth() / (float) juce::jmax (4, info.name.length()) * 1.3f);
     g.setColour (info.ink);
     g.setFont (juce::FontOptions (nameSize, juce::Font::bold).withKerningFactor (0.1f));
     g.drawFittedText (info.name, plate.removeFromTop (plate.getHeight() * 0.64f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
     g.setColour (info.ink.withAlpha (0.7f));
-    g.setFont (juce::FontOptions (juce::jlimit (8.0f, 10.0f, body.getWidth() * 0.055f)).withKerningFactor (0.14f));
+    g.setFont (juce::FontOptions (juce::jlimit (6.0f, 10.0f, body.getWidth() * 0.055f)).withKerningFactor (0.14f));
     g.drawFittedText (info.subtitle.toUpperCase(), plate.toNearestInt(), juce::Justification::centred, 1, 0.7f);
 
     if (slot < 10)
@@ -380,7 +381,7 @@ void PedalView::resized()
         return;
     }
 
-    const int fs = juce::jlimit (34, 64, juce::jmin ((int) ((float) body.getWidth() * 0.36f), (int) ((float) body.getHeight() * 0.18f)));
+    const int fs = juce::jlimit (18, 64, juce::jmin ((int) ((float) body.getWidth() * 0.36f), (int) ((float) body.getHeight() * 0.18f)));
     footswitch.setBounds (body.getCentreX() - fs / 2, body.getBottom() - fs - (int) ((float) body.getHeight() * 0.07f), fs, fs);
 }
 
@@ -1110,12 +1111,12 @@ void WoodshedEditor::paint (juce::Graphics& g)
 
     if (embedded)
     {
-        // The wordmark, then the track whose rig this is.
-        const juce::Font mark (juce::FontOptions (20.0f, juce::Font::bold).withKerningFactor (0.22f));
-        const int markW = juce::GlyphArrangement::getStringWidthInt (mark, "WOODSHED") + 4;
-        g.setColour (palette::text);
+        // "RIG", then the track whose rig this is (the studio's own bar carries the wordmark).
+        const juce::Font mark (juce::FontOptions (16.0f, juce::Font::bold).withKerningFactor (0.22f));
+        const int markW = juce::GlyphArrangement::getStringWidthInt (mark, "RIG") + 4;
+        g.setColour (palette::dimText);
         g.setFont (mark);
-        g.drawText ("WOODSHED", 20, 0, markW, barH, juce::Justification::centredLeft);
+        g.drawText ("RIG", 20, 0, markW, barH, juce::Justification::centredLeft);
 
         if (trackName.isNotEmpty())
         {
