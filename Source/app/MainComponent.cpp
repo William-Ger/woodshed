@@ -1,0 +1,296 @@
+#include "MainComponent.h"
+
+namespace woodshed::app
+{
+
+MainComponent::MainComponent (Studio& s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s)
+{
+    addAndMakeVisible (controlBar);
+    addAndMakeVisible (arrange);
+    addChildComponent (mixer);
+    addChildComponent (rig);
+
+    // Tracks above, the pane below; the divider between them can be dragged.
+    layout.setItemLayout (0, 120, -1.0, -0.42);
+    layout.setItemLayout (1, 6, 6, 6);
+    layout.setItemLayout (2, 160, -1.0, -0.58);
+    divider = std::make_unique<juce::StretchableLayoutResizerBar> (&layout, 1, false);
+    addAndMakeVisible (*divider);
+
+    studio.commands.registerAllCommandsForTarget (this);
+    studio.commands.setFirstCommandTarget (this);
+    addKeyListener (studio.commands.getKeyMappings());
+    setWantsKeyboardFocus (true);
+
+    studio.addChangeListener (this);
+    changeListenerCallback (&studio);
+}
+
+MainComponent::~MainComponent()
+{
+    studio.removeChangeListener (this);
+}
+
+void MainComponent::paint (juce::Graphics& g)
+{
+    g.fillAll (theme::window);
+}
+
+void MainComponent::resized()
+{
+    auto r = getLocalBounds();
+    controlBar.setBounds (r.removeFromTop (64));
+
+    if (shownPane == Studio::Pane::none)
+    {
+        divider->setVisible (false);
+        arrange.setBounds (r);
+        return;
+    }
+
+    divider->setVisible (true);
+    juce::Component* pane = shownPane == Studio::Pane::mixer ? static_cast<juce::Component*> (&mixer) : &rig;
+    juce::Component* items[] { &arrange, divider.get(), pane };
+    layout.layOutComponents (items, 3, r.getX(), r.getY(), r.getWidth(), r.getHeight(), true, true);
+}
+
+void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    if (studio.getPane() != shownPane)
+    {
+        shownPane = studio.getPane();
+        mixer.setVisible (shownPane == Studio::Pane::mixer);
+        rig.setVisible (shownPane == Studio::Pane::rig);
+        resized();
+    }
+
+    studio.commands.commandStatusChanged();
+}
+
+//==============================================================================
+void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
+{
+    c.addArray ({ cmd::newProject, cmd::openProject, cmd::saveProject, cmd::saveProjectAs, cmd::bounce, cmd::audioSettings,
+                  cmd::undo, cmd::redo, cmd::deleteSelection, cmd::splitAtPlayhead, cmd::selectAll,
+                  cmd::newTrack, cmd::deleteTrack, cmd::duplicateTrack,
+                  cmd::playStop, cmd::record, cmd::returnToStart, cmd::toggleLoop, cmd::toggleClick, cmd::toggleCountIn,
+                  cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
+                  cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner });
+}
+
+void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
+{
+    using KP = juce::KeyPress;
+    const auto cmdKey = juce::ModifierKeys::commandModifier;
+    const auto shift = juce::ModifierKeys::shiftModifier;
+    auto& p = studio.project();
+    auto& s = p.state;
+
+    switch (id)
+    {
+        case cmd::newProject:      info.setInfo ("New Project", {}, "File", 0); info.addDefaultKeypress ('n', cmdKey); break;
+        case cmd::openProject:     info.setInfo ("Open...", {}, "File", 0); info.addDefaultKeypress ('o', cmdKey); break;
+        case cmd::saveProject:     info.setInfo ("Save", {}, "File", 0); info.addDefaultKeypress ('s', cmdKey); break;
+        case cmd::saveProjectAs:   info.setInfo ("Save As...", {}, "File", 0); info.addDefaultKeypress ('s', cmdKey | shift); break;
+        case cmd::bounce:          info.setInfo ("Bounce to WAV...", {}, "File", 0); info.addDefaultKeypress ('b', cmdKey);
+                                   info.setActive (! studio.engine().isBouncing()); break;
+        case cmd::audioSettings:   info.setInfo ("Audio Settings...", {}, "File", 0); info.addDefaultKeypress (',', cmdKey); break;
+
+        case cmd::undo:            info.setInfo ("Undo " + p.undo.getUndoDescription(), {}, "Edit", 0); info.addDefaultKeypress ('z', cmdKey);
+                                   info.setActive (p.undo.canUndo()); break;
+        case cmd::redo:            info.setInfo ("Redo " + p.undo.getRedoDescription(), {}, "Edit", 0); info.addDefaultKeypress ('z', cmdKey | shift);
+                                   info.setActive (p.undo.canRedo()); break;
+        case cmd::deleteSelection: info.setInfo ("Delete", {}, "Edit", 0); info.addDefaultKeypress (KP::backspaceKey, 0);
+                                   info.addDefaultKeypress (KP::deleteKey, 0); info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::splitAtPlayhead: info.setInfo ("Split at Playhead", {}, "Edit", 0); info.addDefaultKeypress ('t', cmdKey); break;
+        case cmd::selectAll:       info.setInfo ("Select All", {}, "Edit", 0); info.addDefaultKeypress ('a', cmdKey); break;
+
+        case cmd::newTrack:        info.setInfo ("New Track", {}, "Track", 0); info.addDefaultKeypress ('n', cmdKey | juce::ModifierKeys::altModifier); break;
+        case cmd::deleteTrack:     info.setInfo ("Delete Track", {}, "Track", 0); info.addDefaultKeypress (KP::backspaceKey, cmdKey);
+                                   info.setActive (studio.getSelectedTrack().isValid()); break;
+        case cmd::duplicateTrack:  info.setInfo ("Duplicate Track", {}, "Track", 0); info.addDefaultKeypress ('d', cmdKey);
+                                   info.setActive (studio.getSelectedTrack().isValid()); break;
+
+        case cmd::playStop:        info.setInfo ("Play / Stop", {}, "Transport", 0); info.addDefaultKeypress (KP::spaceKey, 0);
+                                   info.setTicked (studio.engine().isPlaying()); break;
+        case cmd::record:          info.setInfo ("Record", {}, "Transport", 0); info.addDefaultKeypress ('r', 0);
+                                   info.setTicked (studio.engine().isRecording()); break;
+        case cmd::returnToStart:   info.setInfo ("Go to Start", {}, "Transport", 0); info.addDefaultKeypress (KP::returnKey, 0);
+                                   info.addDefaultKeypress (KP::homeKey, 0); break;
+        case cmd::toggleLoop:      info.setInfo ("Loop", {}, "Transport", 0); info.addDefaultKeypress ('c', 0);
+                                   info.setTicked ((bool) s[daw::ids::loopOn]); break;
+        case cmd::toggleClick:     info.setInfo ("Click", {}, "Transport", 0); info.addDefaultKeypress ('k', 0);
+                                   info.setTicked ((bool) s[daw::ids::click]); break;
+        case cmd::toggleCountIn:   info.setInfo ("Count-In", {}, "Transport", 0); info.setTicked ((bool) s[daw::ids::countIn]); break;
+        case cmd::loopToSelection: info.setInfo ("Loop Selected Regions", {}, "Transport", 0); info.addDefaultKeypress ('u', 0);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+
+        case cmd::showMixer:       info.setInfo ("Mixer", {}, "View", 0); info.addDefaultKeypress ('x', 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::mixer); break;
+        case cmd::showRig:         info.setInfo ("Rig", {}, "View", 0); info.addDefaultKeypress ('b', 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::rig); break;
+        case cmd::hideBottom:      info.setInfo ("Tracks Only", {}, "View", 0); info.addDefaultKeypress ('h', 0); break;
+        case cmd::zoomIn:          info.setInfo ("Zoom In", {}, "View", 0); info.addDefaultKeypress ('=', cmdKey); break;
+        case cmd::zoomOut:         info.setInfo ("Zoom Out", {}, "View", 0); info.addDefaultKeypress ('-', cmdKey); break;
+        case cmd::zoomToFit:       info.setInfo ("Zoom to Fit", {}, "View", 0); info.addDefaultKeypress ('z', 0); break;
+        case cmd::toggleFullScreen:info.setInfo ("Full Screen", {}, "View", 0); info.addDefaultKeypress ('f', cmdKey | juce::ModifierKeys::ctrlModifier); break;
+        case cmd::showTuner:       info.setInfo ("Tuner", {}, "View", 0); break;
+        default: break;
+    }
+}
+
+bool MainComponent::perform (const InvocationInfo& info)
+{
+    auto& e = studio.engine();
+    auto& p = studio.project();
+    auto& s = p.state;
+    auto toggle = [&s] (const juce::Identifier& id) { s.setProperty (id, ! (bool) s[id], nullptr); };
+
+    switch (info.commandID)
+    {
+        case cmd::newProject:      studio.newProject(); break;
+        case cmd::openProject:     studio.openProjectDialog(); break;
+        case cmd::saveProject:     studio.flash (studio.saveProject() ? "Saved" : "Couldn't save"); break;
+        case cmd::saveProjectAs:   studio.saveProjectAsDialog(); break;
+        case cmd::bounce:          studio.bounceDialog(); break;
+        case cmd::audioSettings:   studio.showAudioSettings(); break;
+
+        case cmd::undo:            p.undo.undo(); break;
+        case cmd::redo:            p.undo.redo(); break;
+        case cmd::deleteSelection: studio.deleteSelectedRegions(); break;
+        case cmd::splitAtPlayhead: studio.splitSelectedAtPlayhead(); break;
+        case cmd::selectAll:
+        {
+            juce::Array<int> all;
+            for (auto t : s)
+                for (auto r : t)
+                    if (r.hasType (daw::ids::REGION))
+                        all.add ((int) r[daw::ids::id]);
+            studio.setSelectedRegions (all);
+            break;
+        }
+
+        case cmd::newTrack:        studio.addTrack(); break;
+        case cmd::deleteTrack:     studio.deleteSelectedTrack(); break;
+        case cmd::duplicateTrack:  studio.duplicateSelectedTrack(); break;
+
+        case cmd::playStop:        e.togglePlay(); break;
+        case cmd::record:          e.toggleRecord(); break;
+        case cmd::returnToStart:   e.setPosition (s[daw::ids::loopOn] ? (juce::int64) s[daw::ids::loopStart] : 0); break;
+        case cmd::toggleLoop:      toggle (daw::ids::loopOn); break;
+        case cmd::toggleClick:     toggle (daw::ids::click); break;
+        case cmd::toggleCountIn:   toggle (daw::ids::countIn); break;
+        case cmd::loopToSelection:
+        {
+            juce::int64 from = std::numeric_limits<juce::int64>::max(), to = 0;
+            for (int id : studio.getSelectedRegions())
+                if (auto r = studio.findRegion (id); r.isValid())
+                {
+                    from = juce::jmin (from, (juce::int64) r[daw::ids::start]);
+                    to = juce::jmax (to, (juce::int64) r[daw::ids::start] + (juce::int64) r[daw::ids::length]);
+                }
+            if (to > from)
+            {
+                p.undo.beginNewTransaction ("Set Loop");
+                s.setProperty (daw::ids::loopStart, from, &p.undo);
+                s.setProperty (daw::ids::loopEnd, to, &p.undo);
+                s.setProperty (daw::ids::loopOn, true, &p.undo);
+            }
+            break;
+        }
+
+        case cmd::showMixer:       studio.setPane (studio.getPane() == Studio::Pane::mixer ? Studio::Pane::none : Studio::Pane::mixer); break;
+        case cmd::showRig:         studio.setPane (studio.getPane() == Studio::Pane::rig ? Studio::Pane::none : Studio::Pane::rig); break;
+        case cmd::hideBottom:      studio.setPane (Studio::Pane::none); break;
+        case cmd::zoomIn:          arrange.zoomBy (1.5); break;
+        case cmd::zoomOut:         arrange.zoomBy (1.0 / 1.5); break;
+        case cmd::zoomToFit:       arrange.zoomToFit(); break;
+        case cmd::toggleFullScreen:
+            if (auto* w = findParentComponentOfClass<juce::ResizableWindow>())
+                w->setFullScreen (! w->isFullScreen());
+            break;
+        case cmd::showTuner:       studio.setPane (Studio::Pane::rig); rig.showTuner(); break;
+        default:                   return false;
+    }
+
+    studio.commands.commandStatusChanged();
+    return true;
+}
+
+//==============================================================================
+juce::StringArray MainComponent::getMenuBarNames()
+{
+    return { "File", "Edit", "Track", "Transport", "View" };
+}
+
+juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
+{
+    juce::PopupMenu m;
+    auto* cm = &studio.commands;
+
+    switch (index)
+    {
+        case 0:
+        {
+            m.addCommandItem (cm, cmd::newProject);
+            m.addCommandItem (cm, cmd::openProject);
+
+            juce::PopupMenu recent;
+            for (auto& path : studio.getRecentProjects())
+            {
+                const juce::File f (path);
+                recent.addItem (f.getFileName(), f.exists(), false, [this, f] { studio.openProject (f); });
+            }
+            m.addSubMenu ("Open Recent", recent, recent.getNumItems() > 0);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::saveProject);
+            m.addCommandItem (cm, cmd::saveProjectAs);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::bounce);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::audioSettings);
+            break;
+        }
+        case 1:
+            m.addCommandItem (cm, cmd::undo);
+            m.addCommandItem (cm, cmd::redo);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::splitAtPlayhead);
+            m.addCommandItem (cm, cmd::deleteSelection);
+            m.addCommandItem (cm, cmd::selectAll);
+            break;
+        case 2:
+            m.addCommandItem (cm, cmd::newTrack);
+            m.addCommandItem (cm, cmd::duplicateTrack);
+            m.addCommandItem (cm, cmd::deleteTrack);
+            break;
+        case 3:
+            m.addCommandItem (cm, cmd::playStop);
+            m.addCommandItem (cm, cmd::record);
+            m.addCommandItem (cm, cmd::returnToStart);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::toggleLoop);
+            m.addCommandItem (cm, cmd::loopToSelection);
+            m.addCommandItem (cm, cmd::toggleClick);
+            m.addCommandItem (cm, cmd::toggleCountIn);
+            break;
+        case 4:
+            m.addCommandItem (cm, cmd::showRig);
+            m.addCommandItem (cm, cmd::showMixer);
+            m.addCommandItem (cm, cmd::hideBottom);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::zoomIn);
+            m.addCommandItem (cm, cmd::zoomOut);
+            m.addCommandItem (cm, cmd::zoomToFit);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::showTuner);
+            m.addCommandItem (cm, cmd::toggleFullScreen);
+            break;
+        default: break;
+    }
+
+    return m;
+}
+
+} // namespace woodshed::app

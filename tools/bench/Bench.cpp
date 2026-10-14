@@ -4,6 +4,7 @@
 //   woodshed-bench knobs [type ...]
 //   woodshed-bench run [type ...] [--wav guitar.wav] [--render outDir]
 //   woodshed-bench presets [file.json ...] [--wav guitar.wav] [--render outDir]
+//   woodshed-bench project      (multitrack engine checks; see ProjectTest.cpp)
 //
 // Each pedal runs alone at 48 kHz in 64-sample blocks, through the same Chain
 // code the app uses. A pedal fails if it produces NaN/inf, makes noise from
@@ -476,6 +477,9 @@ void printKnobs (const juce::StringArray& only)
 
 } // namespace
 
+int runProjectTest();
+int writeDemoProject (const juce::File& folder, const juce::File& di);
+
 int main (int argc, char* argv[])
 {
     juce::StringArray args;
@@ -522,6 +526,13 @@ int main (int argc, char* argv[])
         std::cout << "worst error " << juce::String (worstCents, 2) << " cents\n";
         return worstCents < 1.0f ? 0 : 1;
     }
+
+    if (args[0] == "project")
+        return runProjectTest();
+
+    if (args[0] == "demo" && args.size() > 1)
+        return writeDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]),
+                                 juce::File::getCurrentWorkingDirectory().getChildFile ("tools/testdata/guitar-di-48k.wav"));
 
     if (args[0] == "knobs")
     {

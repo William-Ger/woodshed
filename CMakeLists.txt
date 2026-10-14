@@ -31,23 +31,13 @@ set(WOODSHED_ENGINE_SOURCES
     Source/pedals/Glitch.cpp
     Source/pedals/Weird.cpp)
 
-#==============================================================================
-# The app: standalone + AU + VST3 from one codebase.
-if(NOT WOODSHED_BENCH_ONLY)
-    juce_add_plugin(Woodshed
-        COMPANY_NAME "Gerstung Works"
-        BUNDLE_ID com.gerstungworks.woodshed
-        PRODUCT_NAME "Woodshed"
-        PLUGIN_MANUFACTURER_CODE Gwks
-        PLUGIN_CODE Wdsh
-        FORMATS Standalone AU VST3
-        IS_SYNTH FALSE
-        NEEDS_MIDI_INPUT FALSE
-        NEEDS_MIDI_OUTPUT FALSE
-        MICROPHONE_PERMISSION_ENABLED TRUE
-        MICROPHONE_PERMISSION_TEXT "Woodshed needs audio input to hear your guitar through your interface."
-        COPY_PLUGIN_AFTER_BUILD FALSE)
+# The multitrack engine (song model, playback, recording, bounce); no UI.
+set(WOODSHED_DAW_SOURCES
+    Source/daw/Project.cpp
+    Source/daw/Engine.cpp)
 
+#==============================================================================
+if(NOT WOODSHED_BENCH_ONLY)
     # Rendered UI art (see art/build_assets.py).
     file(GLOB WOODSHED_ART CONFIGURE_DEPENDS art/renders/*.png art/renders/*.jpg art/renders/*.json)
     juce_add_binary_data(WoodshedArt SOURCES ${WOODSHED_ART})
@@ -56,29 +46,52 @@ if(NOT WOODSHED_BENCH_ONLY)
     file(GLOB WOODSHED_PRESETS CONFIGURE_DEPENDS presets/*.json)
     juce_add_binary_data(WoodshedPresets HEADER_NAME PresetData.h NAMESPACE PresetData SOURCES ${WOODSHED_PRESETS})
 
-    target_sources(Woodshed PRIVATE
+    # The guitar rig: pedalboard, amp, cab, presets and tuner. One per track in the studio,
+    # and on its own as an AU/VST3 for other hosts.
+    set(WOODSHED_RIG_SOURCES
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
         Source/TunerPanel.cpp
-        Source/Art.cpp
-        Source/StandaloneApp.cpp
-        ${WOODSHED_ENGINE_SOURCES})
-
-    target_compile_definitions(Woodshed PUBLIC
-        JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
-        JUCE_VST3_CAN_REPLACE_VST2=0
-        JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
+        Source/Art.cpp)
 
     # Windows low-latency audio needs Steinberg's ASIO SDK, which JUCE does not ship.
     # Point ASIO_SDK_PATH at the extracted SDK (the folder containing common/iasiodrv.h).
     set(ASIO_SDK_PATH "" CACHE PATH "Path to the Steinberg ASIO SDK (Windows only)")
+
+    #--------------------------------------------------------------------------
+    # The studio app (Woodshed.app / Woodshed.exe).
+    juce_add_gui_app(WoodshedStudio
+        COMPANY_NAME "Gerstung Works"
+        BUNDLE_ID com.gerstungworks.woodshed
+        PRODUCT_NAME "Woodshed"
+        VERSION 0.2.0
+        MICROPHONE_PERMISSION_ENABLED TRUE
+        MICROPHONE_PERMISSION_TEXT "Woodshed needs audio input to hear and record your guitar through your interface.")
+
+    target_sources(WoodshedStudio PRIVATE
+        Source/app/Main.cpp
+        Source/app/Studio.cpp
+        Source/app/MainComponent.cpp
+        Source/app/ControlBar.cpp
+        Source/app/ArrangeView.cpp
+        Source/app/MixerView.cpp
+        Source/app/RigPanel.cpp
+        ${WOODSHED_RIG_SOURCES}
+        ${WOODSHED_ENGINE_SOURCES}
+        ${WOODSHED_DAW_SOURCES})
+
+    target_compile_definitions(WoodshedStudio PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_APPLICATION_NAME_STRING="Woodshed"
+        JUCE_APPLICATION_VERSION_STRING="0.2.0")
+
     if(WIN32 AND ASIO_SDK_PATH)
-        target_include_directories(Woodshed PRIVATE "${ASIO_SDK_PATH}/common")
-        target_compile_definitions(Woodshed PUBLIC JUCE_ASIO=1)
+        target_include_directories(WoodshedStudio PRIVATE "${ASIO_SDK_PATH}/common")
+        target_compile_definitions(WoodshedStudio PRIVATE JUCE_ASIO=1)
     endif()
 
-    target_link_libraries(Woodshed
+    target_link_libraries(WoodshedStudio
         PRIVATE
             WoodshedArt
             WoodshedPresets
@@ -89,19 +102,52 @@ if(NOT WOODSHED_BENCH_ONLY)
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
 
-    # On macOS, run tools/sign-mac.sh after building the standalone so microphone permission
+    #--------------------------------------------------------------------------
+    # The rig alone as a plug-in.
+    juce_add_plugin(WoodshedRig
+        COMPANY_NAME "Gerstung Works"
+        BUNDLE_ID com.gerstungworks.woodshed.rig
+        PRODUCT_NAME "Woodshed Rig"
+        PLUGIN_MANUFACTURER_CODE Gwks
+        PLUGIN_CODE Wdsh
+        FORMATS AU VST3
+        IS_SYNTH FALSE
+        NEEDS_MIDI_INPUT FALSE
+        NEEDS_MIDI_OUTPUT FALSE
+        COPY_PLUGIN_AFTER_BUILD FALSE)
+
+    target_sources(WoodshedRig PRIVATE ${WOODSHED_RIG_SOURCES} ${WOODSHED_ENGINE_SOURCES})
+    target_compile_definitions(WoodshedRig PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0)
+
+    target_link_libraries(WoodshedRig
+        PRIVATE
+            WoodshedArt
+            WoodshedPresets
+            juce::juce_audio_utils
+            juce::juce_dsp
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_lto_flags
+            juce::juce_recommended_warning_flags)
+
+    # On macOS, run tools/sign-mac.sh after building the app so microphone permission
     # survives rebuilds (ad-hoc signatures change every build and macOS re-prompts).
 endif()
 
 #==============================================================================
 # Offline pedal bench: woodshed-bench list | run [type ...] [--render dir]
 juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
-target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp ${WOODSHED_ENGINE_SOURCES})
+target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(WoodshedBench
     PRIVATE
         juce::juce_dsp
         juce::juce_audio_formats
+        juce::juce_audio_devices
+        juce::juce_audio_processors
         juce::juce_graphics
     PUBLIC
         juce::juce_recommended_config_flags

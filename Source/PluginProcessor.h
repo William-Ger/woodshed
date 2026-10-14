@@ -30,7 +30,7 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override                        { return true; }
 
-    const juce::String getName() const override            { return JucePlugin_Name; }
+    const juce::String getName() const override            { return "Woodshed"; }
     bool acceptsMidi() const override                      { return false; }
     bool producesMidi() const override                     { return false; }
     double getTailLengthSeconds() const override           { return 8.0; }
@@ -88,6 +88,10 @@ public:
     std::atomic<bool> tunerOpen { false }, tunerMutes { true };
     int readTunerInput (float* dest, int maxSamples);       // message thread
     double getCurrentSampleRate() const                    { return currentSampleRate; }
+
+    /** Message thread. Finishes any pending board change right away (normally the timer does
+        it within a frame); offline renders call this after their first block. */
+    void settle()                                          { timerCallback(); }
 
     // Debug capture: records dry input (ch 0) and processed left output (ch 1).
     void armCapture (double seconds);

@@ -492,7 +492,6 @@ void WoodshedProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     masterGain.reset (sampleRate, 0.03);
 
     captureState.store (CaptureState::idle);
-    captureBuffer.setSize (2, (int) (maxCaptureSeconds * sampleRate));
 }
 
 void WoodshedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -617,6 +616,12 @@ void WoodshedProcessor::armCapture (double seconds)
         return;
 
     captureState.store (CaptureState::idle);
+
+    // Allocated on first use: a DAW hosts one rig per track and most never capture.
+    const int needed = (int) (maxCaptureSeconds * currentSampleRate);
+    if (captureBuffer.getNumSamples() < needed)
+        captureBuffer.setSize (2, needed);
+
     captureLength = juce::jmin ((int) (seconds * currentSampleRate), captureBuffer.getNumSamples());
     captureBuffer.clear();
     capturePos = 0;
