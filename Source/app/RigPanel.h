@@ -43,6 +43,7 @@ private:
     /** Brings the shown editor in line with the selection, the track's rig switch and the engine. */
     void sync();
     void dropEditor();
+    void refreshInputChoice();
     void layOutEditor();
     void setRigOn (bool);
     bool waitingForProjectSwap();
@@ -55,6 +56,7 @@ private:
     std::unique_ptr<juce::AudioProcessorEditor> editor;
 
     juce::ToggleButton rigSwitch { "Rig on" };
+    juce::ComboBox inputChoice;
     juce::TextButton turnOnButton { "Turn the rig on" };
 
     // Opening or starting a project frees every rig; hold off on new editors until it lands.

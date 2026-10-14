@@ -567,6 +567,21 @@ void ArrangeView::showTrackMenu (juce::ValueTree track)
                 h->startRename();
     }));
     m.addSubMenu ("Colour", colours);
+
+    // Which interface input the track records and monitors.
+    juce::PopupMenu inputs;
+    int numInputs = 2;
+    if (auto* device = studio.deviceManager.getCurrentAudioDevice())
+        numInputs = juce::jmax (numInputs, device->getActiveInputChannels().countNumberOfSetBits());
+    for (int i = 0; i < numInputs; ++i)
+        inputs.addItem ("Input " + juce::String (i + 1), true, (int) track.getProperty (ids::input, 0) == i,
+                        withTrack ([i] (ArrangeView& v, juce::ValueTree t)
+                        {
+                            auto& p = v.project();
+                            p.undo.beginNewTransaction ("Track Input");
+                            t.setProperty (ids::input, i, &p.undo);
+                        }));
+    m.addSubMenu ("Input", inputs);
     m.addSeparator();
     m.addItem ("Duplicate", withTrack ([] (ArrangeView& v, juce::ValueTree t)
     {

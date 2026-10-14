@@ -23,6 +23,21 @@ RigPanel::RigPanel (Studio& s) : studio (s)
     rigSwitch.onClick = [this] { setRigOn (rigSwitch.getToggleState()); };
     addChildComponent (rigSwitch);
 
+    inputChoice.setTooltip ("The interface input this track records and monitors");
+    inputChoice.setWantsKeyboardFocus (false);
+    inputChoice.onChange = [this]
+    {
+        auto track = studio.getSelectedTrack();
+        const int input = inputChoice.getSelectedId() - 1;
+        if (track.isValid() && input >= 0 && (int) track.getProperty (daw::ids::input, 0) != input)
+        {
+            auto& p = studio.project();
+            p.undo.beginNewTransaction ("Track Input");
+            track.setProperty (daw::ids::input, input, &p.undo);
+        }
+    };
+    addChildComponent (inputChoice);
+
     turnOnButton.setColour (juce::TextButton::buttonColourId, theme::accent);
     turnOnButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xff1a1410));
     turnOnButton.onClick = [this] { setRigOn (true); };
@@ -101,6 +116,7 @@ void RigPanel::sync()
 
     rigSwitch.setVisible (track.isValid());
     rigSwitch.setToggleState (on, juce::dontSendNotification);
+    refreshInputChoice();
     turnOnButton.setVisible (track.isValid() && ! on);
     resized();
     repaint();
@@ -226,6 +242,8 @@ void RigPanel::resized()
 {
     auto header = getLocalBounds().removeFromTop (headerHeight).reduced (14, 0);
     rigSwitch.setBounds (header.removeFromRight (84).withSizeKeepingCentre (84, 22));
+    header.removeFromRight (12);
+    inputChoice.setBounds (header.removeFromRight (110).withSizeKeepingCentre (110, 24));
 
     const auto body = getLocalBounds().withTrimmedTop (headerHeight);
     turnOnButton.setBounds (body.getCentreX() - 80, body.getCentreY() + 20, 160, 30);
@@ -272,6 +290,10 @@ void RigPanel::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Iden
     {
         sync();
     }
+    else if (property == daw::ids::input)
+    {
+        refreshInputChoice();
+    }
     else if (property == daw::ids::name || property == daw::ids::colour)
     {
         if (auto* w = dynamic_cast<WoodshedEditor*> (editor.get()))
@@ -313,6 +335,27 @@ void RigPanel::projectAboutToBeReplaced()
 {
     // Every rig belongs to the project being replaced; the editor must go while they're alive.
     dropEditor();
+}
+
+void RigPanel::refreshInputChoice()
+{
+    auto track = studio.getSelectedTrack();
+    inputChoice.setVisible (track.isValid());
+    if (! track.isValid())
+        return;
+
+    int numInputs = 2;
+    if (auto* device = studio.deviceManager.getCurrentAudioDevice())
+        numInputs = juce::jmax (numInputs, device->getActiveInputChannels().countNumberOfSetBits());
+
+    if (inputChoice.getNumItems() != numInputs)
+    {
+        inputChoice.clear (juce::dontSendNotification);
+        for (int i = 0; i < numInputs; ++i)
+            inputChoice.addItem ("Input " + juce::String (i + 1), i + 1);
+    }
+
+    inputChoice.setSelectedId ((int) track.getProperty (daw::ids::input, 0) + 1, juce::dontSendNotification);
 }
 
 } // namespace woodshed::app
