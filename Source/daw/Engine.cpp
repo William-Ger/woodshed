@@ -93,14 +93,16 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         float* c = rt.work.getWritePointer (1);
         juce::FloatVectorOperations::clear (a, n);
 
-        const bool live = (track.armed || track.monitor) && b.inputs != nullptr;
+        // Input monitoring (IN) always adds the live input. Armed tracks also go live while
+        // stopped or recording. Takes play whenever the song plays, except on a track that is
+        // recording a new one.
+        const bool hearInput = (track.monitor || (track.armed && (! b.playing || b.recording))) && b.inputs != nullptr;
+        const bool playTakes = b.playing && ! (track.armed && b.recording);
 
-        if (live)
-        {
-            if (juce::isPositiveAndBelow (track.input, b.numInputs) && b.inputs[track.input] != nullptr)
-                juce::FloatVectorOperations::copy (a, b.inputs[track.input], n);
-        }
-        else if (b.playing)
+        if (hearInput && juce::isPositiveAndBelow (track.input, b.numInputs) && b.inputs[track.input] != nullptr)
+            juce::FloatVectorOperations::copy (a, b.inputs[track.input], n);
+
+        if (playTakes)
         {
             for (auto& r : track.regions)
             {
@@ -668,6 +670,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         b.position = pos;
         b.numSamples = n;
         b.playing = isPlaying;
+        b.recording = isRec;
         b.inputs = ins.data();
         b.numInputs = numIns;
         b.left = mixBuffer.getWritePointer (0);

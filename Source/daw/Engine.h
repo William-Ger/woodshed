@@ -76,6 +76,7 @@ struct Mixer
         juce::int64 position = 0;       // timeline sample of the block's first sample
         int numSamples = 0;
         bool playing = false;
+        bool recording = false;
         const float* const* inputs = nullptr;
         int numInputs = 0;
         float* left = nullptr;
@@ -90,8 +91,9 @@ struct Mixer
 /**
     Plays and records a Project through the audio interface.
 
-    Every armed (or monitoring) track hears its interface input through its rig, live; other
-    tracks play their regions through their rigs. Recording writes the dry input to a WAV per
+    A track hears its interface input live through its rig when input monitoring is on, or when
+    it's armed and the transport is stopped or recording; otherwise it plays its regions through
+    its rig. So an armed track plays back its take, and goes live again to record. Recording writes the dry input to a WAV per
     armed track and, on stop, adds a region placed back by the interface's round-trip latency
     so the take lines up with what you were hearing.
 */

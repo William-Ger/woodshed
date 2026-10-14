@@ -184,6 +184,50 @@ int runProjectTest()
         engine.setProject (nullptr);
     }
 
+    std::cout << "armed track monitoring\n";
+    {
+        a.setProperty (ids::arm, true, nullptr);
+        std::map<int, std::shared_ptr<TrackRuntime>> runtimes;
+        auto rt = std::make_shared<TrackRuntime>();
+        rt->id = (int) a[ids::id];
+        rt->work.setSize (2, 64);
+        rt->gainLeft.reset (rate, 0.0);
+        rt->gainRight.reset (rate, 0.0);
+        runtimes[rt->id] = rt;
+        auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+
+        std::vector<float> input (64, 0.25f), l (64), r (64);
+        const float* ins[] { input.data() };
+        auto run = [&] (bool playing, bool recording)
+        {
+            Mixer::Block b;
+            b.position = 20500 - 10;        // the take's click is in this block
+            b.numSamples = 64;
+            b.playing = playing;
+            b.recording = recording;
+            b.inputs = ins;
+            b.numInputs = 1;
+            b.left = l.data();
+            b.right = r.data();
+            Mixer::render (*snap, b);
+        };
+
+        a.setProperty (ids::input, 0, nullptr);
+        snap = Engine::buildSnapshot (*project, pool, runtimes);
+        run (false, false);
+        check (std::abs (l[0] - 0.25f) < 0.01f, "armed and stopped: hears the live input");
+        run (true, false);
+        check (std::abs (l[10] - 0.5f) < 0.01f && std::abs (l[0]) < 0.01f, "armed and playing: plays the take back");
+        run (true, true);
+        check (std::abs (l[0] - 0.25f) < 0.01f && std::abs (l[10] - 0.25f) < 0.01f, "armed and recording: hears only the live input");
+        a.setProperty (ids::arm, false, nullptr);
+        a.setProperty (ids::monitor, true, nullptr);
+        snap = Engine::buildSnapshot (*project, pool, runtimes);
+        run (true, false);
+        check (std::abs (l[0] - 0.25f) < 0.01f && std::abs (l[10] - 0.75f) < 0.01f, "input monitoring while playing: live input plus the take");
+        a.setProperty (ids::monitor, false, nullptr);
+    }
+
     folder.deleteRecursively();
     std::cout << (failures == 0 ? "all project checks passed\n" : juce::String (failures) + " project checks failed\n");
     return failures == 0 ? 0 : 1;
