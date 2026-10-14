@@ -126,6 +126,10 @@ public:
     /** Bypass crossfade, owned by the chain. */
     juce::SmoothedValue<float> engaged;
 
+    /** Set while the board is being rearranged: the chain stops feeding knob values
+        so the pedal can't briefly read another slot's knobs. */
+    std::atomic<bool> knobsHeld { false };
+
 protected:
     /** Allocate buffers and set up filters here. sampleRate and maxBlock are valid. */
     virtual void prepared() {}

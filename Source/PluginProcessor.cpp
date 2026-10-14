@@ -1,13 +1,14 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <numeric>
 
 using APVTS = juce::AudioProcessorValueTreeState;
 using woodshed::Registry;
 
 namespace
 {
-const juce::Identifier boardId ("Board"), slotsId ("slots");
+const juce::Identifier boardId ("Board"), slotsId ("slots"), spotsId ("spots");
 
 // Transparent below -2 dBFS, then a soft knee into full scale instead of a hard wall.
 float safetyClip (float x)
@@ -17,7 +18,16 @@ float safetyClip (float x)
     return mag <= knee ? x : std::copysign (knee + room * std::tanh ((mag - knee) / room), x);
 }
 
-const juce::StringArray defaultBoard { "dyn.gate", "drive.overdrive", "amp.head", "cab.speaker", "delay.analog", "reverb.room" };
+struct DefaultPedal { const char* type; int spot; bool on; };
+
+// A full board to explore, with only a sensible core switched on.
+const DefaultPedal defaultBoard[] {
+    { "dyn.gate", 0, true },     { "dyn.compressor", 1, false }, { "drive.overdrive", 2, true },
+    { "drive.fuzz", 3, false },  { "filter.wah", 4, false },
+    { "mod.chorus", 5, false },  { "mod.phaser", 6, false },     { "delay.analog", 7, false },
+    { "delay.tape", 8, false },  { "reverb.room", 9, true },
+    { "amp.head", -1, true },    { "cab.speaker", -1, true }
+};
 }
 
 WoodshedProcessor::WoodshedProcessor()
@@ -27,15 +37,25 @@ WoodshedProcessor::WoodshedProcessor()
       params (*this, nullptr, "Woodshed", createLayout())
 {
     params.state.addListener (this);
-
     loadDefaultBoard();
-    startTimerHz (10);
+    startTimerHz (30);
 }
 
 void WoodshedProcessor::loadDefaultBoard()
 {
-    setBoard (defaultBoard);
-    params.getParameter (onParamId (defaultBoard.indexOf ("delay.analog")))->setValueNotifyingHost (0.0f);
+    for (auto& i : instances) i.reset();
+    for (auto& t : instanceTypes) t = {};
+
+    std::vector<Placement> places;
+    for (auto& d : defaultBoard)
+        places.push_back ({ d.type, d.spot });
+
+    applyPlacements (places, std::vector<int> (places.size(), -1));
+
+    const auto board = getBoard();
+    for (auto& d : defaultBoard)
+        if (const int slot = board.indexOf (d.type); slot >= 0)
+            params.getParameter (onParamId (slot))->setValueNotifyingHost (d.on ? 1.0f : 0.0f);
 }
 
 WoodshedProcessor::~WoodshedProcessor()
@@ -97,27 +117,85 @@ juce::StringArray WoodshedProcessor::getBoard() const
     return types;
 }
 
-void WoodshedProcessor::writeBoard (const juce::StringArray& types)
+juce::String WoodshedProcessor::rigCategory (const juce::String& type)
 {
-    const auto joined = types.joinIntoString ("|");
-    auto tree = boardTree();
+    if (const auto* t = Registry::get().find (type))
+        if (t->info.category == "Amp" || t->info.category == "Cab")
+            return t->info.category;
 
-    if (tree.getProperty (slotsId).toString() == joined)
-        rebuildChain();   // same list of types, but instances may have moved
-    else
-        tree.setProperty (slotsId, joined, nullptr);
+    return {};
 }
 
-void WoodshedProcessor::copySlotValues (int from, int to)
+bool WoodshedProcessor::isRigType (const juce::String& type)
 {
-    auto copy = [this] (const juce::String& src, const juce::String& dst)
-    {
-        params.getParameter (dst)->setValueNotifyingHost (params.getParameter (src)->getValue());
-    };
+    return rigCategory (type).isNotEmpty();
+}
 
-    copy (onParamId (from), onParamId (to));
-    for (int k = 0; k < woodshed::Pedal::maxKnobs; ++k)
-        copy (knobParamId (from, k), knobParamId (to, k));
+std::vector<WoodshedProcessor::Placement> WoodshedProcessor::getPlacements() const
+{
+    const auto types = getBoard();
+    const auto spotTokens = juce::StringArray::fromTokens (params.state.getChildWithName (boardId).getProperty (spotsId).toString(), "|", "");
+
+    std::vector<Placement> places;
+    std::array<bool, boardSpots> used {};
+
+    // First pass: keep every valid, unique stored spot.
+    for (int i = 0; i < types.size(); ++i)
+    {
+        Placement p { types[i], -1 };
+
+        if (! isRigType (p.type) && i < spotTokens.size() && spotTokens[i].containsOnly ("0123456789"))
+        {
+            const int spot = spotTokens[i].getIntValue();
+            if (juce::isPositiveAndBelow (spot, boardSpots) && ! used[(size_t) spot])
+            {
+                p.spot = spot;
+                used[(size_t) spot] = true;
+            }
+        }
+
+        places.push_back (p);
+    }
+
+    // Second pass: older presets had no spots; pack those pedals into the free spots in order.
+    for (auto& p : places)
+    {
+        if (isRigType (p.type) || p.spot >= 0)
+            continue;
+
+        for (int s = 0; s < boardSpots; ++s)
+        {
+            if (! used[(size_t) s])
+            {
+                p.spot = s;
+                used[(size_t) s] = true;
+                break;
+            }
+        }
+    }
+
+    return places;
+}
+
+std::vector<int> WoodshedProcessor::getSpots() const
+{
+    std::vector<int> spots;
+    for (auto& p : getPlacements())
+        spots.push_back (p.spot);
+    return spots;
+}
+
+int WoodshedProcessor::findFreeSpot() const
+{
+    std::array<bool, boardSpots> used {};
+    for (auto& p : getPlacements())
+        if (p.spot >= 0) used[(size_t) p.spot] = true;
+
+    for (int s = 0; s < boardSpots; ++s)
+        if (! used[(size_t) s])
+            return s;
+
+    return -1;
 }
 
 void WoodshedProcessor::resetSlotValues (int slot, const juce::String& type)
@@ -132,101 +210,196 @@ void WoodshedProcessor::resetSlotValues (int slot, const juce::String& type)
     }
 }
 
-void WoodshedProcessor::insertPedal (const juce::String& type, int position)
+bool WoodshedProcessor::addPedal (const juce::String& type, int spot)
 {
-    auto board = getBoard();
-    if (board.size() >= maxSlots || Registry::get().find (type) == nullptr)
-        return;
+    if (Registry::get().find (type) == nullptr)
+        return false;
 
-    position = juce::jlimit (0, board.size(), position);
+    auto places = getPlacements();
+    std::vector<int> sources;
+    for (int i = 0; i < (int) places.size(); ++i)
+        sources.push_back (i);
 
-    for (int s = board.size(); s > position; --s)
+    if (const auto category = rigCategory (type); category.isNotEmpty())
     {
-        copySlotValues (s - 1, s);
-        instances[(size_t) s] = std::move (instances[(size_t) s - 1]);
-        instanceTypes[(size_t) s] = instanceTypes[(size_t) s - 1];
+        // One amp and one cab: a new one replaces the old.
+        for (int i = (int) places.size(); --i >= 0;)
+        {
+            if (rigCategory (places[(size_t) i].type) == category)
+            {
+                places.erase (places.begin() + i);
+                sources.erase (sources.begin() + i);
+            }
+        }
+
+        spot = -1;
+    }
+    else
+    {
+        if (spot < 0)
+            spot = findFreeSpot();
+
+        const bool taken = std::any_of (places.begin(), places.end(), [spot] (const Placement& p) { return p.spot == spot; });
+        if (! juce::isPositiveAndBelow (spot, boardSpots) || taken)
+            return false;
     }
 
-    instances[(size_t) position].reset();
-    instanceTypes[(size_t) position] = {};
-    resetSlotValues (position, type);
+    if ((int) places.size() >= maxSlots)
+        return false;
 
-    board.insert (position, type);
-    writeBoard (board);
+    places.push_back ({ type, spot });
+    sources.push_back (-1);
+    applyPlacements (places, sources);
+    return true;
 }
 
-void WoodshedProcessor::removePedal (int position)
+void WoodshedProcessor::removePedal (int slot)
 {
-    auto board = getBoard();
-    if (! juce::isPositiveAndBelow (position, board.size()))
+    auto places = getPlacements();
+    if (! juce::isPositiveAndBelow (slot, (int) places.size()))
         return;
 
-    for (int s = position; s < board.size() - 1; ++s)
-    {
-        copySlotValues (s + 1, s);
-        instances[(size_t) s] = std::move (instances[(size_t) s + 1]);
-        instanceTypes[(size_t) s] = instanceTypes[(size_t) s + 1];
-    }
+    std::vector<int> sources;
+    for (int i = 0; i < (int) places.size(); ++i)
+        if (i != slot)
+            sources.push_back (i);
 
-    const int last = board.size() - 1;
-    instances[(size_t) last].reset();
-    instanceTypes[(size_t) last] = {};
-
-    board.remove (position);
-    writeBoard (board);
+    places.erase (places.begin() + slot);
+    applyPlacements (places, sources);
 }
 
-void WoodshedProcessor::movePedal (int from, int to)
+void WoodshedProcessor::movePedal (int slot, int spot)
 {
-    auto board = getBoard();
-    to = juce::jlimit (0, board.size() - 1, to);
-
-    if (! juce::isPositiveAndBelow (from, board.size()) || from == to)
+    auto places = getPlacements();
+    if (! juce::isPositiveAndBelow (slot, (int) places.size()) || ! juce::isPositiveAndBelow (spot, boardSpots)
+        || places[(size_t) slot].spot < 0 || places[(size_t) slot].spot == spot)
         return;
 
-    std::array<float, woodshed::Pedal::maxKnobs + 1> saved {};
-    saved[0] = params.getParameter (onParamId (from))->getValue();
-    for (int k = 0; k < woodshed::Pedal::maxKnobs; ++k)
-        saved[(size_t) k + 1] = params.getParameter (knobParamId (from, k))->getValue();
+    // Dropping onto an occupied spot swaps the two pedals.
+    for (auto& p : places)
+        if (p.spot == spot)
+            p.spot = places[(size_t) slot].spot;
 
-    auto instance = std::move (instances[(size_t) from]);
-    auto instanceType = instanceTypes[(size_t) from];
-    const int step = to > from ? 1 : -1;
+    places[(size_t) slot].spot = spot;
 
-    for (int s = from; s != to; s += step)
-    {
-        copySlotValues (s + step, s);
-        instances[(size_t) s] = std::move (instances[(size_t) (s + step)]);
-        instanceTypes[(size_t) s] = instanceTypes[(size_t) (s + step)];
-    }
+    std::vector<int> sources;
+    for (int i = 0; i < (int) places.size(); ++i)
+        sources.push_back (i);
 
-    params.getParameter (onParamId (to))->setValueNotifyingHost (saved[0]);
-    for (int k = 0; k < woodshed::Pedal::maxKnobs; ++k)
-        params.getParameter (knobParamId (to, k))->setValueNotifyingHost (saved[(size_t) k + 1]);
-
-    instances[(size_t) to] = std::move (instance);
-    instanceTypes[(size_t) to] = instanceType;
-
-    board.move (from, to);
-    writeBoard (board);
+    applyPlacements (places, sources);
 }
 
-void WoodshedProcessor::setBoard (const juce::StringArray& types)
+void WoodshedProcessor::holdAllKnobs()
 {
+    for (auto& i : instances)
+        if (i != nullptr)
+            i->knobsHeld = true;
+
+    releaseHoldAtGeneration = -1;   // set again once the new chain is published
+}
+
+void WoodshedProcessor::applyPlacements (std::vector<Placement> places, std::vector<int> sources)
+{
+    jassert (places.size() == sources.size() && (int) places.size() <= maxSlots);
+
+    // Chain order: board pedals by spot, then the amp, then the cab.
+    std::vector<int> order ((size_t) places.size());
+    std::iota (order.begin(), order.end(), 0);
+
+    auto key = [&places] (int i)
+    {
+        const auto& p = places[(size_t) i];
+        const auto category = rigCategory (p.type);
+        return category == "Amp" ? 1000 : category == "Cab" ? 1001 : p.spot;
+    };
+
+    std::stable_sort (order.begin(), order.end(), [&key] (int a, int b) { return key (a) < key (b); });
+
+    // Freeze every pedal's knobs while values move between slots underneath the running chain.
+    holdAllKnobs();
+
+    std::array<std::array<float, woodshed::Pedal::maxKnobs + 1>, maxSlots> saved {};
     for (int s = 0; s < maxSlots; ++s)
     {
-        instances[(size_t) s].reset();
-        instanceTypes[(size_t) s] = {};
-        resetSlotValues (s, s < types.size() ? types[s] : juce::String());
+        saved[(size_t) s][0] = params.getParameter (onParamId (s))->getValue();
+        for (int k = 0; k < woodshed::Pedal::maxKnobs; ++k)
+            saved[(size_t) s][(size_t) k + 1] = params.getParameter (knobParamId (s, k))->getValue();
     }
 
-    writeBoard (types);
+    const auto oldInstances = instances;
+    const auto oldTypes = instanceTypes;
+
+    auto write = [this] (const juce::String& id, float value)
+    {
+        auto* p = params.getParameter (id);
+        if (! juce::exactlyEqual (p->getValue(), value))
+            p->setValueNotifyingHost (value);
+    };
+
+    juce::StringArray types, spots;
+
+    for (int slot = 0; slot < maxSlots; ++slot)
+    {
+        if (slot >= (int) order.size())
+        {
+            instances[(size_t) slot].reset();
+            instanceTypes[(size_t) slot] = {};
+            continue;
+        }
+
+        const auto& p = places[(size_t) order[(size_t) slot]];
+        const int from = sources[(size_t) order[(size_t) slot]];
+        types.add (p.type);
+        spots.add (juce::String (p.spot));
+
+        if (from < 0)
+        {
+            resetSlotValues (slot, p.type);
+            instances[(size_t) slot].reset();
+            instanceTypes[(size_t) slot] = {};
+        }
+        else
+        {
+            write (onParamId (slot), saved[(size_t) from][0]);
+            for (int k = 0; k < woodshed::Pedal::maxKnobs; ++k)
+                write (knobParamId (slot, k), saved[(size_t) from][(size_t) k + 1]);
+
+            instances[(size_t) slot] = oldInstances[(size_t) from];
+            instanceTypes[(size_t) slot] = oldTypes[(size_t) from];
+        }
+    }
+
+    auto tree = boardTree();
+    const auto joinedTypes = types.joinIntoString ("|");
+    const bool typesChanged = tree.getProperty (slotsId).toString() != joinedTypes;
+
+    tree.setProperty (spotsId, spots.joinIntoString ("|"), nullptr);
+
+    if (typesChanged)
+        tree.setProperty (slotsId, joinedTypes, nullptr);   // listener rebuilds the chain
+    else
+        rebuildChain();
 }
 
 void WoodshedProcessor::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Identifier& property)
 {
-    if (tree.hasType (boardId) && property == slotsId)
+    if (! tree.hasType (boardId))
+        return;
+
+    if (property == slotsId)
         rebuildChain();
+    else if (property == spotsId)
+        sendChangeMessage();
+}
+
+void WoodshedProcessor::valueTreeRedirected (juce::ValueTree&)
+{
+    // A preset or saved session arrived: put it in chain order (older files may lack spots
+    // or have the amp in the middle of the list), then rebuild.
+    auto places = getPlacements();
+    std::vector<int> sources ((size_t) places.size());
+    std::iota (sources.begin(), sources.end(), 0);
+    applyPlacements (places, sources);
 }
 
 void WoodshedProcessor::rebuildChain()
@@ -266,6 +439,8 @@ void WoodshedProcessor::rebuildChain()
     }
 
     const int latency = chain->latencySamples;
+    chain->generation = ++publishedGeneration;
+    releaseHoldAtGeneration = chain->generation;
     delete pending.exchange (chain.release());
     setLatencySamples (latency);
     sendChangeMessage();
@@ -281,6 +456,16 @@ void WoodshedProcessor::freeRetiredChains()
 void WoodshedProcessor::timerCallback()
 {
     freeRetiredChains();
+
+    // The audio thread is now running a chain built after the last rearrangement.
+    if (releaseHoldAtGeneration >= 0 && installedGeneration.load() >= releaseHoldAtGeneration)
+    {
+        for (auto& i : instances)
+            if (i != nullptr)
+                i->knobsHeld = false;
+
+        releaseHoldAtGeneration = -1;
+    }
 }
 
 //==============================================================================
@@ -325,6 +510,7 @@ void WoodshedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             }
 
             current = next;
+            installedGeneration.store (current->generation);
         }
     }
 

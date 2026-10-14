@@ -26,6 +26,7 @@ struct Chain
 
     std::vector<Entry> entries;
     int latencySamples = 0;
+    int generation = 0;
 
     /** Wires an entry to its controls. `knobSources` must hold info.knobs.size() pointers. */
     static Entry makeEntry (std::shared_ptr<Pedal>, const PedalInfo&, const std::atomic<float>* on,

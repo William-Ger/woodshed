@@ -147,14 +147,16 @@ Knob::Knob (juce::AudioProcessorValueTreeState& state, const juce::String& param
     caption.setFont (juce::FontOptions (11.0f, juce::Font::bold));
     caption.setColour (juce::Label::textColourId, ink);
     caption.setInterceptsMouseClicks (false, false);
-    caption.setMinimumHorizontalScale (0.6f);
+    caption.setMinimumHorizontalScale (0.45f);
+    caption.setBorderSize ({});
     addAndMakeVisible (caption);
 
     valueText.setJustificationType (juce::Justification::centred);
     valueText.setFont (juce::FontOptions (10.0f));
     valueText.setColour (juce::Label::textColourId, ink.withAlpha (0.75f));
     valueText.setInterceptsMouseClicks (false, false);
-    valueText.setMinimumHorizontalScale (0.6f);
+    valueText.setMinimumHorizontalScale (0.5f);
+    valueText.setBorderSize ({});
     addChildComponent (valueText);
     valueText.setVisible (spec.isChoice());
     updateValueText();
@@ -168,10 +170,16 @@ void Knob::updateValueText()
 
 void Knob::resized()
 {
+    // Captions shrink with the knob so tightly packed pedals stay readable.
+    const float fontSize = juce::jlimit (8.0f, 11.0f, (float) getWidth() * 0.16f);
+    caption.setFont (juce::FontOptions (fontSize, juce::Font::bold));
+    valueText.setFont (juce::FontOptions (fontSize - 0.5f));
+
     auto r = getLocalBounds();
     if (spec.isChoice())
-        valueText.setBounds (r.removeFromBottom (13));
-    caption.setBounds (r.removeFromBottom (15));
+        valueText.setBounds (r.removeFromBottom ((int) fontSize + 2));
+    caption.setBounds (r.removeFromBottom ((int) fontSize + 4));
+
     slider.setBounds (r);
 }
 
@@ -209,8 +217,8 @@ void Meter::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-PedalView::PedalView (WoodshedProcessor& p, int s, const juce::String& t)
-    : processor (p), slot (s), type (Registry::get().find (t)), typeId (t)
+PedalView::PedalView (WoodshedProcessor& p, int s, const juce::String& t, bool canDrag)
+    : processor (p), slot (s), type (Registry::get().find (t)), typeId (t), draggable (canDrag)
 {
     removeButton.setTooltip ("Remove from board");
     removeButton.onClick = [this]
@@ -219,10 +227,19 @@ PedalView::PedalView (WoodshedProcessor& p, int s, const juce::String& t)
         const int position = slot;
         juce::MessageManager::callAsync ([&proc, position] { proc.removePedal (position); });
     };
-    addAndMakeVisible (removeButton);
+    removeButton.setColour (juce::TextButton::buttonColourId, juce::Colours::black.withAlpha (0.25f));
+    removeButton.setColour (juce::TextButton::textColourOffId, juce::Colours::white.withAlpha (0.6f));
+    addChildComponent (removeButton);
+    removeButton.setVisible (draggable);
+
+    if (draggable)
+        setMouseCursor (juce::MouseCursor::DraggingHandCursor);
 
     if (type == nullptr)
+    {
+        removeButton.setVisible (true);
         return;
+    }
 
     for (size_t k = 0; k < type->info.knobs.size(); ++k)
         addAndMakeVisible (knobs.add (new Knob (processor.params, WoodshedProcessor::knobParamId (slot, (int) k),
@@ -230,39 +247,26 @@ PedalView::PedalView (WoodshedProcessor& p, int s, const juce::String& t)
 
     footswitchAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.params, WoodshedProcessor::onParamId (slot), footswitch);
-    footswitch.setTooltip ("Click or press " + juce::String (slot + 1) + " to stomp");
+    footswitch.setTooltip (draggable ? "Click or press " + juce::String ((slot + 1) % 10) + " to stomp" : "Power");
     footswitch.onStateChange = [this] { repaint(); };
     addAndMakeVisible (footswitch);
-}
-
-int PedalView::widthFor (const PedalType* t)
-{
-    if (t == nullptr)
-        return 180;
-
-    const int n = (int) t->info.knobs.size();
-    int w = n <= 2 ? 190 : n == 3 ? 205 : n == 4 ? 225 : n <= 6 ? 285 : 345;
-
-    if (t->info.category == "Amp")
-        w = juce::jmax (w, 380);
-
-    return w;
 }
 
 void PedalView::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat().reduced (2.0f);
+    const float corner = juce::jmin (12.0f, r.getWidth() * 0.07f);
 
-    g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.fillRoundedRectangle (r.translated (0, 6), 14.0f);
+    g.setColour (juce::Colours::black.withAlpha (dragging ? 0.6f : 0.5f));
+    g.fillRoundedRectangle (r.translated (0, dragging ? 12.0f : 5.0f), corner);
 
     if (type == nullptr)
     {
         g.setColour (juce::Colour (0xff2a2826));
-        g.fillRoundedRectangle (r, 14.0f);
+        g.fillRoundedRectangle (r, corner);
         g.setColour (palette::dimText);
-        g.setFont (juce::FontOptions (13.0f));
-        g.drawFittedText ("Unknown pedal\n" + typeId, r.reduced (12).toNearestInt(), juce::Justification::centred, 3);
+        g.setFont (juce::FontOptions (12.0f));
+        g.drawFittedText ("Unknown pedal\n" + typeId, r.reduced (10).toNearestInt(), juce::Justification::centred, 3);
         return;
     }
 
@@ -275,31 +279,31 @@ void PedalView::paint (juce::Graphics& g)
     {
         // Tolex-covered head with a coloured control panel and gold piping.
         g.setColour (palette::tolex);
-        g.fillRoundedRectangle (r, 12.0f);
+        g.fillRoundedRectangle (r, corner);
         g.setColour (juce::Colours::white.withAlpha (0.025f));
         for (float y = r.getY(); y < r.getBottom(); y += 3.0f)
             g.drawHorizontalLine ((int) y, r.getX(), r.getRight());
 
-        auto plate = knobArea.reduced (12.0f, 14.0f).withTrimmedTop (4.0f);
+        auto plate = r.reduced (12.0f, 12.0f).withHeight (r.getHeight() * 0.62f);
         juce::ColourGradient face (info.body.brighter (0.15f), plate.getX(), plate.getY(),
                                    info.body.darker (0.2f), plate.getX(), plate.getBottom(), false);
         g.setGradientFill (face);
         g.fillRoundedRectangle (plate, 6.0f);
         g.setColour (palette::piping);
         g.drawRoundedRectangle (plate.expanded (3.0f), 8.0f, 1.6f);
-        g.drawRoundedRectangle (r.reduced (5.0f), 9.0f, 1.0f);
+        g.drawRoundedRectangle (r.reduced (5.0f), corner * 0.75f, 1.0f);
     }
     else if (isCab)
     {
         g.setColour (palette::tolex);
-        g.fillRoundedRectangle (r, 12.0f);
+        g.fillRoundedRectangle (r, corner);
 
-        auto strip = knobArea.reduced (10.0f, 12.0f);
+        auto strip = knobArea.reduced (10.0f, 10.0f);
         g.setColour (info.body);
         g.fillRoundedRectangle (strip, 6.0f);
 
         // Grille cloth: a woven diagonal pattern under the controls.
-        auto grille = r.withTrimmedTop (knobArea.getHeight() + 4.0f).reduced (14.0f, 0.0f).withTrimmedBottom (110.0f);
+        auto grille = r.withTrimmedTop (knobArea.getHeight() + 2.0f).reduced (12.0f, 0.0f).withTrimmedBottom (12.0f);
         g.setColour (juce::Colour (0xff3a342b));
         g.fillRoundedRectangle (grille, 6.0f);
         g.saveState();
@@ -319,67 +323,100 @@ void PedalView::paint (juce::Graphics& g)
         juce::ColourGradient body (info.body.brighter (0.18f), r.getX(), r.getY(),
                                    info.body.darker (0.25f), r.getX(), r.getBottom(), false);
         g.setGradientFill (body);
-        g.fillRoundedRectangle (r, 14.0f);
+        g.fillRoundedRectangle (r, corner);
         g.setColour (juce::Colours::white.withAlpha (0.14f));
-        g.drawRoundedRectangle (r.reduced (1.0f), 13.0f, 1.2f);
+        g.drawRoundedRectangle (r.reduced (1.0f), corner - 1.0f, 1.2f);
 
-        for (auto p : { r.getTopLeft() + juce::Point<float> (13, 13), r.getTopRight() + juce::Point<float> (-13, 13),
-                        r.getBottomLeft() + juce::Point<float> (13, -13), r.getBottomRight() + juce::Point<float> (-13, -13) })
+        for (auto p : { r.getTopLeft() + juce::Point<float> (10, 10), r.getTopRight() + juce::Point<float> (-10, 10),
+                        r.getBottomLeft() + juce::Point<float> (10, -10), r.getBottomRight() + juce::Point<float> (-10, -10) })
         {
             g.setColour (juce::Colour (0xff9a968f));
-            g.fillEllipse (juce::Rectangle<float> (8, 8).withCentre (p));
+            g.fillEllipse (juce::Rectangle<float> (7, 7).withCentre (p));
             g.setColour (juce::Colour (0xff4a4743));
-            g.drawLine ({ p.translated (-2.5f, -2.5f), p.translated (2.5f, 2.5f) }, 1.2f);
+            g.drawLine ({ p.translated (-2.0f, -2.0f), p.translated (2.0f, 2.0f) }, 1.1f);
+        }
+
+        // Jacks on the sides, where the patch cables plug in.
+        for (float x : { r.getX() - 1.0f, r.getRight() - 5.0f })
+        {
+            g.setColour (juce::Colour (0xff8f8a82));
+            g.fillRoundedRectangle (x, r.getY() + r.getHeight() * 0.3f - 6.0f, 6.0f, 12.0f, 2.0f);
         }
     }
 
     const auto nameInk = (isAmp || isCab) ? palette::text : info.ink;
+    const bool on = footswitch.getToggleState();
+
+    if (isAmp || isCab)
+    {
+        // Pilot light and name badge.
+        const auto badge = isAmp ? r.withTrimmedTop (r.getHeight() * 0.66f).reduced (14.0f, 4.0f)
+                                 : r.withTrimmedTop (r.getHeight() * 0.62f).withHeight (40.0f);
+        g.setColour (nameInk);
+        g.setFont (juce::FontOptions (22.0f, juce::Font::bold).withKerningFactor (0.14f));
+        g.drawText (info.name, badge.withHeight (28.0f), juce::Justification::centred);
+        g.setColour (nameInk.withAlpha (0.6f));
+        g.setFont (juce::FontOptions (10.0f).withKerningFactor (0.18f));
+        g.drawText (info.subtitle.toUpperCase(), badge.withTrimmedTop (26.0f).withHeight (14.0f), juce::Justification::centred);
+
+        const auto pilot = juce::Rectangle<float> (10, 10).withCentre ({ r.getX() + 24.0f, badge.getY() + 14.0f });
+        g.setColour (on ? palette::ledOn.withAlpha (0.35f) : juce::Colours::transparentBlack);
+        g.fillEllipse (pilot.expanded (6.0f));
+        g.setColour (on ? palette::ledOn : juce::Colour (0xff3a1612));
+        g.fillEllipse (pilot);
+        return;
+    }
 
     // LED.
-    const bool on = footswitch.getToggleState();
-    const auto led = juce::Rectangle<float> (12, 12).withCentre ({ r.getCentreX(), r.getY() + r.getHeight() * 0.555f });
+    const auto led = juce::Rectangle<float> (10, 10).withCentre ({ r.getCentreX(), r.getY() + r.getHeight() * 0.535f });
     if (on)
     {
         g.setColour (palette::ledOn.withAlpha (0.35f));
-        g.fillEllipse (led.expanded (7.0f));
+        g.fillEllipse (led.expanded (6.0f));
     }
     g.setColour (on ? palette::ledOn : juce::Colour (0xff3a1612));
     g.fillEllipse (led);
     g.setColour (juce::Colours::white.withAlpha (on ? 0.7f : 0.15f));
-    g.fillEllipse (led.reduced (3.5f).translated (-1.2f, -1.2f));
+    g.fillEllipse (led.reduced (3.0f).translated (-1.0f, -1.0f));
 
     // Name plate.
-    auto plate = r.withTrimmedTop (r.getHeight() * 0.6f).withHeight (58.0f);
-    const float nameSize = juce::jlimit (18.0f, 30.0f, r.getWidth() / (float) juce::jmax (4, info.name.length()) * 1.25f);
+    auto plate = r.withTrimmedTop (r.getHeight() * 0.58f).withHeight (46.0f);
+    const float nameSize = juce::jlimit (13.0f, 24.0f, r.getWidth() / (float) juce::jmax (4, info.name.length()) * 1.3f);
     g.setColour (nameInk);
-    g.setFont (juce::FontOptions (nameSize, juce::Font::bold).withKerningFactor (0.12f));
-    g.drawFittedText (info.name, plate.removeFromTop (34.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+    g.setFont (juce::FontOptions (nameSize, juce::Font::bold).withKerningFactor (0.1f));
+    g.drawFittedText (info.name, plate.removeFromTop (28.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
     g.setColour (nameInk.withAlpha (0.7f));
-    g.setFont (juce::FontOptions (11.0f).withKerningFactor (0.18f));
-    g.drawText (info.subtitle.toUpperCase(), plate.removeFromTop (16.0f), juce::Justification::centred);
+    g.setFont (juce::FontOptions (9.5f).withKerningFactor (0.14f));
+    g.drawFittedText (info.subtitle.toUpperCase(), plate.removeFromTop (14.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
 
-    if (slot < 9)
+    if (slot < 10)
     {
         g.setColour (nameInk.withAlpha (0.45f));
-        g.setFont (juce::FontOptions (10.0f, juce::Font::bold));
-        g.drawText (juce::String (slot + 1), r.withTrimmedBottom (8.0f).removeFromBottom (14.0f), juce::Justification::centred);
+        g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
+        g.drawText (juce::String ((slot + 1) % 10), r.withTrimmedBottom (5.0f).removeFromBottom (12.0f), juce::Justification::centred);
     }
 }
 
 void PedalView::resized()
 {
-    removeButton.setBounds (getWidth() - 30, 8, 22, 22);
+    removeButton.setBounds (getWidth() - 24, 6, 18, 18);
 
     if (type == nullptr)
         return;
 
-    auto r = getLocalBounds().reduced (18, 16);
-    auto knobArea = r.removeFromTop ((int) ((float) getHeight() * 0.46f)).withTrimmedTop (type->info.category == "Amp" ? 8 : 4);
+    const bool isAmp = type->info.category == "Amp";
+    const bool isCab = type->info.category == "Cab";
+
+    auto r = getLocalBounds().reduced (isAmp ? 20 : 12, isAmp ? 18 : 12);
+    auto knobArea = r.removeFromTop ((int) ((float) getHeight() * (isAmp ? 0.56f : 0.44f)));
+    if (! isAmp && ! isCab)
+        knobArea.removeFromTop (4);
+
     const int n = knobs.size();
 
     if (n > 0)
     {
-        const int perRow = n <= 2 ? n : n == 3 ? 2 : n == 4 ? 2 : n <= 6 ? 3 : 4;
+        const int perRow = n <= 2 ? n : n <= 4 ? 2 : n <= 6 ? 3 : 4;
         const int rows = (n + perRow - 1) / perRow;
         const int cellH = knobArea.getHeight() / rows;
         const int cellW = knobArea.getWidth() / perRow;
@@ -391,138 +428,358 @@ void PedalView::resized()
             line = line.withSizeKeepingCentre (cellW * inRow, cellH);
 
             for (int c = 0; c < inRow; ++c, ++i)
-                knobs[i]->setBounds (line.removeFromLeft (cellW).reduced (3, 2));
+                knobs[i]->setBounds (line.removeFromLeft (cellW).reduced (2, 1));
         }
     }
 
-    const int fs = 70;
-    footswitch.setBounds (getLocalBounds().getCentreX() - fs / 2, getHeight() - fs - 26, fs, fs);
+    if (isAmp || isCab)
+    {
+        // A small power switch in the corner instead of a stomp switch.
+        const int s = 30;
+        footswitch.setBounds (getWidth() - s - 14, getHeight() - s - 12, s, s);
+        return;
+    }
+
+    const int fs = juce::jlimit (34, 62, juce::jmin ((int) ((float) getWidth() * 0.34f), (int) ((float) getHeight() * 0.17f)));
+    footswitch.setBounds (getLocalBounds().getCentreX() - fs / 2, getHeight() - fs - 18, fs, fs);
 }
 
-void PedalView::mouseDown (const juce::MouseEvent&)
+void PedalView::mouseDown (const juce::MouseEvent& e)
 {
-    dragStarted = false;
+    if (draggable && e.eventComponent == this)
+        dragger.startDraggingComponent (this, e);
 }
 
 void PedalView::mouseDrag (const juce::MouseEvent& e)
 {
-    if (dragStarted || e.getDistanceFromDragStart() < 8)
+    if (! draggable || e.eventComponent != this)
         return;
 
-    if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this))
+    if (! dragging && e.getDistanceFromDragStart() < 5)
+        return;
+
+    if (! dragging)
     {
-        dragStarted = true;
-        auto image = createComponentSnapshot (getLocalBounds()).rescaled (getWidth() / 2, getHeight() / 2);
-        container->startDragging ("pedal:" + juce::String (slot), this, juce::ScaledImage (image), true);
+        dragging = true;
+        toFront (false);
+    }
+
+    dragger.dragComponent (this, e, nullptr);
+    if (onDragMove) onDragMove (*this);
+}
+
+void PedalView::mouseUp (const juce::MouseEvent& e)
+{
+    if (e.eventComponent == this && dragging)
+    {
+        dragging = false;
+        repaint();
+        if (onDragEnd) onDragEnd (*this);
     }
 }
 
 //==============================================================================
-BoardContent::BoardContent (WoodshedProcessor& p) : processor (p)
-{
-    addButton.setTooltip ("Add a pedal (A)");
-    addButton.onClick = [this] { if (onAddClicked) onAddClicked(); };
-    addAndMakeVisible (addButton);
-}
+BoardView::BoardView (WoodshedProcessor& p) : processor (p) {}
 
-void BoardContent::rebuild()
+void BoardView::rebuild()
 {
     pedals.clear();
     const auto types = processor.getBoard();
+    spots = processor.getSpots();
 
-    for (int i = 0; i < types.size(); ++i)
-        addAndMakeVisible (pedals.add (new PedalView (processor, i, types[i])));
-
-    addButton.setVisible (types.size() < WoodshedProcessor::maxSlots);
-    layoutForHeight (getHeight());
-}
-
-void BoardContent::layoutForHeight (int height)
-{
-    const auto types = processor.getBoard();
-    const int top = 22, pedalH = juce::jmax (300, height - 44);
-    int x = 26;
-
-    for (auto* p : pedals)
+    for (int slot = 0; slot < types.size(); ++slot)
     {
-        const int w = PedalView::widthFor (Registry::get().find (types[p->getSlot()]));
-        p->setBounds (x, top, w, pedalH);
-        x += w + 24;
+        if (spots[(size_t) slot] < 0)
+            continue;
+
+        auto* view = pedals.add (new PedalView (processor, slot, types[slot], true));
+
+        view->onDragMove = [this] (PedalView& v)
+        {
+            const int target = spotAt (v.getBounds().getCentre());
+            if (target != dragTarget) { dragTarget = target; repaint(); }
+        };
+
+        view->onDragEnd = [this] (PedalView& v)
+        {
+            const int target = dragTarget, from = v.getSlot();
+            dragTarget = -1;
+
+            if (target >= 0 && target != spots[(size_t) from])
+            {
+                auto& proc = processor;
+                juce::MessageManager::callAsync ([&proc, from, target] { proc.movePedal (from, target); });
+            }
+
+            layoutPedals();   // snap into place now; the rebuild after the move confirms it
+            repaint();
+        };
+
+        addAndMakeVisible (view);
     }
 
-    addButton.setBounds (x, top + pedalH / 2 - 70, 120, 140);
-    x += addButton.isVisible() ? 120 + 26 : 0;
-
-    setSize (x, height);
+    layoutPedals();
+    repaint();
 }
 
-void BoardContent::paint (juce::Graphics& g)
+juce::Array<PedalView*> BoardView::pedalsInChainOrder() const
 {
-    g.fillAll (palette::board);
-    g.setColour (palette::boardRib);
-    for (int y = 6; y < getHeight(); y += 14)
-        g.fillRect (0, y, getWidth(), 6);
-
-    // Patch cable running through the chain.
-    const float y = (float) getHeight() * 0.62f;
-    g.setColour (palette::cable);
-    g.drawLine (0.0f, y, (float) getWidth(), y, 7.0f);
-    g.setColour (juce::Colour (0xff2a2724));
-    g.drawLine (0.0f, y - 2.0f, (float) getWidth(), y - 2.0f, 1.5f);
+    juce::Array<PedalView*> list;
+    for (auto* p : pedals) list.add (p);
+    std::sort (list.begin(), list.end(), [] (PedalView* a, PedalView* b) { return a->getSlot() < b->getSlot(); });
+    return list;
 }
 
-void BoardContent::paintOverChildren (juce::Graphics& g)
+juce::Rectangle<int> BoardView::spotBounds (int spot) const
 {
-    if (dropIndex < 0)
+    const int col = spot % WoodshedProcessor::boardColumns, row = spot / WoodshedProcessor::boardColumns;
+    const int gapX = 10, gapY = 22;
+    const int cellW = (deck.getWidth() - gapX * (WoodshedProcessor::boardColumns - 1)) / WoodshedProcessor::boardColumns;
+    const int cellH = (deck.getHeight() - gapY * (WoodshedProcessor::boardRows - 1)) / WoodshedProcessor::boardRows;
+    return { deck.getX() + col * (cellW + gapX), deck.getY() + row * (cellH + gapY), cellW, cellH };
+}
+
+int BoardView::spotAt (juce::Point<int> pt) const
+{
+    for (int s = 0; s < WoodshedProcessor::boardSpots; ++s)
+        if (spotBounds (s).expanded (6, 12).contains (pt))
+            return s;
+
+    return -1;
+}
+
+void BoardView::layoutPedals()
+{
+    for (auto* p : pedals)
+        if (! p->isBeingDragged())
+            p->setBounds (pedalBounds (spots[(size_t) p->getSlot()]));
+}
+
+void BoardView::resized()
+{
+    deck = getLocalBounds().reduced (46, 26);
+    layoutPedals();
+}
+
+void BoardView::paint (juce::Graphics& g)
+{
+    auto frame = getLocalBounds().toFloat().reduced (4.0f);
+
+    // Board frame: anodised black with a bevelled lip.
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillRoundedRectangle (frame.translated (0, 6), 16.0f);
+    juce::ColourGradient body (juce::Colour (0xff303033), frame.getX(), frame.getY(),
+                               juce::Colour (0xff141415), frame.getX(), frame.getBottom(), false);
+    g.setGradientFill (body);
+    g.fillRoundedRectangle (frame, 16.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.08f));
+    g.drawRoundedRectangle (frame.reduced (1.0f), 15.0f, 1.5f);
+
+    // Rails: brushed slats with dark gaps between them, one set per row.
+    for (int row = 0; row < WoodshedProcessor::boardRows; ++row)
+    {
+        auto rowArea = spotBounds (row * WoodshedProcessor::boardColumns).toFloat()
+                           .withX ((float) deck.getX() - 14.0f).withRight ((float) deck.getRight() + 14.0f);
+        const int slats = 3;
+        const float slatH = rowArea.getHeight() / (float) slats;
+
+        for (int i = 0; i < slats; ++i)
+        {
+            auto slat = rowArea.withY (rowArea.getY() + (float) i * slatH).withHeight (slatH - 7.0f);
+            juce::ColourGradient metal (juce::Colour (0xff4a4a4e), slat.getX(), slat.getY(),
+                                        juce::Colour (0xff2c2c2f), slat.getX(), slat.getBottom(), false);
+            g.setGradientFill (metal);
+            g.fillRoundedRectangle (slat, 3.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.10f));
+            g.drawHorizontalLine ((int) slat.getY() + 1, slat.getX() + 3.0f, slat.getRight() - 3.0f);
+        }
+    }
+
+    // Empty spots, drop target.
+    std::array<bool, WoodshedProcessor::boardSpots> used {};
+    for (auto s : spots)
+        if (s >= 0) used[(size_t) s] = true;
+
+    for (int s = 0; s < WoodshedProcessor::boardSpots; ++s)
+    {
+        const auto b = pedalBounds (s).toFloat();
+
+        if (s == dragTarget)
+        {
+            g.setColour (palette::accent.withAlpha (0.18f));
+            g.fillRoundedRectangle (b, 10.0f);
+            g.setColour (palette::accent);
+            g.drawRoundedRectangle (b, 10.0f, 2.0f);
+        }
+        else if (! used[(size_t) s])
+        {
+            juce::Path outline;
+            outline.addRoundedRectangle (b, 10.0f);
+            juce::Path dashed;
+            const float dashes[] { 6.0f, 5.0f };
+            juce::PathStrokeType (1.5f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (juce::Colours::white.withAlpha (s == hoverSpot ? 0.45f : 0.16f));
+            g.fillPath (dashed);
+            g.setFont (juce::FontOptions (s == hoverSpot ? 34.0f : 28.0f));
+            g.drawText ("+", b, juce::Justification::centred);
+        }
+    }
+
+    // Patch cables, in chain order: guitar -> pedals -> amp.
+    auto inJack  = [this] (int spot) { auto b = pedalBounds (spot); return juce::Point<float> ((float) b.getX() + 2.0f, (float) b.getY() + (float) b.getHeight() * 0.3f); };
+    auto outJack = [this] (int spot) { auto b = pedalBounds (spot); return juce::Point<float> ((float) b.getRight() - 2.0f, (float) b.getY() + (float) b.getHeight() * 0.3f); };
+
+    auto cable = [&g] (juce::Point<float> a, juce::Point<float> b, juce::Colour colour)
+    {
+        juce::Path p;
+        p.startNewSubPath (a);
+        const float span = a.getDistanceFrom (b);
+        const float pull = juce::jlimit (8.0f, 120.0f, std::abs (b.x - a.x) * 0.4f);
+        const float sag = juce::jlimit (2.0f, 26.0f, span * 0.08f);
+        p.cubicTo (a.translated (pull, sag), b.translated (-pull, sag), b);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.strokePath (p, juce::PathStrokeType (6.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), juce::AffineTransform::translation (0, 3));
+        g.setColour (colour);
+        g.strokePath (p, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (colour.brighter (0.6f).withAlpha (0.5f));
+        g.strokePath (p, juce::PathStrokeType (1.2f), juce::AffineTransform::translation (0, -1.2f));
+        for (auto end : { a, b })
+        {
+            g.setColour (juce::Colour (0xffb9b3a8));
+            g.fillRoundedRectangle (juce::Rectangle<float> (12.0f, 10.0f).withCentre (end), 3.0f);
+        }
+    };
+
+    std::vector<int> chainSpots;
+    for (auto* p : pedalsInChainOrder())
+        chainSpots.push_back (spots[(size_t) p->getSlot()]);
+
+    const auto cableColour = juce::Colour (0xff1b1b1d);
+    const auto guitarIn = juce::Point<float> (frame.getX() + 6.0f, chainSpots.empty() ? frame.getCentreY() : inJack (chainSpots.front()).y);
+    const auto toAmp = juce::Point<float> (frame.getRight() - 6.0f, chainSpots.empty() ? frame.getCentreY() : outJack (chainSpots.back()).y);
+
+    if (chainSpots.empty())
+    {
+        cable (guitarIn, toAmp, cableColour);
+    }
+    else
+    {
+        cable (guitarIn, inJack (chainSpots.front()), juce::Colour (0xff2b2b2e));
+        for (size_t i = 1; i < chainSpots.size(); ++i)
+            cable (outJack (chainSpots[i - 1]), inJack (chainSpots[i]), cableColour);
+        cable (outJack (chainSpots.back()), toAmp, juce::Colour (0xff2b2b2e));
+    }
+
+    g.setColour (palette::dimText);
+    g.setFont (juce::FontOptions (9.5f, juce::Font::bold).withKerningFactor (0.2f));
+    g.drawText ("IN", juce::Rectangle<float> (frame.getX() + 6.0f, guitarIn.y - 24.0f, 30.0f, 12.0f), juce::Justification::centredLeft);
+    g.drawText ("OUT", juce::Rectangle<float> (frame.getRight() - 36.0f, toAmp.y - 24.0f, 30.0f, 12.0f), juce::Justification::centredRight);
+}
+
+void BoardView::mouseMove (const juce::MouseEvent& e)
+{
+    const int s = e.eventComponent == this ? spotAt (e.getPosition()) : -1;
+    const bool empty = s >= 0 && std::find (spots.begin(), spots.end(), s) == spots.end();
+    const int hover = empty ? s : -1;
+
+    if (hover != hoverSpot)
+    {
+        hoverSpot = hover;
+        setMouseCursor (hover >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void BoardView::mouseExit (const juce::MouseEvent&)
+{
+    if (hoverSpot >= 0) { hoverSpot = -1; repaint(); }
+}
+
+void BoardView::mouseUp (const juce::MouseEvent& e)
+{
+    if (e.eventComponent != this || ! e.mouseWasClicked())
         return;
 
-    int x = 14;
-    if (juce::isPositiveAndBelow (dropIndex, pedals.size()))
-        x = pedals[dropIndex]->getX() - 13;
-    else if (! pedals.isEmpty())
-        x = pedals.getLast()->getRight() + 11;
-
-    g.setColour (palette::accent);
-    g.fillRoundedRectangle ((float) x - 2.0f, 16.0f, 4.0f, (float) getHeight() - 32.0f, 2.0f);
+    const int s = spotAt (e.getPosition());
+    if (s >= 0 && std::find (spots.begin(), spots.end(), s) == spots.end() && onEmptySpotClicked)
+        onEmptySpotClicked (s);
 }
 
-bool BoardContent::isInterestedInDragSource (const SourceDetails& d)
+//==============================================================================
+RigStack::RigStack (WoodshedProcessor& p) : processor (p)
 {
-    return d.description.toString().startsWith ("pedal:");
+    chooseAmp.onClick = [this] { if (onChoose) onChoose ("Amp"); };
+    chooseCab.onClick = [this] { if (onChoose) onChoose ("Cab"); };
+    swapAmp.onClick = chooseAmp.onClick;
+    swapCab.onClick = chooseCab.onClick;
+
+    for (auto* b : { &swapAmp, &swapCab })
+        b->setTooltip ("Pick a different model");
+
+    addChildComponent (chooseAmp);
+    addChildComponent (chooseCab);
+    addChildComponent (swapAmp);
+    addChildComponent (swapCab);
 }
 
-int BoardContent::insertionIndexFor (int x) const
+void RigStack::rebuild()
 {
-    for (int i = 0; i < pedals.size(); ++i)
-        if (x < pedals[i]->getBounds().getCentreX())
-            return i;
+    amp.reset();
+    cab.reset();
 
-    return pedals.size();
-}
+    const auto types = processor.getBoard();
+    for (int slot = 0; slot < types.size(); ++slot)
+    {
+        const auto category = WoodshedProcessor::rigCategory (types[slot]);
+        if (category == "Amp" && amp == nullptr) amp = std::make_unique<PedalView> (processor, slot, types[slot], false);
+        if (category == "Cab" && cab == nullptr) cab = std::make_unique<PedalView> (processor, slot, types[slot], false);
+    }
 
-void BoardContent::itemDragMove (const SourceDetails& d)
-{
-    const int index = insertionIndexFor (d.localPosition.x);
-    if (index != dropIndex) { dropIndex = index; repaint(); }
-}
+    if (amp != nullptr) addAndMakeVisible (*amp);
+    if (cab != nullptr) addAndMakeVisible (*cab);
 
-void BoardContent::itemDragExit (const SourceDetails&)
-{
-    dropIndex = -1;
+    chooseAmp.setVisible (amp == nullptr);
+    chooseCab.setVisible (cab == nullptr);
+    swapAmp.setVisible (amp != nullptr);
+    swapCab.setVisible (cab != nullptr);
+    swapAmp.toFront (false);
+    swapCab.toFront (false);
+
+    resized();
     repaint();
 }
 
-void BoardContent::itemDropped (const SourceDetails& d)
+void RigStack::resized()
 {
-    const int from = d.description.toString().fromFirstOccurrenceOf ("pedal:", false, false).getIntValue();
-    int to = insertionIndexFor (d.localPosition.x);
-    if (to > from) --to;
+    auto r = getLocalBounds().reduced (4, 0);
+    auto ampArea = r.removeFromTop ((int) ((float) r.getHeight() * 0.44f));
+    r.removeFromTop (6);
+    auto cabArea = r;
 
-    dropIndex = -1;
-    repaint();
+    if (amp != nullptr) amp->setBounds (ampArea);
+    if (cab != nullptr) cab->setBounds (cabArea);
 
-    auto& proc = processor;
-    juce::MessageManager::callAsync ([&proc, from, to] { proc.movePedal (from, to); });
+    chooseAmp.setBounds (ampArea.withSizeKeepingCentre (130, 32));
+    chooseCab.setBounds (cabArea.withSizeKeepingCentre (130, 32));
+    swapAmp.setBounds (ampArea.getRight() - 120, ampArea.getBottom() - 38, 62, 22);
+    swapCab.setBounds (cabArea.getRight() - 120, cabArea.getBottom() - 38, 62, 22);
+}
+
+void RigStack::paint (juce::Graphics& g)
+{
+    auto r = getLocalBounds().toFloat().reduced (4.0f, 0.0f);
+    auto ampArea = r.removeFromTop (r.getHeight() * 0.44f);
+    r.removeFromTop (6.0f);
+
+    for (auto area : { ampArea, r })
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.05f));
+        g.drawRoundedRectangle (area.reduced (1.0f), 12.0f, 1.5f);
+    }
+
+    // Floor shadow under the stack.
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.fillEllipse (r.getX() + 10.0f, r.getBottom() - 8.0f, r.getWidth() - 20.0f, 10.0f);
 }
 
 //==============================================================================
@@ -620,6 +877,15 @@ LibraryPanel::LibraryPanel (std::function<void (const juce::String&)> pick) : on
     refresh();
 }
 
+void LibraryPanel::showCategory (const juce::String& c)
+{
+    category = c == "All" ? juce::String() : c;
+
+    for (auto* b : categoryButtons)
+        b->setToggleState (b->getButtonText().upToFirstOccurrenceOf ("  ", false, false) == (category.isEmpty() ? "All" : category),
+                           juce::dontSendNotification);
+}
+
 void LibraryPanel::refresh()
 {
     cards.clear();
@@ -709,7 +975,8 @@ void LibraryPanel::visibilityChanged()
 {
     if (isVisible())
     {
-        search.setText ({}, juce::sendNotification);
+        search.setText ({}, juce::dontSendNotification);
+        refresh();
         search.grabKeyboardFocus();
     }
 }
@@ -723,16 +990,8 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
       inputGainAttachment (p.params, "input_gain", inputGain),
       masterAttachment (p.params, "master", master),
       board (p),
-      library ([this] (const juce::String& type)
-               {
-                   library.setVisible (false);
-                   woodshedProcessor.insertPedal (type, woodshedProcessor.getBoard().size());
-                   juce::Timer::callAfterDelay (60, [safe = juce::Component::SafePointer<WoodshedEditor> (this)]
-                   {
-                       if (safe != nullptr)
-                           safe->boardViewport.setViewPosition (safe->board.getWidth(), 0);
-                   });
-               })
+      rig (p),
+      library ([this] (const juce::String& type) { pickFromLibrary (type); })
 {
     using namespace woodshed;
     setLookAndFeel (&lookAndFeel);
@@ -785,7 +1044,7 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
 
     libraryButton.setColour (juce::TextButton::buttonColourId, palette::accent);
     libraryButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xff1a1410));
-    libraryButton.setTooltip ("Browse every pedal (A)");
+    libraryButton.setTooltip ("Browse every pedal and add one to the first free spot (A)");
     libraryButton.onClick = [this] { showLibrary(); };
     addAndMakeVisible (libraryButton);
 
@@ -808,12 +1067,13 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
     captureButton.onClick = [this] { startCapture (10.0); };
     addAndMakeVisible (captureButton);
 
-    board.onAddClicked = [this] { showLibrary(); };
+    board.onEmptySpotClicked = [this] (int spot) { showLibrary (spot); };
     board.rebuild();
-    boardViewport.setViewedComponent (&board, false);
-    boardViewport.setScrollBarsShown (false, true);
-    boardViewport.setScrollBarThickness (10);
-    addAndMakeVisible (boardViewport);
+    addAndMakeVisible (board);
+
+    rig.onChoose = [this] (const juce::String& category) { showLibrary (-1, category); };
+    rig.rebuild();
+    addAndMakeVisible (rig);
 
     library.onClose = [this] { library.setVisible (false); grabKeyboardFocus(); };
     addChildComponent (library);
@@ -868,8 +1128,12 @@ void WoodshedEditor::paint (juce::Graphics& g)
     g.fillRect (footer);
     g.setColour (palette::dimText);
     g.setFont (juce::FontOptions (11.5f));
-    g.drawText (juce::String (woodshedProcessor.getBoard().size()) + " / " + juce::String (WoodshedProcessor::maxSlots)
-                    + " pedals   ·   1-9 stomp   ·   A add pedal   ·   drag a pedal to reorder   ·   double-click a knob to reset",
+    int onBoard = 0;
+    for (auto spot : woodshedProcessor.getSpots())
+        onBoard += spot >= 0 ? 1 : 0;
+
+    g.drawText (juce::String (onBoard) + " / " + juce::String (WoodshedProcessor::boardSpots)
+                    + " spots   ·   1-0 stomp   ·   click an empty spot or press A to add   ·   drag pedals to rearrange   ·   double-click a knob to reset",
                 footer.reduced (16, 0), juce::Justification::centredLeft);
 }
 
@@ -913,19 +1177,24 @@ void WoodshedEditor::resized()
     statusLabel.setBounds (bar.reduced (8, 22));
 
     r.removeFromBottom (24);
-    boardViewport.setBounds (r);
-    board.layoutForHeight (r.getHeight() - boardViewport.getScrollBarThickness());
+    r.reduce (14, 14);
+
+    const int rigWidth = juce::jlimit (300, 400, (int) ((float) r.getWidth() * 0.27f));
+    rig.setBounds (r.removeFromRight (rigWidth));
+    r.removeFromRight (14);
+    board.setBounds (r);
 }
 
 bool WoodshedEditor::keyPressed (const juce::KeyPress& key)
 {
     const auto c = key.getTextCharacter();
 
-    if (c >= '1' && c <= '9')
+    if (c >= '0' && c <= '9')
     {
-        const int index = (int) (c - '1');
-        if (juce::isPositiveAndBelow (index, board.pedals.size()))
-            board.pedals[index]->toggle();
+        const int index = c == '0' ? 9 : (int) (c - '1');
+        const auto pedals = board.pedalsInChainOrder();
+        if (juce::isPositiveAndBelow (index, pedals.size()))
+            pedals[index]->toggle();
         return true;
     }
 
@@ -938,18 +1207,33 @@ bool WoodshedEditor::keyPressed (const juce::KeyPress& key)
     return false;
 }
 
-void WoodshedEditor::showLibrary()
+void WoodshedEditor::showLibrary (int targetSpot, const juce::String& category)
 {
+    libraryTargetSpot = targetSpot;
+    library.showCategory (category.isEmpty() ? "All" : category);
     library.setVisible (true);
     library.toFront (true);
 }
 
+void WoodshedEditor::pickFromLibrary (const juce::String& type)
+{
+    library.setVisible (false);
+    grabKeyboardFocus();
+
+    if (! woodshedProcessor.addPedal (type, WoodshedProcessor::isRigType (type) ? -1 : libraryTargetSpot))
+        flash ("The board is full: remove a pedal to make room");
+}
+
+void WoodshedEditor::flash (const juce::String& message)
+{
+    statusLabel.setText (message, juce::dontSendNotification);
+    statusFrames = 120;
+}
+
 void WoodshedEditor::changeListenerCallback (juce::ChangeBroadcaster*)
 {
-    const auto scroll = boardViewport.getViewPosition();
     board.rebuild();
-    board.layoutForHeight (boardViewport.getHeight() - boardViewport.getScrollBarThickness());
-    boardViewport.setViewPosition (scroll);
+    rig.rebuild();
     repaint();
 }
 

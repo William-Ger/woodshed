@@ -45,11 +45,22 @@ public:
 
     //==============================================================================
     // Board editing (message thread). Changes are broadcast via ChangeBroadcaster.
-    juce::StringArray getBoard() const;
-    void insertPedal (const juce::String& type, int position);
-    void removePedal (int position);
-    void movePedal (int from, int to);
-    void setBoard (const juce::StringArray& types);         // resets every knob to its default
+    //
+    // The pedalboard has boardRows x boardColumns spots; each pedal sits in one spot and
+    // the signal runs left to right, top row first. The amp and cab are not on the board:
+    // they always come last in the chain (pedals -> amp -> cab). Slot order always equals
+    // chain order, and getSpots() tells the UI where each board pedal sits.
+    static constexpr int boardRows = 2, boardColumns = 5, boardSpots = boardRows * boardColumns;
+
+    juce::StringArray getBoard() const;                     // pedal type per slot, chain order
+    std::vector<int> getSpots() const;                      // spot per slot (row * columns + col), -1 for amp/cab
+    static bool isRigType (const juce::String& type);       // amp or cab: lives in the stack, not on the board
+    static juce::String rigCategory (const juce::String& type);
+
+    int findFreeSpot() const;
+    bool addPedal (const juce::String& type, int spot = -1); // amp/cab replace the current one
+    void removePedal (int slot);
+    void movePedal (int slot, int spot);                    // swaps if the spot is taken
     void loadDefaultBoard();
 
     static juce::String onParamId (int slot)               { return "s" + juce::String (slot) + "_on"; }
@@ -74,14 +85,19 @@ public:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 
+    struct Placement { juce::String type; int spot = -1; };
+
     juce::ValueTree boardTree();
-    void writeBoard (const juce::StringArray& types);
+    std::vector<Placement> getPlacements() const;
+    /** Puts the board in chain order and moves every slot's knobs and instance along with it.
+        `sourceSlots[i]` is the slot the i-th placement currently occupies (-1 for a new pedal). */
+    void applyPlacements (std::vector<Placement>, std::vector<int> sourceSlots);
     void rebuildChain();
-    void copySlotValues (int from, int to);
     void resetSlotValues (int slot, const juce::String& type);
+    void holdAllKnobs();
 
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
-    void valueTreeRedirected (juce::ValueTree&) override   { rebuildChain(); }
+    void valueTreeRedirected (juce::ValueTree&) override;
     void timerCallback() override;
 
     // Message-thread view of the live pedals, slot by slot.
@@ -92,6 +108,11 @@ private:
     // `current` and retires the old one through a FIFO for deletion on the message thread.
     std::atomic<woodshed::Chain*> pending { nullptr };
     woodshed::Chain* current = nullptr;
+
+    // While slots are being shuffled, pedals keep their last knob values until the audio
+    // thread is running a chain built after the shuffle (see holdAllKnobs()).
+    std::atomic<int> installedGeneration { 0 };
+    int publishedGeneration = 0, releaseHoldAtGeneration = -1;
     juce::AbstractFifo retireFifo { 64 };
     std::array<woodshed::Chain*, 64> retired {};
     void freeRetiredChains();

@@ -29,16 +29,20 @@ void Chain::process (float* left, float* right, float* scratchLeft, float* scrat
     for (auto& e : entries)
     {
         auto& p = *e.pedal;
-        p.engaged.setTargetValue (e.on->load (std::memory_order_relaxed) > 0.5f ? 1.0f : 0.0f);
+        if (! p.knobsHeld.load (std::memory_order_relaxed))
+            p.engaged.setTargetValue (e.on->load (std::memory_order_relaxed) > 0.5f ? 1.0f : 0.0f);
 
         const bool fading = p.engaged.isSmoothing();
         if (! fading && p.engaged.getCurrentValue() < 0.5f)
             continue;
 
-        for (int k = 0; k < e.numKnobs; ++k)
+        if (! p.knobsHeld.load (std::memory_order_relaxed))
         {
-            const auto& r = e.ranges[(size_t) k];
-            p.setKnob (k, r.snapToLegalValue (r.convertFrom0to1 (e.knobs[(size_t) k]->load (std::memory_order_relaxed))));
+            for (int k = 0; k < e.numKnobs; ++k)
+            {
+                const auto& r = e.ranges[(size_t) k];
+                p.setKnob (k, r.snapToLegalValue (r.convertFrom0to1 (e.knobs[(size_t) k]->load (std::memory_order_relaxed))));
+            }
         }
 
         p.update();
