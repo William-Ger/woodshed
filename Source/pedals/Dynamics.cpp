@@ -72,7 +72,7 @@ public:
             s.env = juce::jmax (std::abs (x[i]), s.env * envRelease);
 
             if (s.env > openThreshold)       { s.open = true; s.hold = holdSamples; }
-            else if (s.env < closeThreshold && --s.hold <= 0) s.open = false;
+            else if (s.env < closeThreshold && (s.hold = juce::jmax (0, s.hold - 1)) == 0) s.open = false;
 
             const float target = s.open ? 1.0f : 0.0f;
             s.gain += (s.open ? openCoeff : closeCoeff) * (target - s.gain);
@@ -359,7 +359,7 @@ private:
 };
 
 //==============================================================================
-// TIDE: auto-swell. A fast/slow envelope pair spots each pick attack a few ms ahead
+// VIOLA: auto-swell. A fast/slow envelope pair spots each pick attack a few ms ahead
 // of the (delayed) audio, ducks the volume to silence just before the pick lands and
 // fades it back in, so every note blooms like a bowed string.
 class AutoSwell final : public Pedal
@@ -592,7 +592,7 @@ void registerDynamicsPedals (Registry& r)
                            knob ("tilt", "Tilt", -1.0f, 1.0f, 0.15f, "%"),
                            choice ("voice", "Voice", { "Flat", "Fat", "Tight" }, 0) } });
 
-    r.add<AutoSwell> ({ "dyn.swell", "TIDE", "auto-swell", "Dynamics",
+    r.add<AutoSwell> ({ "dyn.swell", "VIOLA", "auto-swell", "Dynamics",
                         "Fades every picked note in from silence for bowed, violin-like swells",
                         juce::Colour (0xff2f6f73), juce::Colour (0xffe6f2ee),
                         { knob ("sense", "Sense", -66.0f, -24.0f, -48.0f, "dB"),
