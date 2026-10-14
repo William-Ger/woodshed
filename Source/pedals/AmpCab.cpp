@@ -959,7 +959,7 @@ void registerAmpCabPedals (Registry& r)
                         knob ("presence", "Presence", 0.0f, 1.0f, 0.4f, "%"),
                         knob ("master", "Master", 0.0f, 1.0f, 0.5f, "%") } });
 
-    r.add<BassAmp> ({ "amp.bass", "UNDERTOW", "bass amp", "Amp",
+    r.add<BassAmp> ({ "amp.bass", "BASEMENT", "bass amp", "Amp",
                       "Bass and baritone amp: deep clean, warm tube growl, or grind over a solid low end",
                       juce::Colour (0xff1f2a33), juce::Colour (0xffd7e0e6),
                       { choice ("voice", "Voice", { "Studio Clean", "Tube Warm", "Grind" }, 0),
