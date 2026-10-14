@@ -45,5 +45,7 @@ void registerPitchPedals (Registry&);
 void registerDelayPedals (Registry&);
 void registerReverbPedals (Registry&);
 void registerAmpCabPedals (Registry&);
+void registerGlitchPedals (Registry&);
+void registerWeirdPedals (Registry&);
 
 } // namespace woodshed

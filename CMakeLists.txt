@@ -26,7 +26,9 @@ set(WOODSHED_ENGINE_SOURCES
     Source/pedals/Modulation.cpp
     Source/pedals/Pitch.cpp
     Source/pedals/Delay.cpp
-    Source/pedals/Reverb.cpp)
+    Source/pedals/Reverb.cpp
+    Source/pedals/Glitch.cpp
+    Source/pedals/Weird.cpp)
 
 #==============================================================================
 # The app: standalone + AU + VST3 from one codebase.

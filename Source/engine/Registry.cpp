@@ -13,6 +13,8 @@ Registry::Registry()
     registerPitchPedals (*this);
     registerDelayPedals (*this);
     registerReverbPedals (*this);
+    registerGlitchPedals (*this);
+    registerWeirdPedals (*this);
 }
 
 const Registry& Registry::get()
@@ -32,7 +34,7 @@ const PedalType* Registry::find (const juce::String& type) const
 
 const juce::StringArray& Registry::categories()
 {
-    static const juce::StringArray list { "Dynamics", "Drive", "Amp", "Cab", "Filter", "Modulation", "Pitch", "Delay", "Reverb" };
+    static const juce::StringArray list { "Dynamics", "Drive", "Amp", "Cab", "Filter", "Modulation", "Pitch", "Delay", "Reverb", "Weird" };
     return list;
 }
 
