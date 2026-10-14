@@ -3,3 +3,6 @@ build-*/
 .DS_Store
 *.wav
 !tools/testdata/*.wav
+.claude/worktrees/
+.swamp/
+**/.swamp/

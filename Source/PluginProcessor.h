@@ -50,6 +50,7 @@ public:
     void removePedal (int position);
     void movePedal (int from, int to);
     void setBoard (const juce::StringArray& types);         // resets every knob to its default
+    void loadDefaultBoard();
 
     static juce::String onParamId (int slot)               { return "s" + juce::String (slot) + "_on"; }
     static juce::String knobParamId (int slot, int knob)   { return "s" + juce::String (slot) + "_p" + juce::String (knob); }

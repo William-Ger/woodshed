@@ -55,7 +55,6 @@ public:
     static int widthFor (const PedalType*);
 
     void paint (juce::Graphics&) override;
-    void paintOverChildren (juce::Graphics&) override;
     void resized() override;
     void mouseEnter (const juce::MouseEvent&) override       { repaint(); }
     void mouseExit (const juce::MouseEvent&) override        { repaint(); }

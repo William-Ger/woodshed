@@ -74,14 +74,8 @@ if(NOT WOODSHED_BENCH_ONLY)
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
 
-    # macOS remembers microphone permission per signing identity; ad-hoc signatures change every
-    # build and re-prompt. Point this at a stable local identity to avoid that.
-    set(WOODSHED_SIGN_IDENTITY "" CACHE STRING "macOS code-signing identity for the standalone app")
-    if(APPLE AND WOODSHED_SIGN_IDENTITY)
-        add_custom_command(TARGET Woodshed_Standalone POST_BUILD
-            COMMAND codesign --force --sign "${WOODSHED_SIGN_IDENTITY}" "$<TARGET_BUNDLE_DIR:Woodshed_Standalone>"
-            VERBATIM)
-    endif()
+    # On macOS, run tools/sign-mac.sh after building the standalone so microphone permission
+    # survives rebuilds (ad-hoc signatures change every build and macOS re-prompts).
 endif()
 
 #==============================================================================

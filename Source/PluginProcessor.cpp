@@ -28,10 +28,14 @@ WoodshedProcessor::WoodshedProcessor()
 {
     params.state.addListener (this);
 
+    loadDefaultBoard();
+    startTimerHz (10);
+}
+
+void WoodshedProcessor::loadDefaultBoard()
+{
     setBoard (defaultBoard);
     params.getParameter (onParamId (defaultBoard.indexOf ("delay.analog")))->setValueNotifyingHost (0.0f);
-
-    startTimerHz (10);
 }
 
 WoodshedProcessor::~WoodshedProcessor()
