@@ -36,7 +36,8 @@ struct TrackRuntime
     std::unique_ptr<juce::AudioProcessor> rig;
     juce::AudioBuffer<float> work;                                      // audio thread scratch
     juce::SmoothedValue<float> gainLeft, gainRight;
-    std::atomic<float> peakLeft { 0.0f }, peakRight { 0.0f };
+    std::atomic<float> peakLeft { 0.0f }, peakRight { 0.0f };          // audio thread accumulates
+    float shownLeft = 0.0f, shownRight = 0.0f;                          // message thread: last 30 Hz frame
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> recorder { nullptr };
 };
 
@@ -130,7 +131,7 @@ public:
     /** Copies every rig's settings into its track's RIG child; call before saving. */
     void syncRigStates();
 
-    // Meters: peak since the last call, linear.
+    // Meters: the peak over the last 30 Hz frame, linear. Any number of views can read them.
     struct Levels { float left = 0.0f, right = 0.0f; };
     Levels takeTrackLevels (int trackId);
     Levels takeMasterLevels();
@@ -204,6 +205,7 @@ private:
     std::atomic<juce::int64> position { 0 }, recordStart { 0 };
     std::atomic<juce::int64> requestedPosition { -1 };
     std::atomic<float> masterPeakLeft { 0.0f }, masterPeakRight { 0.0f };
+    Levels masterShown;
     std::atomic<juce::uint64> callbackCount { 0 };
 
     // Recording bookkeeping (message thread).

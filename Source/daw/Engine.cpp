@@ -431,13 +431,13 @@ void Engine::removeTrack (juce::ValueTree track)
 Engine::Levels Engine::takeTrackLevels (int trackId)
 {
     if (auto it = runtimes.find (trackId); it != runtimes.end())
-        return { it->second->peakLeft.exchange (0.0f), it->second->peakRight.exchange (0.0f) };
+        return { it->second->shownLeft, it->second->shownRight };
     return {};
 }
 
 Engine::Levels Engine::takeMasterLevels()
 {
-    return { masterPeakLeft.exchange (0.0f), masterPeakRight.exchange (0.0f) };
+    return masterShown;
 }
 
 //==============================================================================
@@ -573,6 +573,14 @@ void Engine::freeRetired()
 void Engine::timerCallback()
 {
     freeRetired();
+
+    // One meter frame: collect the audio thread's peaks so every view sees the same values.
+    masterShown = { masterPeakLeft.exchange (0.0f), masterPeakRight.exchange (0.0f) };
+    for (auto& [id, rt] : runtimes)
+    {
+        rt->shownLeft = rt->peakLeft.exchange (0.0f);
+        rt->shownRight = rt->peakRight.exchange (0.0f);
+    }
 
     // Close the takes once the audio thread has certainly stopped writing to them.
     const bool deviceRunning = deviceManager.getCurrentAudioDevice() != nullptr && deviceManager.getCurrentAudioDevice()->isPlaying();
