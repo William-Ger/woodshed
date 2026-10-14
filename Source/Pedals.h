@@ -97,7 +97,7 @@ public:
             const float cutoff = tone.getNextValue();
             const float a = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * cutoff / (float) sr);
             toneState += a * (dcBlock.processSample (data[i]) - toneState);
-            data[i] = toneState * level.getNextValue() * 0.6f;
+            data[i] = toneState * level.getNextValue() * outputTrim;
         }
     }
 
@@ -108,6 +108,9 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> gain { 1.0f }, tone { 4000.0f };
     juce::SmoothedValue<float> level { 1.0f };
     float toneState = 0.0f;
+
+    // The clipper saturates near full scale; bring it back to roughly a clean DI's level.
+    static constexpr float outputTrim = 0.12f;
 };
 
 //==============================================================================

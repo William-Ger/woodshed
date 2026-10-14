@@ -4,6 +4,14 @@
 
 using APVTS = juce::AudioProcessorValueTreeState;
 
+// Transparent below -2 dBFS, then a soft knee into full scale instead of a hard wall.
+static float safetyClip (float x)
+{
+    constexpr float knee = 0.8f, room = 1.0f - knee;
+    const float mag = std::abs (x);
+    return mag <= knee ? x : std::copysign (knee + room * std::tanh ((mag - knee) / room), x);
+}
+
 WoodshedProcessor::WoodshedProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
@@ -200,8 +208,8 @@ void WoodshedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     for (int i = 0; i < n; ++i)
     {
         const float g = masterGain.getNextValue();
-        left[i] = juce::jlimit (-1.0f, 1.0f, left[i] * g);
-        right[i] = juce::jlimit (-1.0f, 1.0f, right[i] * g);
+        left[i] = safetyClip (left[i] * g);
+        right[i] = safetyClip (right[i] * g);
         outPeak = juce::jmax (outPeak, std::abs (left[i]), std::abs (right[i]));
     }
 

@@ -11,6 +11,7 @@
 namespace
 {
 constexpr int preferredBufferSize = 64;
+constexpr double preferredSampleRate = 48000.0;   // GarageBand-class rate; 192k just burns CPU
 
 juce::String findInterface()
 {
@@ -64,6 +65,7 @@ public:
         preferred.inputDeviceName  = interfaceName;
         preferred.outputDeviceName = interfaceName;
         preferred.bufferSize       = preferredBufferSize;
+        preferred.sampleRate       = preferredSampleRate;
 
         auto holder = std::make_unique<juce::StandalonePluginHolder> (settings, false, interfaceName,
                                                                       interfaceName.isNotEmpty() ? &preferred : nullptr);

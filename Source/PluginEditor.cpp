@@ -300,6 +300,8 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
     addAndMakeVisible (outputMeter);
 
     latencyLabel.setFont (juce::FontOptions (13.0f));
+    latencyLabel.setMinimumHorizontalScale (0.7f);
+    latencyLabel.setTooltip ("Round-trip latency  ·  buffer size @ sample rate");
     latencyLabel.setJustificationType (juce::Justification::centredRight);
     latencyLabel.setColour (juce::Label::textColourId, palette::dimText);
     addAndMakeVisible (latencyLabel);
@@ -338,6 +340,9 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
         addAndMakeVisible (pedal);
 
     captureDir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                                    #if JUCE_MAC
+                     .getChildFile ("Application Support")
+               #endif
                      .getChildFile ("Woodshed").getChildFile ("captures");
     captureRequestFile = captureDir.getChildFile ("capture.request");
 
@@ -389,8 +394,8 @@ void WoodshedEditor::paint (juce::Graphics& g)
 
         g.setColour (palette::dimText);
         g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.2f));
-        g.drawText ("GUITAR", 6, (int) y + 8, 60, 14, juce::Justification::centredLeft);
-        g.drawText ("AMP", getWidth() - 66, (int) y + 8, 60, 14, juce::Justification::centredRight);
+        g.drawText ("IN", 8, (int) y + 8, 30, 14, juce::Justification::centredLeft);
+        g.drawText ("OUT", getWidth() - 38, (int) y + 8, 30, 14, juce::Justification::centredRight);
     }
 }
 
@@ -419,8 +424,8 @@ void WoodshedEditor::resized()
         bar.removeFromRight (8);
     }
 
-    latencyLabel.setBounds (bar.withTrimmedBottom (34).withTrimmedTop (12));
-    statusLabel.setBounds (bar.withTrimmedTop (38).withHeight (20));
+    latencyLabel.setBounds (bar.withTrimmedBottom (30).withTrimmedTop (12));
+    statusLabel.setBounds (bar.withTrimmedTop (40).withHeight (20));
 
     auto board = r.reduced (40, 36);
     const int gap = 28;
@@ -466,9 +471,12 @@ void WoodshedEditor::updateLatencyText()
             const double rate = device->getCurrentSampleRate();
             const int total = device->getInputLatencyInSamples() + device->getOutputLatencyInSamples()
                             + woodshedProcessor.getLatencySamples();
-            text = juce::String (1000.0 * total / rate, 1) + " ms round trip   |   "
-                 + juce::String (device->getCurrentBufferSizeSamples()) + " samples @ "
-                 + juce::String (rate / 1000.0, 1) + " kHz   |   " + device->getName();
+            text = juce::String (1000.0 * total / rate, 1) + " ms  ·  "
+                 + juce::String (device->getCurrentBufferSizeSamples()) + " @ "
+                 + juce::String (rate / 1000.0, 1) + "k";
+
+            if (const int xruns = device->getXRunCount(); xruns > 0)
+                text << "  ·  " << xruns << " dropouts";
         }
         else
         {
