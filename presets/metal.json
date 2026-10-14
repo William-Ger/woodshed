@@ -2,6 +2,89 @@
   "genre": "Hard Rock & Metal",
   "presets": [
     {
+      "name": "Breakwall Bounce",
+      "description": "Early-2000s nu-metal wall: a hard gate for the stop-start riffs, a tight boost into a modern high-gain channel, and a wide double-track so it sounds like two guitars. Stomp 3 to go mono, 4 for a lead echo.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Lead",
+          "tight": "Tight",
+          "gain": 0.6,
+          "bass": 0.55,
+          "lowmid": -2,
+          "highmid": 2,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Tight 4x12",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.3,
+          "lowcut": 80,
+          "highcut": 7000,
+          "level": 0.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -50,
+            "release": 35
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 7,
+            "tilt": 0.25,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "mod.doubler",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 14,
+            "drift": 0.3,
+            "width": 0.9,
+            "tone": 7000,
+            "mix": 0.6,
+            "mode": "Double"
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 8,
+          "on": false,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.3,
+            "mix": 0.18,
+            "tone": 5000
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "mix": 0.06
+          }
+        }
+      ]
+    },
+    {
       "name": "Iron Bastion",
       "description": "Modern brick-wall rhythm: a gate and a tight boost slam the high-gain amp, with the cab's fizz trimmed off. Stomp 9 for a lead echo.",
       "amp": {
