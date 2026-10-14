@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "Art.h"
 
 #if JucePlugin_Build_Standalone
  #include <juce_audio_utils/juce_audio_utils.h>
@@ -54,72 +55,55 @@ BoardLookAndFeel::BoardLookAndFeel()
 void BoardLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos,
                                          float startAngle, float endAngle, juce::Slider& slider)
 {
+    auto& art = Art::get();
     const auto ink = slider.findColour (juce::Slider::rotarySliderOutlineColourId);
-    const auto bounds = juce::Rectangle<int> (x, y, w, h).toFloat().reduced (3.0f);
+    const auto bounds = juce::Rectangle<int> (x, y, w, h).toFloat().reduced (2.0f);
     const float radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f;
     const auto centre = bounds.getCentre();
     const float angle = startAngle + pos * (endAngle - startAngle);
 
-    // Tick marks printed on the enclosure; stepped knobs get one tick per position.
+    // Scale printed on the enclosure; stepped knobs get one tick per position.
     const auto interval = slider.getNormalisableRange().interval;
     const int ticks = interval > 0.0 ? juce::roundToInt (1.0 / interval) : 10;
 
-    g.setColour (ink.withAlpha (0.55f));
+    g.setColour (ink.withAlpha (0.6f));
     for (int i = 0; i <= ticks; ++i)
     {
         const float a = startAngle + (float) i / (float) ticks * (endAngle - startAngle);
         const bool major = interval > 0.0 || i % 5 == 0;
-        const auto p1 = centre.getPointOnCircumference (radius * 0.86f, a);
-        const auto p2 = centre.getPointOnCircumference (radius * (major ? 1.0f : 0.94f), a);
-        g.drawLine ({ p1, p2 }, major ? 1.6f : 1.0f);
+        g.drawLine ({ centre.getPointOnCircumference (radius * 0.88f, a),
+                      centre.getPointOnCircumference (radius * (major ? 1.0f : 0.95f), a) }, major ? 1.5f : 1.0f);
     }
 
-    const float skirt = radius * 0.76f, cap = radius * 0.56f;
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
-    g.fillEllipse (juce::Rectangle<float> (skirt * 2, skirt * 2).withCentre (centre.translated (0, 2.5f)));
+    // The rendered knob, sized so its skirt sits just inside the scale.
+    const float skirt = radius * 0.82f;
+    const float imageSize = skirt / art.knobSkirt;
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    g.drawImage (art.knob, juce::Rectangle<float> (imageSize, imageSize).withCentre (centre));
 
-    juce::ColourGradient skirtGrad (juce::Colour (0xff2b2926), centre.x, centre.y - skirt,
-                                    juce::Colour (0xff0e0d0c), centre.x, centre.y + skirt, false);
-    g.setGradientFill (skirtGrad);
-    g.fillEllipse (juce::Rectangle<float> (skirt * 2, skirt * 2).withCentre (centre));
-
-    juce::ColourGradient capGrad (juce::Colour (0xff3d3a36), centre.x - cap, centre.y - cap,
-                                  juce::Colour (0xff151413), centre.x + cap, centre.y + cap, false);
-    g.setGradientFill (capGrad);
-    g.fillEllipse (juce::Rectangle<float> (cap * 2, cap * 2).withCentre (centre));
-
-    g.setColour (slider.isMouseOverOrDragging() ? palette::accent : juce::Colour (0xfff2ece0));
-    g.drawLine ({ centre.getPointOnCircumference (cap * 0.25f, angle),
-                  centre.getPointOnCircumference (skirt * 0.95f, angle) }, juce::jmax (1.8f, radius * 0.08f));
+    // Indicator line across the fluted body.
+    const float body = imageSize * art.knobBody, cap = imageSize * art.knobCap;
+    g.setColour (slider.isMouseOverOrDragging() ? palette::accent : juce::Colour (0xfff4efe4));
+    g.drawLine ({ centre.getPointOnCircumference (cap * 0.35f, angle),
+                  centre.getPointOnCircumference (body * 0.96f, angle) }, juce::jmax (1.6f, radius * 0.075f));
 }
 
 void BoardLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& button, bool highlighted, bool down)
 {
-    // A stomp footswitch: knurled ring, domed metal cap.
+    auto& art = Art::get();
     const auto b = button.getLocalBounds().toFloat();
-    const float r = juce::jmin (b.getWidth(), b.getHeight()) * 0.5f - 2.0f;
-    const auto c = b.getCentre().translated (0, down ? 1.5f : 0.0f);
+    const float r = juce::jmin (b.getWidth(), b.getHeight()) * 0.5f * (down ? 0.97f : 1.0f);
+    const float imageSize = r / art.footswitchRadius;
 
-    g.setColour (juce::Colours::black.withAlpha (0.4f));
-    g.fillEllipse (juce::Rectangle<float> (r * 2, r * 2).withCentre (b.getCentre().translated (0, 3)));
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    g.setOpacity (1.0f);
+    g.drawImage (art.footswitch, juce::Rectangle<float> (imageSize, imageSize).withCentre (b.getCentre().translated (0, down ? 1.0f : 0.0f)));
 
-    juce::ColourGradient ring (juce::Colour (0xffbdbab4), c.x, c.y - r, juce::Colour (0xff55524d), c.x, c.y + r, false);
-    g.setGradientFill (ring);
-    g.fillEllipse (juce::Rectangle<float> (r * 2, r * 2).withCentre (c));
-
-    g.setColour (juce::Colour (0xff3d3b38));
-    for (int i = 0; i < 36; ++i)
+    if (down || highlighted)
     {
-        const float a = (float) i / 36.0f * juce::MathConstants<float>::twoPi;
-        g.drawLine ({ c.getPointOnCircumference (r * 0.82f, a), c.getPointOnCircumference (r * 0.97f, a) }, 1.0f);
+        g.setColour ((down ? juce::Colours::black : juce::Colours::white).withAlpha (down ? 0.18f : 0.06f));
+        g.fillEllipse (juce::Rectangle<float> (r * 1.3f, r * 1.3f).withCentre (b.getCentre()));
     }
-
-    const float dome = r * 0.66f;
-    juce::ColourGradient domeGrad (highlighted ? juce::Colour (0xfff5f3ee) : juce::Colour (0xffe3e0da),
-                                   c.x - dome * 0.4f, c.y - dome * 0.6f,
-                                   juce::Colour (0xff7a7670), c.x + dome * 0.5f, c.y + dome, true);
-    g.setGradientFill (domeGrad);
-    g.fillEllipse (juce::Rectangle<float> (dome * 2, dome * 2).withCentre (c));
 }
 
 //==============================================================================
@@ -252,171 +236,125 @@ PedalView::PedalView (WoodshedProcessor& p, int s, const juce::String& t, bool c
     addAndMakeVisible (footswitch);
 }
 
+juce::Rectangle<float> PedalView::bodyArea() const
+{
+    auto& art = Art::get();
+    const auto all = getLocalBounds().toFloat();
+
+    if (type != nullptr && type->info.category == "Amp")
+        return Art::regionIn (all, art.ampRect);
+    if (type != nullptr && type->info.category == "Cab")
+        return Art::regionIn (all, art.cabRect);
+
+    return Art::regionIn (all, art.enclosureBody);
+}
+
+juce::Rectangle<float> PedalView::controlArea() const
+{
+    auto& art = Art::get();
+    const auto all = getLocalBounds().toFloat();
+
+    if (type != nullptr && type->info.category == "Amp") return Art::regionIn (all, art.ampPanel).reduced (10.0f, 6.0f);
+    if (type != nullptr && type->info.category == "Cab") return Art::regionIn (all, art.cabPanel).reduced (10.0f, 6.0f);
+
+    auto body = bodyArea().reduced (bodyArea().getWidth() * 0.07f, bodyArea().getHeight() * 0.05f);
+    return body.withHeight (body.getHeight() * 0.47f);
+}
+
 void PedalView::paint (juce::Graphics& g)
 {
-    auto r = getLocalBounds().toFloat().reduced (2.0f);
-    const float corner = juce::jmin (12.0f, r.getWidth() * 0.07f);
-
-    g.setColour (juce::Colours::black.withAlpha (dragging ? 0.6f : 0.5f));
-    g.fillRoundedRectangle (r.translated (0, dragging ? 12.0f : 5.0f), corner);
+    auto& art = Art::get();
+    const auto all = getLocalBounds().toFloat();
+    const auto body = bodyArea();
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
 
     if (type == nullptr)
     {
         g.setColour (juce::Colour (0xff2a2826));
-        g.fillRoundedRectangle (r, corner);
+        g.fillRoundedRectangle (body, 10.0f);
         g.setColour (palette::dimText);
         g.setFont (juce::FontOptions (12.0f));
-        g.drawFittedText ("Unknown pedal\n" + typeId, r.reduced (10).toNearestInt(), juce::Justification::centred, 3);
+        g.drawFittedText ("Unknown pedal\n" + typeId, body.reduced (10).toNearestInt(), juce::Justification::centred, 3);
         return;
     }
 
     const auto& info = type->info;
-    const bool isAmp = info.category == "Amp";
-    const bool isCab = info.category == "Cab";
-    const auto knobArea = r.withHeight (r.getHeight() * 0.5f);
-
-    if (isAmp)
-    {
-        // Tolex-covered head with a coloured control panel and gold piping.
-        g.setColour (palette::tolex);
-        g.fillRoundedRectangle (r, corner);
-        g.setColour (juce::Colours::white.withAlpha (0.025f));
-        for (float y = r.getY(); y < r.getBottom(); y += 3.0f)
-            g.drawHorizontalLine ((int) y, r.getX(), r.getRight());
-
-        auto plate = r.reduced (12.0f, 12.0f).withHeight (r.getHeight() * 0.62f);
-        juce::ColourGradient face (info.body.brighter (0.15f), plate.getX(), plate.getY(),
-                                   info.body.darker (0.2f), plate.getX(), plate.getBottom(), false);
-        g.setGradientFill (face);
-        g.fillRoundedRectangle (plate, 6.0f);
-        g.setColour (palette::piping);
-        g.drawRoundedRectangle (plate.expanded (3.0f), 8.0f, 1.6f);
-        g.drawRoundedRectangle (r.reduced (5.0f), corner * 0.75f, 1.0f);
-    }
-    else if (isCab)
-    {
-        g.setColour (palette::tolex);
-        g.fillRoundedRectangle (r, corner);
-
-        auto strip = knobArea.reduced (10.0f, 10.0f);
-        g.setColour (info.body);
-        g.fillRoundedRectangle (strip, 6.0f);
-
-        // Grille cloth: a woven diagonal pattern under the controls.
-        auto grille = r.withTrimmedTop (knobArea.getHeight() + 2.0f).reduced (12.0f, 0.0f).withTrimmedBottom (12.0f);
-        g.setColour (juce::Colour (0xff3a342b));
-        g.fillRoundedRectangle (grille, 6.0f);
-        g.saveState();
-        g.reduceClipRegion (grille.toNearestInt());
-        g.setColour (juce::Colour (0xff58503f).withAlpha (0.55f));
-        for (float d = -grille.getHeight(); d < grille.getWidth(); d += 6.0f)
-        {
-            g.drawLine (grille.getX() + d, grille.getBottom(), grille.getX() + d + grille.getHeight(), grille.getY(), 1.2f);
-            g.drawLine (grille.getX() + d, grille.getY(), grille.getX() + d + grille.getHeight(), grille.getBottom(), 0.8f);
-        }
-        g.restoreState();
-        g.setColour (palette::piping.withAlpha (0.7f));
-        g.drawRoundedRectangle (grille, 6.0f, 1.2f);
-    }
-    else
-    {
-        juce::ColourGradient body (info.body.brighter (0.18f), r.getX(), r.getY(),
-                                   info.body.darker (0.25f), r.getX(), r.getBottom(), false);
-        g.setGradientFill (body);
-        g.fillRoundedRectangle (r, corner);
-        g.setColour (juce::Colours::white.withAlpha (0.14f));
-        g.drawRoundedRectangle (r.reduced (1.0f), corner - 1.0f, 1.2f);
-
-        for (auto p : { r.getTopLeft() + juce::Point<float> (10, 10), r.getTopRight() + juce::Point<float> (-10, 10),
-                        r.getBottomLeft() + juce::Point<float> (10, -10), r.getBottomRight() + juce::Point<float> (-10, -10) })
-        {
-            g.setColour (juce::Colour (0xff9a968f));
-            g.fillEllipse (juce::Rectangle<float> (7, 7).withCentre (p));
-            g.setColour (juce::Colour (0xff4a4743));
-            g.drawLine ({ p.translated (-2.0f, -2.0f), p.translated (2.0f, 2.0f) }, 1.1f);
-        }
-
-        // Jacks on the sides, where the patch cables plug in.
-        for (float x : { r.getX() - 1.0f, r.getRight() - 5.0f })
-        {
-            g.setColour (juce::Colour (0xff8f8a82));
-            g.fillRoundedRectangle (x, r.getY() + r.getHeight() * 0.3f - 6.0f, 6.0f, 12.0f, 2.0f);
-        }
-    }
-
-    const auto nameInk = (isAmp || isCab) ? palette::text : info.ink;
     const bool on = footswitch.getToggleState();
+    const bool isAmp = info.category == "Amp", isCab = info.category == "Cab";
 
     if (isAmp || isCab)
     {
-        // Pilot light and name badge.
-        const auto badge = isAmp ? r.withTrimmedTop (r.getHeight() * 0.66f).reduced (14.0f, 4.0f)
-                                 : r.withTrimmedTop (r.getHeight() * 0.62f).withHeight (40.0f);
-        g.setColour (nameInk);
-        g.setFont (juce::FontOptions (22.0f, juce::Font::bold).withKerningFactor (0.14f));
-        g.drawText (info.name, badge.withHeight (28.0f), juce::Justification::centred);
-        g.setColour (nameInk.withAlpha (0.6f));
-        g.setFont (juce::FontOptions (10.0f).withKerningFactor (0.18f));
-        g.drawText (info.subtitle.toUpperCase(), badge.withTrimmedTop (26.0f).withHeight (14.0f), juce::Justification::centred);
+        // Panel painted in the model's colour sits in the hole the body render leaves for it.
+        g.drawImage (isAmp ? art.ampPanelIn (info.body) : art.cabPanelIn (info.body), all);
+        g.drawImage (isAmp ? art.ampBody : art.cabBody, all);
 
-        const auto pilot = juce::Rectangle<float> (10, 10).withCentre ({ r.getX() + 24.0f, badge.getY() + 14.0f });
-        g.setColour (on ? palette::ledOn.withAlpha (0.35f) : juce::Colours::transparentBlack);
-        g.fillEllipse (pilot.expanded (6.0f));
-        g.setColour (on ? palette::ledOn : juce::Colour (0xff3a1612));
-        g.fillEllipse (pilot);
+        // Name badge on the grille cloth, like a script logo.
+        const auto grille = Art::regionIn (all, isAmp ? art.ampGrille : art.cabGrille);
+        const auto badge = grille.withSizeKeepingCentre (grille.getWidth() * 0.6f, juce::jmin (grille.getHeight(), 46.0f));
+        g.setFont (juce::FontOptions (juce::jlimit (16.0f, 30.0f, badge.getHeight() * 0.62f), juce::Font::bold).withKerningFactor (0.16f));
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.drawText (info.name, badge.translated (1.0f, 2.0f), juce::Justification::centred);
+        g.setColour (palette::piping.brighter (0.25f));
+        g.drawText (info.name, badge, juce::Justification::centred);
+
+        // Pilot light.
+        const auto pilot = juce::Rectangle<float> (18.0f, 18.0f).withCentre ({ grille.getX() + 22.0f, grille.getCentreY() });
+        if (on)
+        {
+            g.setColour (palette::ledOn.withAlpha (0.3f));
+            g.fillEllipse (pilot.expanded (8.0f));
+        }
+        g.drawImage (on ? art.ledOn : art.ledOff, pilot.expanded (pilot.getWidth() * 0.5f));
         return;
     }
 
-    // LED.
-    const auto led = juce::Rectangle<float> (10, 10).withCentre ({ r.getCentreX(), r.getY() + r.getHeight() * 0.535f });
+    g.drawImage (art.enclosure (info.body), all);
+
+    // LED in its chrome bezel.
+    const float ledSize = juce::jlimit (14.0f, 22.0f, body.getWidth() * 0.11f);
+    const auto led = juce::Rectangle<float> (ledSize, ledSize).withCentre ({ body.getCentreX(), body.getY() + body.getHeight() * 0.53f });
     if (on)
     {
-        g.setColour (palette::ledOn.withAlpha (0.35f));
-        g.fillEllipse (led.expanded (6.0f));
+        juce::ColourGradient glow (palette::ledOn.withAlpha (0.45f), led.getCentreX(), led.getCentreY(),
+                                   palette::ledOn.withAlpha (0.0f), led.getCentreX() + ledSize * 1.6f, led.getCentreY(), true);
+        g.setGradientFill (glow);
+        g.fillEllipse (led.expanded (ledSize * 1.6f));
     }
-    g.setColour (on ? palette::ledOn : juce::Colour (0xff3a1612));
-    g.fillEllipse (led);
-    g.setColour (juce::Colours::white.withAlpha (on ? 0.7f : 0.15f));
-    g.fillEllipse (led.reduced (3.0f).translated (-1.0f, -1.0f));
+    g.drawImage (on ? art.ledOn : art.ledOff, led.expanded (ledSize * 0.5f));
 
-    // Name plate.
-    auto plate = r.withTrimmedTop (r.getHeight() * 0.58f).withHeight (46.0f);
-    const float nameSize = juce::jlimit (13.0f, 24.0f, r.getWidth() / (float) juce::jmax (4, info.name.length()) * 1.3f);
-    g.setColour (nameInk);
+    // Silkscreened name and subtitle.
+    auto plate = body.withTrimmedTop (body.getHeight() * 0.585f).withHeight (body.getHeight() * 0.16f);
+    const float nameSize = juce::jlimit (12.0f, 24.0f, body.getWidth() / (float) juce::jmax (4, info.name.length()) * 1.3f);
+    g.setColour (info.ink);
     g.setFont (juce::FontOptions (nameSize, juce::Font::bold).withKerningFactor (0.1f));
-    g.drawFittedText (info.name, plate.removeFromTop (28.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
-    g.setColour (nameInk.withAlpha (0.7f));
-    g.setFont (juce::FontOptions (9.5f).withKerningFactor (0.14f));
-    g.drawFittedText (info.subtitle.toUpperCase(), plate.removeFromTop (14.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+    g.drawFittedText (info.name, plate.removeFromTop (plate.getHeight() * 0.64f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+    g.setColour (info.ink.withAlpha (0.7f));
+    g.setFont (juce::FontOptions (juce::jlimit (8.0f, 10.0f, body.getWidth() * 0.055f)).withKerningFactor (0.14f));
+    g.drawFittedText (info.subtitle.toUpperCase(), plate.toNearestInt(), juce::Justification::centred, 1, 0.7f);
 
     if (slot < 10)
     {
-        g.setColour (nameInk.withAlpha (0.45f));
-        g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
-        g.drawText (juce::String ((slot + 1) % 10), r.withTrimmedBottom (5.0f).removeFromBottom (12.0f), juce::Justification::centred);
+        g.setColour (info.ink.withAlpha (0.4f));
+        g.setFont (juce::FontOptions (9.0f, juce::Font::bold));
+        g.drawText (juce::String ((slot + 1) % 10), body.withTrimmedBottom (body.getHeight() * 0.035f).removeFromBottom (12.0f), juce::Justification::centred);
     }
 }
 
 void PedalView::resized()
 {
-    removeButton.setBounds (getWidth() - 24, 6, 18, 18);
+    const auto body = bodyArea().toNearestInt();
+    removeButton.setBounds (body.getRight() - 26, body.getY() + 8, 18, 18);
 
     if (type == nullptr)
         return;
 
-    const bool isAmp = type->info.category == "Amp";
-    const bool isCab = type->info.category == "Cab";
-
-    auto r = getLocalBounds().reduced (isAmp ? 20 : 12, isAmp ? 18 : 12);
-    auto knobArea = r.removeFromTop ((int) ((float) getHeight() * (isAmp ? 0.56f : 0.44f)));
-    if (! isAmp && ! isCab)
-        knobArea.removeFromTop (4);
-
+    const bool isAmp = type->info.category == "Amp", isCab = type->info.category == "Cab";
+    auto knobArea = controlArea().toNearestInt();
     const int n = knobs.size();
 
     if (n > 0)
     {
-        const int perRow = n <= 2 ? n : n <= 4 ? 2 : n <= 6 ? 3 : 4;
+        const int perRow = (isAmp || isCab) ? (n <= 4 ? n : (n + 1) / 2) : (n <= 2 ? n : n <= 4 ? 2 : n <= 6 ? 3 : 4);
         const int rows = (n + perRow - 1) / perRow;
         const int cellH = knobArea.getHeight() / rows;
         const int cellW = knobArea.getWidth() / perRow;
@@ -434,14 +372,15 @@ void PedalView::resized()
 
     if (isAmp || isCab)
     {
-        // A small power switch in the corner instead of a stomp switch.
-        const int s = 30;
-        footswitch.setBounds (getWidth() - s - 14, getHeight() - s - 12, s, s);
+        // A small power switch at the right end of the grille.
+        const auto grille = Art::regionIn (getLocalBounds().toFloat(), isAmp ? Art::get().ampGrille : Art::get().cabGrille);
+        const int s = juce::jlimit (22, 34, (int) (grille.getHeight() * 0.7f));
+        footswitch.setBounds (juce::Rectangle<int> (s, s).withCentre ({ (int) grille.getRight() - s, (int) grille.getCentreY() }));
         return;
     }
 
-    const int fs = juce::jlimit (34, 62, juce::jmin ((int) ((float) getWidth() * 0.34f), (int) ((float) getHeight() * 0.17f)));
-    footswitch.setBounds (getLocalBounds().getCentreX() - fs / 2, getHeight() - fs - 18, fs, fs);
+    const int fs = juce::jlimit (34, 64, juce::jmin ((int) ((float) body.getWidth() * 0.36f), (int) ((float) body.getHeight() * 0.18f)));
+    footswitch.setBounds (body.getCentreX() - fs / 2, body.getBottom() - fs - (int) ((float) body.getHeight() * 0.07f), fs, fs);
 }
 
 void PedalView::mouseDown (const juce::MouseEvent& e)
@@ -533,16 +472,37 @@ juce::Array<PedalView*> BoardView::pedalsInChainOrder() const
 juce::Rectangle<int> BoardView::spotBounds (int spot) const
 {
     const int col = spot % WoodshedProcessor::boardColumns, row = spot / WoodshedProcessor::boardColumns;
-    const int gapX = 10, gapY = 22;
-    const int cellW = (deck.getWidth() - gapX * (WoodshedProcessor::boardColumns - 1)) / WoodshedProcessor::boardColumns;
-    const int cellH = (deck.getHeight() - gapY * (WoodshedProcessor::boardRows - 1)) / WoodshedProcessor::boardRows;
-    return { deck.getX() + col * (cellW + gapX), deck.getY() + row * (cellH + gapY), cellW, cellH };
+    const auto rowArea = Art::regionIn (boardImage, Art::get().boardRows[(size_t) row]);
+    const float colW = rowArea.getWidth() / (float) WoodshedProcessor::boardColumns;
+    return rowArea.withX (rowArea.getX() + (float) col * colW).withWidth (colW).toNearestInt();
+}
+
+juce::Rectangle<float> BoardView::bodyBounds (int spot) const
+{
+    auto& art = Art::get();
+    const auto cell = spotBounds (spot).toFloat();
+    const float aspect = (art.enclosureBody.getWidth() * (float) art.enclosure (juce::Colours::white).getWidth())
+                       / (art.enclosureBody.getHeight() * (float) art.enclosure (juce::Colours::white).getHeight());
+
+    float h = cell.getHeight() * 1.04f, w = h * aspect;
+    if (w > cell.getWidth() * 0.82f)
+    {
+        w = cell.getWidth() * 0.82f;
+        h = w / aspect;
+    }
+
+    return juce::Rectangle<float> (w, h).withCentre (cell.getCentre());
+}
+
+juce::Rectangle<int> BoardView::pedalBounds (int spot) const
+{
+    return Art::imageBoundsFor (bodyBounds (spot), Art::get().enclosureBody).toNearestInt();
 }
 
 int BoardView::spotAt (juce::Point<int> pt) const
 {
     for (int s = 0; s < WoodshedProcessor::boardSpots; ++s)
-        if (spotBounds (s).expanded (6, 12).contains (pt))
+        if (spotBounds (s).expanded (4, 10).contains (pt))
             return s;
 
     return -1;
@@ -557,106 +517,99 @@ void BoardView::layoutPedals()
 
 void BoardView::resized()
 {
-    deck = getLocalBounds().reduced (46, 26);
+    const auto& image = Art::get().board;
+    boardImage = juce::RectanglePlacement (juce::RectanglePlacement::centred)
+                     .appliedTo (image.getBounds().toFloat(), getLocalBounds().toFloat().reduced (2.0f));
     layoutPedals();
 }
 
 void BoardView::paint (juce::Graphics& g)
 {
-    auto frame = getLocalBounds().toFloat().reduced (4.0f);
+    auto& art = Art::get();
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    g.drawImage (art.board, boardImage);
 
-    // Board frame: anodised black with a bevelled lip.
-    g.setColour (juce::Colours::black.withAlpha (0.45f));
-    g.fillRoundedRectangle (frame.translated (0, 6), 16.0f);
-    juce::ColourGradient body (juce::Colour (0xff303033), frame.getX(), frame.getY(),
-                               juce::Colour (0xff141415), frame.getX(), frame.getBottom(), false);
-    g.setGradientFill (body);
-    g.fillRoundedRectangle (frame, 16.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.08f));
-    g.drawRoundedRectangle (frame.reduced (1.0f), 15.0f, 1.5f);
-
-    // Rails: brushed slats with dark gaps between them, one set per row.
-    for (int row = 0; row < WoodshedProcessor::boardRows; ++row)
-    {
-        auto rowArea = spotBounds (row * WoodshedProcessor::boardColumns).toFloat()
-                           .withX ((float) deck.getX() - 14.0f).withRight ((float) deck.getRight() + 14.0f);
-        const int slats = 3;
-        const float slatH = rowArea.getHeight() / (float) slats;
-
-        for (int i = 0; i < slats; ++i)
-        {
-            auto slat = rowArea.withY (rowArea.getY() + (float) i * slatH).withHeight (slatH - 7.0f);
-            juce::ColourGradient metal (juce::Colour (0xff4a4a4e), slat.getX(), slat.getY(),
-                                        juce::Colour (0xff2c2c2f), slat.getX(), slat.getBottom(), false);
-            g.setGradientFill (metal);
-            g.fillRoundedRectangle (slat, 3.0f);
-            g.setColour (juce::Colours::white.withAlpha (0.10f));
-            g.drawHorizontalLine ((int) slat.getY() + 1, slat.getX() + 3.0f, slat.getRight() - 3.0f);
-        }
-    }
-
-    // Empty spots, drop target.
     std::array<bool, WoodshedProcessor::boardSpots> used {};
     for (auto s : spots)
         if (s >= 0) used[(size_t) s] = true;
 
+    // Empty spots and the drop target.
     for (int s = 0; s < WoodshedProcessor::boardSpots; ++s)
     {
-        const auto b = pedalBounds (s).toFloat();
+        const auto b = bodyBounds (s);
 
         if (s == dragTarget)
         {
-            g.setColour (palette::accent.withAlpha (0.18f));
+            g.setColour (palette::accent.withAlpha (0.16f));
             g.fillRoundedRectangle (b, 10.0f);
             g.setColour (palette::accent);
             g.drawRoundedRectangle (b, 10.0f, 2.0f);
         }
         else if (! used[(size_t) s])
         {
-            juce::Path outline;
+            juce::Path outline, dashed;
             outline.addRoundedRectangle (b, 10.0f);
-            juce::Path dashed;
             const float dashes[] { 6.0f, 5.0f };
             juce::PathStrokeType (1.5f).createDashedStroke (dashed, outline, dashes, 2);
-            g.setColour (juce::Colours::white.withAlpha (s == hoverSpot ? 0.45f : 0.16f));
+            g.setColour (juce::Colours::white.withAlpha (s == hoverSpot ? 0.5f : 0.2f));
             g.fillPath (dashed);
             g.setFont (juce::FontOptions (s == hoverSpot ? 34.0f : 28.0f));
             g.drawText ("+", b, juce::Justification::centred);
         }
     }
 
-    // Patch cables, in chain order: guitar -> pedals -> amp.
-    auto inJack  = [this] (int spot) { auto b = pedalBounds (spot); return juce::Point<float> ((float) b.getX() + 2.0f, (float) b.getY() + (float) b.getHeight() * 0.3f); };
-    auto outJack = [this] (int spot) { auto b = pedalBounds (spot); return juce::Point<float> ((float) b.getRight() - 2.0f, (float) b.getY() + (float) b.getHeight() * 0.3f); };
-
-    auto cable = [&g] (juce::Point<float> a, juce::Point<float> b, juce::Colour colour)
+    // Patch cables in chain order: guitar -> pedals -> amp, plugged into the side jacks.
+    auto jack = [this, &art] (int spot, bool output)
     {
+        const auto b = bodyBounds (spot);
+        const float y = b.getY() + b.getHeight() * art.jackY;
+        return output ? juce::Point<float> (b.getRight() + b.getWidth() * 0.075f, y)
+                      : juce::Point<float> (b.getX() - b.getWidth() * 0.075f, y);
+    };
+
+    auto plug = [&g] (juce::Point<float> at, float direction)
+    {
+        // Right-angle plug: nickel barrel into the jack, black boot behind it.
+        const auto barrel = juce::Rectangle<float> (9.0f, 9.0f).withCentre (at.translated (-direction * 3.0f, 0.0f));
+        const auto boot = juce::Rectangle<float> (12.0f, 15.0f).withCentre (at.translated (direction * 6.0f, 0.0f));
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (boot.translated (2.0f, 3.0f), 3.5f);
+        juce::ColourGradient metal (juce::Colour (0xffd6d2ca), barrel.getX(), barrel.getY(), juce::Colour (0xff6e6a64), barrel.getX(), barrel.getBottom(), false);
+        g.setGradientFill (metal);
+        g.fillRoundedRectangle (barrel, 2.0f);
+        juce::ColourGradient rubber (juce::Colour (0xff3a3a3e), boot.getX(), boot.getY(), juce::Colour (0xff0c0c0d), boot.getX(), boot.getBottom(), false);
+        g.setGradientFill (rubber);
+        g.fillRoundedRectangle (boot, 3.5f);
+    };
+
+    auto cable = [&] (juce::Point<float> a, juce::Point<float> b, juce::Colour colour)
+    {
+        const auto a2 = a.translated (12.0f, 0.0f), b2 = b.translated (-12.0f, 0.0f);
         juce::Path p;
-        p.startNewSubPath (a);
-        const float span = a.getDistanceFrom (b);
-        const float pull = juce::jlimit (8.0f, 120.0f, std::abs (b.x - a.x) * 0.4f);
-        const float sag = juce::jlimit (2.0f, 26.0f, span * 0.08f);
-        p.cubicTo (a.translated (pull, sag), b.translated (-pull, sag), b);
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.strokePath (p, juce::PathStrokeType (6.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), juce::AffineTransform::translation (0, 3));
+        p.startNewSubPath (a2);
+        const float span = a2.getDistanceFrom (b2);
+        const float pull = juce::jlimit (8.0f, 140.0f, std::abs (b2.x - a2.x) * 0.45f + 20.0f);
+        const float sag = juce::jlimit (4.0f, 40.0f, span * 0.12f);
+        p.cubicTo (a2.translated (pull, sag), b2.translated (-pull, sag), b2);
+
+        g.setColour (juce::Colours::black.withAlpha (0.4f));
+        g.strokePath (p, juce::PathStrokeType (8.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), juce::AffineTransform::translation (3.0f, 5.0f));
         g.setColour (colour);
-        g.strokePath (p, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (colour.brighter (0.6f).withAlpha (0.5f));
-        g.strokePath (p, juce::PathStrokeType (1.2f), juce::AffineTransform::translation (0, -1.2f));
-        for (auto end : { a, b })
-        {
-            g.setColour (juce::Colour (0xffb9b3a8));
-            g.fillRoundedRectangle (juce::Rectangle<float> (12.0f, 10.0f).withCentre (end), 3.0f);
-        }
+        g.strokePath (p, juce::PathStrokeType (6.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (colour.brighter (0.9f).withAlpha (0.35f));
+        g.strokePath (p, juce::PathStrokeType (1.6f), juce::AffineTransform::translation (-0.8f, -1.6f));
+        plug (a.translated (6.0f, 0.0f), 1.0f);
+        plug (b.translated (-6.0f, 0.0f), -1.0f);
     };
 
     std::vector<int> chainSpots;
     for (auto* p : pedalsInChainOrder())
         chainSpots.push_back (spots[(size_t) p->getSlot()]);
 
-    const auto cableColour = juce::Colour (0xff1b1b1d);
-    const auto guitarIn = juce::Point<float> (frame.getX() + 6.0f, chainSpots.empty() ? frame.getCentreY() : inJack (chainSpots.front()).y);
-    const auto toAmp = juce::Point<float> (frame.getRight() - 6.0f, chainSpots.empty() ? frame.getCentreY() : outJack (chainSpots.back()).y);
+    const auto frame = Art::regionIn (boardImage, art.boardFrame);
+    const auto cableColour = juce::Colour (0xff222226);
+    const auto guitarIn = juce::Point<float> (frame.getX() - 30.0f, chainSpots.empty() ? frame.getCentreY() : jack (chainSpots.front(), false).y);
+    const auto toAmp = juce::Point<float> ((float) getWidth() + 30.0f, chainSpots.empty() ? frame.getCentreY() : jack (chainSpots.back(), true).y);
 
     if (chainSpots.empty())
     {
@@ -664,16 +617,11 @@ void BoardView::paint (juce::Graphics& g)
     }
     else
     {
-        cable (guitarIn, inJack (chainSpots.front()), juce::Colour (0xff2b2b2e));
+        cable (guitarIn, jack (chainSpots.front(), false), juce::Colour (0xff2c2c30));
         for (size_t i = 1; i < chainSpots.size(); ++i)
-            cable (outJack (chainSpots[i - 1]), inJack (chainSpots[i]), cableColour);
-        cable (outJack (chainSpots.back()), toAmp, juce::Colour (0xff2b2b2e));
+            cable (jack (chainSpots[i - 1], true), jack (chainSpots[i], false), cableColour);
+        cable (jack (chainSpots.back(), true), toAmp, juce::Colour (0xff2c2c30));
     }
-
-    g.setColour (palette::dimText);
-    g.setFont (juce::FontOptions (9.5f, juce::Font::bold).withKerningFactor (0.2f));
-    g.drawText ("IN", juce::Rectangle<float> (frame.getX() + 6.0f, guitarIn.y - 24.0f, 30.0f, 12.0f), juce::Justification::centredLeft);
-    g.drawText ("OUT", juce::Rectangle<float> (frame.getRight() - 36.0f, toAmp.y - 24.0f, 30.0f, 12.0f), juce::Justification::centredRight);
 }
 
 void BoardView::mouseMove (const juce::MouseEvent& e)
@@ -735,8 +683,18 @@ void RigStack::rebuild()
         if (category == "Cab" && cab == nullptr) cab = std::make_unique<PedalView> (processor, slot, types[slot], false);
     }
 
-    if (amp != nullptr) addAndMakeVisible (*amp);
-    if (cab != nullptr) addAndMakeVisible (*cab);
+    // The renders have transparent margins; only the controls should take clicks.
+    for (auto* v : { amp.get(), cab.get() })
+    {
+        if (v != nullptr)
+        {
+            v->setInterceptsMouseClicks (false, true);
+            addAndMakeVisible (*v);
+        }
+    }
+
+    if (amp != nullptr && cab != nullptr)
+        amp->toFront (false);   // the head sits on top of the cab
 
     chooseAmp.setVisible (amp == nullptr);
     chooseCab.setVisible (cab == nullptr);
@@ -751,35 +709,51 @@ void RigStack::rebuild()
 
 void RigStack::resized()
 {
-    auto r = getLocalBounds().reduced (4, 0);
-    auto ampArea = r.removeFromTop ((int) ((float) r.getHeight() * 0.44f));
-    r.removeFromTop (6);
-    auto cabArea = r;
+    auto& art = Art::get();
+    const auto area = getLocalBounds().toFloat();
 
-    if (amp != nullptr) amp->setBounds (ampArea);
-    if (cab != nullptr) cab->setBounds (cabArea);
+    // Real proportions: the head sits directly on the cab, both as wide as the column allows.
+    const float ampAspect = art.ampRect.getWidth() * (float) art.ampBody.getWidth() / (art.ampRect.getHeight() * (float) art.ampBody.getHeight());
+    const float cabAspect = art.cabRect.getWidth() * (float) art.cabBody.getWidth() / (art.cabRect.getHeight() * (float) art.cabBody.getHeight());
 
-    chooseAmp.setBounds (ampArea.withSizeKeepingCentre (130, 32));
-    chooseCab.setBounds (cabArea.withSizeKeepingCentre (130, 32));
-    swapAmp.setBounds (ampArea.getRight() - 120, ampArea.getBottom() - 38, 62, 22);
-    swapCab.setBounds (cabArea.getRight() - 120, cabArea.getBottom() - 38, 62, 22);
+    float width = area.getWidth() - 8.0f;
+    if (width / ampAspect + width / cabAspect > area.getHeight() - 10.0f)
+        width = (area.getHeight() - 10.0f) / (1.0f / ampAspect + 1.0f / cabAspect);
+
+    const auto cabBody = juce::Rectangle<float> (width, width / cabAspect).withCentre ({ area.getCentreX(), 0.0f }).withBottomY (area.getBottom() - 6.0f);
+    const auto ampBody = juce::Rectangle<float> (width * 0.96f, width * 0.96f / ampAspect).withCentre ({ area.getCentreX(), 0.0f }).withBottomY (cabBody.getY() + 2.0f);
+
+    ampSlot = ampBody;
+    cabSlot = cabBody;
+
+    if (amp != nullptr) amp->setBounds (Art::imageBoundsFor (ampBody, art.ampRect).toNearestInt());
+    if (cab != nullptr) cab->setBounds (Art::imageBoundsFor (cabBody, art.cabRect).toNearestInt());
+
+    chooseAmp.setBounds (ampBody.toNearestInt().withSizeKeepingCentre (130, 32));
+    chooseCab.setBounds (cabBody.toNearestInt().withSizeKeepingCentre (130, 32));
+
+    auto changeButton = [] (juce::Rectangle<float> grille) { return juce::Rectangle<float> (64.0f, 22.0f).withCentre ({ grille.getX() + 82.0f, grille.getCentreY() }).toNearestInt(); };
+    swapAmp.setBounds (changeButton (Art::regionIn (Art::imageBoundsFor (ampBody, art.ampRect), art.ampGrille)));
+    swapCab.setBounds (changeButton (Art::regionIn (Art::imageBoundsFor (cabBody, art.cabRect), art.cabGrille)));
+    swapAmp.toFront (false);
+    swapCab.toFront (false);
 }
 
 void RigStack::paint (juce::Graphics& g)
 {
-    auto r = getLocalBounds().toFloat().reduced (4.0f, 0.0f);
-    auto ampArea = r.removeFromTop (r.getHeight() * 0.44f);
-    r.removeFromTop (6.0f);
-
-    for (auto area : { ampArea, r })
+    // Placeholders when no amp or cab is chosen.
+    for (auto [slot, present] : { std::pair { ampSlot, amp != nullptr }, std::pair { cabSlot, cab != nullptr } })
     {
-        g.setColour (juce::Colours::white.withAlpha (0.05f));
-        g.drawRoundedRectangle (area.reduced (1.0f), 12.0f, 1.5f);
-    }
+        if (present || slot.isEmpty())
+            continue;
 
-    // Floor shadow under the stack.
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
-    g.fillEllipse (r.getX() + 10.0f, r.getBottom() - 8.0f, r.getWidth() - 20.0f, 10.0f);
+        juce::Path outline, dashed;
+        outline.addRoundedRectangle (slot, 12.0f);
+        const float dashes[] { 6.0f, 5.0f };
+        juce::PathStrokeType (1.5f).createDashedStroke (dashed, outline, dashes, 2);
+        g.setColour (juce::Colours::white.withAlpha (0.25f));
+        g.fillPath (dashed);
+    }
 }
 
 //==============================================================================
@@ -1112,6 +1086,15 @@ void WoodshedEditor::paint (juce::Graphics& g)
 {
     using namespace woodshed;
     g.fillAll (palette::board);
+
+    // Stage floor under everything, darkened towards the edges like a pool of stage light.
+    const auto stage = getLocalBounds().withTrimmedTop (72).withTrimmedBottom (24).toFloat();
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    g.drawImage (Art::get().floor, stage, juce::RectanglePlacement::fillDestination);
+    juce::ColourGradient vignette (juce::Colours::transparentBlack, stage.getCentreX(), stage.getCentreY() - stage.getHeight() * 0.1f,
+                                   juce::Colours::black.withAlpha (0.62f), stage.getX(), stage.getBottom(), true);
+    g.setGradientFill (vignette);
+    g.fillRect (stage);
 
     auto bar = getLocalBounds().removeFromTop (72);
     g.setColour (palette::topBar);

@@ -47,10 +47,15 @@ if(NOT WOODSHED_BENCH_ONLY)
         MICROPHONE_PERMISSION_TEXT "Woodshed needs audio input to hear your guitar through your interface."
         COPY_PLUGIN_AFTER_BUILD FALSE)
 
+    # Rendered UI art (see art/build_assets.py).
+    file(GLOB WOODSHED_ART CONFIGURE_DEPENDS art/renders/*.png art/renders/*.jpg art/renders/*.json)
+    juce_add_binary_data(WoodshedArt SOURCES ${WOODSHED_ART})
+
     target_sources(Woodshed PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
         Source/TunerPanel.cpp
+        Source/Art.cpp
         Source/StandaloneApp.cpp
         ${WOODSHED_ENGINE_SOURCES})
 
@@ -70,6 +75,7 @@ if(NOT WOODSHED_BENCH_ONLY)
 
     target_link_libraries(Woodshed
         PRIVATE
+            WoodshedArt
             juce::juce_audio_utils
             juce::juce_dsp
         PUBLIC

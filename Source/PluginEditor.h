@@ -63,6 +63,10 @@ public:
     int getSlot() const                                      { return slot; }
     bool isBeingDragged() const                              { return dragging; }
 
+    /** The enclosure (or amp/cab front) inside this component, which also includes jacks and shadow. */
+    juce::Rectangle<float> bodyArea() const;
+    juce::Rectangle<float> controlArea() const;
+
     std::function<void (PedalView&)> onDragMove, onDragEnd;
 
 private:
@@ -98,15 +102,16 @@ public:
     std::function<void (int spot)> onEmptySpotClicked;
 
 private:
-    juce::Rectangle<int> spotBounds (int spot) const;
-    juce::Rectangle<int> pedalBounds (int spot) const        { return spotBounds (spot).reduced (5, 10); }
+    juce::Rectangle<int> spotBounds (int spot) const;        // the cell on the rails
+    juce::Rectangle<float> bodyBounds (int spot) const;      // where the enclosure sits in that cell
+    juce::Rectangle<int> pedalBounds (int spot) const;       // the PedalView, including jacks and shadow
     int spotAt (juce::Point<int>) const;
     void layoutPedals();
 
     WoodshedProcessor& processor;
     juce::OwnedArray<PedalView> pedals;
     std::vector<int> spots;          // per slot
-    juce::Rectangle<int> deck;       // the area inside the frame
+    juce::Rectangle<float> boardImage;  // where the board render is drawn
     int dragTarget = -1, hoverSpot = -1;
 };
 
@@ -128,6 +133,7 @@ public:
 private:
     WoodshedProcessor& processor;
     std::unique_ptr<PedalView> amp, cab;
+    juce::Rectangle<float> ampSlot, cabSlot;
     juce::TextButton chooseAmp { "Choose amp" }, chooseCab { "Choose cab" },
                      swapAmp { "Change" }, swapCab { "Change" };
 };

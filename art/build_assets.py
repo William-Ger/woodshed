@@ -545,7 +545,7 @@ def render_floor():
     assign(floor, m)
     s.render.film_transparent = False
     camera_top(60, 2048, 1280)
-    render(os.path.join(OUT, "floor.jpg") if False else os.path.join(OUT, "floor.png"))
+    render(os.path.join(OUT, "floor.png"))   # the app ships it as floor.jpg (see art/README)
 
 
 # ---------------------------------------------------------------------------
