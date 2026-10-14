@@ -487,7 +487,7 @@ private:
 };
 
 //==============================================================================
-// ECLIPSE: single-sideband frequency shifter. Every partial moves by the same
+// PENUMBRA: single-sideband frequency shifter. Every partial moves by the same
 // number of Hz, so harmony turns metallic; tiny shifts swirl like a phaser
 // that never turns around. Feedback through a short delay makes it spiral.
 //==============================================================================
@@ -589,7 +589,7 @@ private:
 };
 
 //==============================================================================
-// AURORA: sympathetic strings. Eight tuned resonators set to a chord in a key
+// BOREALIS: sympathetic strings. Eight tuned resonators set to a chord in a key
 // ring along whenever you play a note that shares their harmonics, like a sitar's
 // drone strings or a piano with the sustain pedal down.
 //==============================================================================
@@ -1499,7 +1499,7 @@ void registerWeirdPedals (Registry& r)
                             knob ("env", "Env", 0.0f, 1.0f, 0.6f, "%"),
                             knob ("mix", "Mix", 0.0f, 1.0f, 0.8f, "%") } });
 
-    r.add<FrequencyShifter> ({ "weird.shift", "ECLIPSE", "frequency shifter", "Weird",
+    r.add<FrequencyShifter> ({ "weird.shift", "PENUMBRA", "frequency shifter", "Weird",
                                "Moves every partial by the same Hz: barber-pole swirl, then clang and metal",
                                juce::Colour (0xff141018), juce::Colour (0xffffb347),
                                { knob ("shift", "Shift", 0.0f, 2000.0f, 6.0f, "Hz", 0.25f),
@@ -1509,7 +1509,7 @@ void registerWeirdPedals (Registry& r)
                                  knob ("drift", "Drift", 0.0f, 1.0f, 0.3f, "%"),
                                  knob ("mix", "Mix", 0.0f, 1.0f, 0.5f, "%") } });
 
-    r.add<SympatheticStrings> ({ "weird.strings", "AURORA", "sympathetic strings", "Weird",
+    r.add<SympatheticStrings> ({ "weird.strings", "BOREALIS", "sympathetic strings", "Weird",
                                  "Eight drone strings tuned to a chord that ring along with whatever you play",
                                  juce::Colour (0xff23104a), juce::Colour (0xff7dffcf),
                                  { choice ("key", "Key", keyNames(), 4),
