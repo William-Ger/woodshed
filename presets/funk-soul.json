@@ -2,6 +2,115 @@
   "genre": "Funk & Soul",
   "presets": [
     {
+      "name": "Gold Lamé Strut",
+      "description": "Bright, glassy disco-funk rhythm: squeezed and snappy for muted sixteenth chops, thin lows, a hint of chorus shimmer and a short plate. Stomp 4 to lift single-note fills, 5 for a phaser groove.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.2,
+          "bass": 0.35,
+          "mid": 0.5,
+          "treble": 0.72,
+          "presence": 0.6,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.4,
+          "lowcut": 150,
+          "highcut": 12000,
+          "level": 6.0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.6,
+            "attack": 2,
+            "blend": 0.85,
+            "level": 6.5
+          }
+        },
+        {
+          "type": "dyn.transient",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "attack": 0.3,
+            "sustain": -0.3
+          }
+        },
+        {
+          "type": "eq.graphic",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "b100": -6,
+            "b200": -3,
+            "b400": -2,
+            "b800": 1,
+            "b1k6": 3,
+            "b3k2": 3,
+            "b6k4": 2
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "boost": 2.5,
+            "tilt": 0.2,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 4,
+          "on": false,
+          "knobs": {
+            "rate": 0.5,
+            "depth": 0.6,
+            "center": 900,
+            "stages": "4",
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "rate": 0.6,
+            "depth": 0.25,
+            "voices": "Two",
+            "width": 0.8,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1200,
+            "predelay": 15,
+            "lowcut": 300,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
       "name": "Velvet Rope Quack",
       "description": "Snappy envelope filter that quacks open on every pick, into a sparkling clean amp. Dig in harder for a wider sweep.",
       "amp": {
