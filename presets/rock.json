@@ -2,6 +2,74 @@
   "genre": "Classic Rock",
   "presets": [
     {
+      "name": "Parked Wah Swagger",
+      "description": "The honky, nasal eighties riff tone: a wah parked in the vocal midrange into a pushed British crunch head and an off-axis 4x12, mostly dry. Stomp 1 to drop the wah for straight crunch, 3 for a lead echo.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.6,
+          "bass": 0.4,
+          "mid": 0.7,
+          "treble": 0.5,
+          "presence": 0.4,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.5,
+          "lowcut": 100,
+          "highcut": 7000,
+          "room": 0.2,
+          "level": 0.0
+        }
+      },
+      "board": [
+        {
+          "type": "filter.wah",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "position": 0.55,
+            "voice": "Vintage",
+            "resonance": 0.6,
+            "level": 0
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.35,
+            "tone": 0.45,
+            "level": 3
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 7,
+          "on": false,
+          "knobs": {
+            "time": 360,
+            "mix": 0.2
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
       "name": "Redline Crunch",
       "description": "A non-master British stack turned way up: open, chewy crunch with big saggy lows. Stomp 2 for a clean push into a lead.",
       "amp": {
