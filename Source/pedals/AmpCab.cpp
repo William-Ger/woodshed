@@ -554,7 +554,7 @@ private:
     bool firstBlock = true, stackDirty = true, presenceDirty = true;
 };
 
-/** UNDERTOW: the same amp engine with bass voicings. */
+/** BASEMENT: the same amp engine with bass voicings. */
 class BassAmp final : public AmpHead
 {
 public:
