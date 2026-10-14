@@ -75,6 +75,15 @@ public:
 
         mainWindow = std::make_unique<juce::StandaloneFilterWindow> (getApplicationName(), juce::Colour (0xff12110f),
                                                                      std::move (holder));
+
+        // A native title bar gives the macOS green full-screen button and the Windows maximise
+        // button. The editor has its own Audio button, so JUCE's Options button isn't needed.
+        mainWindow->setTitleBarButtonsRequired (juce::DocumentWindow::allButtons, false);
+        mainWindow->setUsingNativeTitleBar (true);
+        for (auto* child : mainWindow->getChildren())
+            if (auto* button = dynamic_cast<juce::TextButton*> (child); button != nullptr && button->getButtonText() == "Options")
+                button->setVisible (false);
+
         mainWindow->setVisible (true);
     }
 

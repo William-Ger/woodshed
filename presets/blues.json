@@ -1,0 +1,777 @@
+{
+  "genre": "Blues",
+  "presets": [
+    {
+      "name": "Delta Porch",
+      "description": "Small combo right on the edge of breakup: clean when you play soft, hairy when you dig in. Stomp the boost for a solo lift.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.55,
+          "tone": 0.5,
+          "output": 0
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "position": 0.35,
+          "distance": 0.3,
+          "level": -0.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.boost",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 4,
+            "tilt": 0.1,
+            "voice": "Fat"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1600,
+            "mix": 0.18,
+            "drip": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Brown River Shuffle",
+      "description": "Mid-forward overdrive pushing a clean amp into a gritty Texas shuffle. Stomp the slapback for a bit of room bounce.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.4,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.6,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x10 Vintage",
+          "mic": 0.3,
+          "highcut": 8500,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "drive": 0.35,
+            "tone": 0.55,
+            "level": 0
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 7,
+          "on": false,
+          "knobs": {
+            "time": 95,
+            "level": 0.3,
+            "grit": 0.2
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Juke Joint Harp",
+      "description": "Dark, honky midrange squeezed through a narrow band like a harp mic in a cheap amp. Great for single-note riffs on the neck pickup.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.6,
+          "tone": 0.4
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x10 Open",
+          "highcut": 6000,
+          "room": 0.25,
+          "level": -2.9
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.5,
+            "tone": 0.4,
+            "body": 0.65
+          }
+        },
+        {
+          "type": "filter.telephone",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "low": 350,
+            "high": 2800,
+            "bump": 7,
+            "drive": 0.35
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 120,
+            "level": 0.3,
+            "tone": 3500,
+            "grit": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Slow Rain Lead",
+      "description": "Singing, sustaining lead for slow minor blues, with a warm delay sitting behind the note. Stomp the reverb off for a drier room.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.45,
+          "bass": 0.45,
+          "mid": 0.65,
+          "treble": 0.5,
+          "presence": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "highcut": 7500,
+          "level": -1.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.35,
+            "attack": 15,
+            "blend": 0.6
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 450,
+            "repeats": 0.3,
+            "mix": 0.2
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bottleneck Bayou",
+      "description": "Compressed, glassy slide tone that sustains forever and rings out with a room around it. Stomp the boost for a fatter slide solo.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.55,
+          "treble": 0.5,
+          "bass": 0.5,
+          "cut": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Dynamic",
+          "highcut": 8000,
+          "level": 0.8
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.65,
+            "attack": 20,
+            "blend": 0.8
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "gain": 0.45,
+            "treble": 0.45,
+            "blend": 0.4
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "boost": 3,
+            "voice": "Fat"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Levee Swirl",
+      "description": "Throbbing, lamp-lit chorus-vibrato swirl into a fuzzed-out amp for psychedelic slow blues. Stomp the fuzz off for a cleaner swirl.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.45,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "highcut": 7000,
+          "level": 2.4
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.55,
+            "bias": 0.5,
+            "guitar": 0.85
+          }
+        },
+        {
+          "type": "mod.throb",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "speed": 1.6,
+            "intensity": 0.65,
+            "mode": "Chorus"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.6,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Silver Creek",
+      "description": "Smooth, vocal lead channel blended over a glassy clean, with a soft delay tail. Made for long, singing bends.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.5,
+          "drive": 0.55,
+          "od": 0.6,
+          "bass": 0.45,
+          "mid": 0.65,
+          "treble": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.5,
+          "highcut": 8000,
+          "level": -1.9
+        }
+      },
+      "board": [
+        {
+          "type": "delay.digital",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.25,
+            "mix": 0.16,
+            "tone": 5000
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1800,
+            "mix": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Night Freight",
+      "description": "Dark, creamy overdrive amp with the treble rolled off, for jazzy blues lines after hours. Stomp the treble booster to cut through the band.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Post",
+          "volume": 0.45,
+          "drive": 0.45,
+          "od": 0.55,
+          "bass": 0.5,
+          "mid": 0.55,
+          "treble": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Ribbon",
+          "highcut": 7000,
+          "level": -1.8
+        }
+      },
+      "board": [
+        {
+          "type": "drive.treble",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 0.35,
+            "range": "Mid",
+            "level": 8
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.16
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rail Yard Stomp",
+      "description": "Cranked non-master stack: loudness is the crunch, with big, saggy lows. Roll back the guitar volume to clean it up.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.7,
+          "bass": 0.4,
+          "mid": 0.65,
+          "treble": 0.55,
+          "presence": 0.45,
+          "sag": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "highcut": 7500,
+          "room": 0.2,
+          "level": -1.8
+        }
+      },
+      "board": [
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.45,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Junction Crank",
+      "description": "Tiny combo flat-out, with a treble booster hitting the front for a raw, hairy roar. Stomp the slapback for a juke-joint echo.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.85,
+          "tone": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "highcut": 7000,
+          "level": 0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.treble",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "boost": 0.4,
+            "range": "Full"
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 7,
+          "on": false,
+          "knobs": {
+            "time": 110,
+            "level": 0.35,
+            "grit": 0.35
+          }
+        }
+      ]
+    },
+    {
+      "name": "Flood Stage",
+      "description": "Two overdrives stacked into a crunch amp for a thick, saturated Texas lead. Stomp the first drive off for rhythm, back on for the solo.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.35,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "highcut": 7500,
+          "level": 0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "drive": 0.5,
+            "tone": 0.5,
+            "level": 0
+          }
+        },
+        {
+          "type": "drive.touch",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "gain": 0.3,
+            "tone": 0.5,
+            "body": 0.6
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.25,
+            "mix": 0.15
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rainy Day Trem",
+      "description": "Clean, bright amp with a slow, deep tremolo and drippy springs for moody minor-key blues.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.5,
+          "mid": 0.45,
+          "treble": 0.6,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "highcut": 9000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "mod.tremolo",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 4.2,
+            "depth": 0.55,
+            "wave": "Bias"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "drip": 0.6,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hill Country Mud",
+      "description": "Woolly vintage fuzz into a warm small combo for gnarly, raw hill-country riffs. Stomp the harmonic trem for a rolling pulse.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.5,
+          "tone": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Ribbon",
+          "highcut": 6500,
+          "level": -2.5
+        }
+      },
+      "board": [
+        {
+          "type": "drive.battery",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.5,
+            "battery": 0.25,
+            "tone": 0.45
+          }
+        },
+        {
+          "type": "mod.harmtrem",
+          "spot": 4,
+          "on": false,
+          "knobs": {
+            "rate": 3.5,
+            "depth": 0.55
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gulf Coast Cry",
+      "description": "Crunchy class-A chime with a vintage wah set for vocal, crying leads. Stomp the wah off for a straight crunch rhythm.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.6,
+          "treble": 0.5,
+          "bass": 0.5,
+          "cut": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.35,
+          "highcut": 8000,
+          "level": 3.6
+        }
+      },
+      "board": [
+        {
+          "type": "filter.wah",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "position": 0.5,
+            "voice": "Vintage",
+            "resonance": 0.55
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.35,
+            "tone": 0.5
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 340,
+            "repeats": 0.3,
+            "mix": 0.15,
+            "wow": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Train Whistle Tremble",
+      "description": "Rotary speaker on the slow drum into a warm edge-of-breakup amp, for organ-like chords and swirling turnarounds.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.4,
+          "bass": 0.5,
+          "mid": 0.55,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 9000,
+          "level": 1.4
+        }
+      },
+      "board": [
+        {
+          "type": "drive.blend",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.35,
+            "blend": 0.5
+          }
+        },
+        {
+          "type": "mod.rotary",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "speed": "Slow",
+            "drive": 0.2,
+            "mix": 0.8
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1800,
+            "mix": 0.15
+          }
+        }
+      ]
+    }
+  ]
+}

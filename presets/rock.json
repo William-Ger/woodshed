@@ -1,0 +1,1015 @@
+{
+  "genre": "Classic Rock",
+  "presets": [
+    {
+      "name": "Redline Crunch",
+      "description": "A non-master British stack turned way up: open, chewy crunch with big saggy lows. Stomp 2 for a clean push into a lead.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.78,
+          "bass": 0.45,
+          "mid": 0.65,
+          "treble": 0.6,
+          "presence": 0.45,
+          "sag": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.3,
+          "distance": 0.2,
+          "highcut": 8500,
+          "level": -3.3
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -66,
+            "release": 120
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "boost": 6,
+            "tilt": 0.1,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.45,
+            "damp": 0.5,
+            "mix": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Arena Overpass",
+      "description": "Singing seventies arena lead: hot amp, warm tape echo and a big hall behind every bend. Stomp 3 for slow phase swirl.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.58,
+          "bass": 0.45,
+          "mid": 0.65,
+          "treble": 0.55,
+          "presence": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.35,
+          "highcut": 8000,
+          "room": 0.12,
+          "level": -0.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -68,
+            "release": 150
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.15,
+            "level": 4,
+            "tone": 0.5
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "rate": 0.25,
+            "depth": 0.6,
+            "center": 800,
+            "feedback": 0.25,
+            "stages": "4",
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.35,
+            "mix": 0.24,
+            "wow": 0.2,
+            "drive": 0.3,
+            "age": 0.35,
+            "heads": "Long"
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2400,
+            "size": 0.65,
+            "predelay": 30,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Powerline Crunch",
+      "description": "Dry, punchy mid-gain crunch with almost no effects: loud enough to bite, clean enough to hear every string of the chord. Stomp 1 for a bright lead kick.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.66,
+          "bass": 0.4,
+          "mid": 0.72,
+          "treble": 0.65,
+          "presence": 0.5,
+          "sag": 0.3
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.35,
+          "highcut": 9000,
+          "level": -2.9
+        }
+      },
+      "board": [
+        {
+          "type": "drive.treble",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 0.45,
+            "range": "Mid",
+            "level": 3
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "damp": 0.55,
+            "mix": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "name": "Magnolia Highway",
+      "description": "Warm, loose southern crunch with a short analog echo and drippy springs. Stomp 2 for a fatter overdrive on slide and solos.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.45,
+          "bass": 0.5,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "position": 0.35,
+          "distance": 0.3,
+          "highcut": 9500,
+          "level": 0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.35,
+            "tone": 0.5,
+            "level": 1,
+            "body": 0.6
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "drive": 0.4,
+            "level": 2,
+            "tone": 0.5
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 340,
+            "repeats": 0.25,
+            "mix": 0.18
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1600,
+            "tone": 3600,
+            "drip": 0.45,
+            "boing": 0.3,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Glitter Boulevard",
+      "description": "Fat, sparkly glam crunch with a plate tail for big chord stabs. Stomp 3 for a jet-plane flange on the intro riff.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.55,
+          "bass": 0.55,
+          "mid": 0.55,
+          "treble": 0.65,
+          "presence": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.3,
+          "highcut": 9000,
+          "room": 0.15,
+          "level": 1.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -66
+          }
+        },
+        {
+          "type": "drive.distortion",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "distortion": 0.3,
+            "filter": 0.55,
+            "volume": 0,
+            "clip": "LED"
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "rate": 0.18,
+            "depth": 0.7,
+            "manual": 0.8,
+            "feedback": 0.45,
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1800,
+            "predelay": 15,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Summer Bandstand",
+      "description": "Bright jangle-crunch for power pop: chimey class-A grit, a squeeze for evenness and a wide double. Stomp 2 for a glowing lead layer.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.62,
+          "treble": 0.6,
+          "bass": 0.45,
+          "cut": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.4,
+          "highcut": 11000,
+          "level": 2.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.45,
+            "attack": 10,
+            "level": 0,
+            "blend": 0.7
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "gain": 0.55,
+            "treble": 0.55,
+            "level": 0,
+            "blend": 0.4
+          }
+        },
+        {
+          "type": "pitch.doubler",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "detune": 7,
+            "delay": 12,
+            "width": 0.9,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "damp": 0.4,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Neon Vacancy",
+      "description": "Slow, swirling four-stage phaser over a gritty crunch, for spacey riffs and wah-free funk-rock. Stomp 5 for an echo on the lead lines.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.4,
+          "bass": 0.5,
+          "mid": 0.6,
+          "treble": 0.6,
+          "presence": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.3,
+          "highcut": 9500,
+          "room": 0.18,
+          "level": 1.7
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "drive": 0.45,
+            "level": 0,
+            "tone": 0.55
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "rate": 0.35,
+            "depth": 0.75,
+            "center": 700,
+            "feedback": 0.35,
+            "stages": "4",
+            "spread": 0.5,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.3,
+            "mix": 0.2
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jukebox Mouthpiece",
+      "description": "Talk-box style lead: a vowel filter opens with your pick attack on top of a smooth overdriven amp. Stomp 4 for a fat dotted echo.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.5,
+          "drive": 0.55,
+          "od": 0.6,
+          "bass": 0.5,
+          "mid": 0.65,
+          "treble": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Dynamic",
+          "position": 0.3,
+          "distance": 0.2,
+          "highcut": 9000,
+          "level": 0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "attack": 6,
+            "blend": 0.8
+          }
+        },
+        {
+          "type": "filter.vowel",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "vowel": 0.2,
+            "control": "Envelope",
+            "depth": 0.75,
+            "resonance": 0.6,
+            "shift": 1.0,
+            "mix": 0.9
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 450,
+            "division": "1/8 dot",
+            "repeats": 0.3,
+            "mix": 0.2,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1500,
+            "mix": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fuzz Turnpike",
+      "description": "Woolly two-transistor fuzz into a cranked British amp: roll the guitar back for crunch, dig in for a roaring wall. Stomp 3 for a dark echo.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.55,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.4,
+          "sag": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Ribbon",
+          "position": 0.3,
+          "distance": 0.25,
+          "highcut": 8000,
+          "level": -7.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.7,
+            "bias": 0.55,
+            "volume": 0,
+            "guitar": 1
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 300,
+            "repeats": 0.3,
+            "mix": 0.2
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1400,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Two-Lane Wah",
+      "description": "Treble-boosted British crunch with a wah parked in the vocal sweet spot for a cocked-wah lead. Stomp 1 to bypass the wah for rhythm.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bright",
+          "volume": 0.6,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.4,
+          "sag": 0.4
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.35,
+          "highcut": 8500,
+          "room": 0.15,
+          "level": 0
+        }
+      },
+      "board": [
+        {
+          "type": "filter.wah",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "position": 0.55,
+            "voice": "Vintage",
+            "resonance": 0.55,
+            "level": 0
+          }
+        },
+        {
+          "type": "drive.treble",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 0.5,
+            "range": "Treble",
+            "level": 0
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.3,
+            "mix": 0.18,
+            "heads": "Long"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chrome Exhaust",
+      "description": "Germanium treble booster slammed into a bright, small-ish combo for a raw, cutting late-sixties rock tone. Stomp 2 for a slow tremolo.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.6,
+          "tone": 0.5,
+          "output": 0
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.25,
+          "highcut": 9000,
+          "level": -3.9
+        }
+      },
+      "board": [
+        {
+          "type": "drive.treble",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "boost": 0.6,
+            "range": "Full",
+            "level": 0
+          }
+        },
+        {
+          "type": "mod.tremolo",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "rate": 4,
+            "depth": 0.5,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1800,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ignition Rhythm",
+      "description": "Tight, focused rock rhythm from a boutique amp's lead channel, double-tracked wide for big choruses. Stomp 3 for a stereo bounce on the fills.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Post",
+          "volume": 0.5,
+          "drive": 0.5,
+          "od": 0.6,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "highcut": 9000,
+          "level": -0.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -66
+          }
+        },
+        {
+          "type": "mod.doubler",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "time": 18,
+            "drift": 0.3,
+            "width": 0.85,
+            "mix": 0.5,
+            "mode": "Double"
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 360,
+            "repeats": 0.3,
+            "mix": 0.2,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Desert Motel",
+      "description": "Cranked little combo with hypnotic tremolo, slapback and a soaked spring tank, for dusty roadhouse rock. Stomp 1 for a fuzz roar.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.62,
+          "tone": 0.55,
+          "output": 0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.4,
+          "highcut": 9500,
+          "room": 0.2,
+          "level": -2.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.fuzz",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "sustain": 0.5,
+            "tone": 0.5,
+            "volume": -4,
+            "mids": "Lift"
+          }
+        },
+        {
+          "type": "mod.tremolo",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "rate": 5,
+            "depth": 0.45,
+            "wave": "Triangle"
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 120,
+            "level": 0.35,
+            "tone": 4000,
+            "grit": 0.3
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "drip": 0.6,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Carburetor Swirl",
+      "description": "Overdriven rotary speaker on a crunchy amp for organ-like riffs. Stomp 1 for extra grind into the spinning speaker.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.5,
+          "bass": 0.5,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "position": 0.3,
+          "distance": 0.3,
+          "highcut": 9000,
+          "level": 0.6
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "drive": 0.35,
+            "level": 2,
+            "tone": 0.5
+          }
+        },
+        {
+          "type": "mod.rotary",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "speed": "Slow",
+            "ramp": 1,
+            "balance": 0.5,
+            "drive": 0.3,
+            "width": 0.8,
+            "mix": 1
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Last Encore",
+      "description": "Huge stadium crunch with a touch of chorus, ping-pong echo and a long hall for anthem chords and soaring solos. Stomp 1 for a lead boost.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.6,
+          "bass": 0.5,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.35,
+          "highcut": 8500,
+          "level": -1.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -66
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "boost": 5,
+            "tilt": 0.2,
+            "voice": "Flat"
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.5,
+            "depth": 0.35,
+            "voices": "Two",
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 480,
+            "repeats": 0.35,
+            "mix": 0.18,
+            "tone": 5500
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3200,
+            "size": 0.75,
+            "predelay": 35,
+            "mix": 0.2
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,840 @@
+{
+  "genre": "Ambient & Shoegaze",
+  "presets": [
+    {
+      "name": "Northern Vault",
+      "description": "Glassy clean pad with an octave-rising shimmer tail that hangs in the air. Stomp the chorus for extra width.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.45,
+          "treble": 0.55,
+          "master": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 9000,
+          "level": 1.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.45,
+            "attack": 15,
+            "level": 0
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 4,
+          "on": false,
+          "knobs": {
+            "rate": 0.3,
+            "depth": 0.35,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 9000,
+            "shimmer": 0.5,
+            "interval": "Octave",
+            "mix": 0.4,
+            "predelay": 60
+          }
+        }
+      ]
+    },
+    {
+      "name": "Slow Thaw",
+      "description": "Every note fades in from silence and melts into warm repeats and a long hall, like bowed glass. Stomp 1 to turn the swells off.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.45,
+          "treble": 0.5,
+          "bass": 0.5,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "level": 1.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rise": 500,
+            "curve": "Bloom",
+            "sense": -50,
+            "level": 6
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 520,
+            "repeats": 0.5,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 6500,
+            "size": 0.85,
+            "predelay": 40,
+            "mix": 0.4,
+            "lowcut": 150
+          }
+        }
+      ]
+    },
+    {
+      "name": "Static Sky",
+      "description": "Wall-of-fuzz shoegaze: scooped fuzz doubled wide and drowned in a huge hall. Stomp the reverse delay for backwards haze.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.35,
+          "bass": 0.45,
+          "mid": 0.55,
+          "treble": 0.5,
+          "sag": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 6500,
+          "level": -1.4
+        }
+      },
+      "board": [
+        {
+          "type": "drive.fuzz",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.75,
+            "tone": 0.45,
+            "mids": "Flat",
+            "volume": 0
+          }
+        },
+        {
+          "type": "pitch.doubler",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "detune": 12,
+            "delay": 14,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 700,
+            "repeats": 0.3,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 8000,
+            "size": 0.95,
+            "mix": 0.5,
+            "damp": 0.55,
+            "lowcut": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "Glacier Drone",
+      "description": "Each picked note freezes into a sustained drone you can play melodies over, all inside a drifting cloud reverb.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "treble": 0.5,
+          "master": 0.62
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "highcut": 8000,
+          "level": 4.9
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.cryotron",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "mode": "Picked",
+            "sustain": 9000,
+            "swell": 900,
+            "drone": 0.5,
+            "shimmer": 0.25,
+            "tone": 4000
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 16000,
+            "size": 0.85,
+            "mix": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Aurora Strings",
+      "description": "Eight sympathetic strings tuned to E minor ring along with every note, over slow chorus and a bright plate.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.45,
+          "drive": 0.0,
+          "od": 0.0,
+          "treble": 0.5,
+          "master": 0.62
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "level": 3.5
+        }
+      },
+      "board": [
+        {
+          "type": "weird.strings",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "key": "E",
+            "chord": "Minor",
+            "decay": 6000,
+            "bright": 0.5,
+            "mix": 0.45,
+            "range": "Mid"
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.25,
+            "depth": 0.3,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 4500,
+            "mix": 0.32,
+            "predelay": 25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ash Cloud",
+      "description": "Splinters of what you just played scatter into a granular haze above a frozen-able ambient wash. Stomp the fuzz for grit.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 8500,
+          "level": 2.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "gain": 0.45,
+            "level": 0
+          }
+        },
+        {
+          "type": "glitch.scrapyard",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "density": 18,
+            "size": 160,
+            "scatter": 900,
+            "pitch": "Octaves",
+            "reverse": 0.4,
+            "mix": 0.4,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 14000,
+            "size": 0.8,
+            "mix": 0.38
+          }
+        }
+      ]
+    },
+    {
+      "name": "High Altitude",
+      "description": "Ethereal octave-up voice over the clean signal, swaying modulated repeats and a shimmer tail. Made for slow single-note melodies.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.4,
+          "drive": 0.0,
+          "od": 0.0,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Condenser",
+          "distance": 0.4,
+          "level": 2.6
+        }
+      },
+      "board": [
+        {
+          "type": "pitch.harmony",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "voice1": "+Oct",
+            "level1": 0.4,
+            "voice2": "Off",
+            "tone": 5000
+          }
+        },
+        {
+          "type": "delay.modulated",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 600,
+            "repeats": 0.45,
+            "mix": 0.3,
+            "depth": 0.4
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 7000,
+            "shimmer": 0.4,
+            "mix": 0.32
+          }
+        }
+      ]
+    },
+    {
+      "name": "Salt Fog Reel",
+      "description": "Slow-motion tape: seasick wow, worn three-head echoes and a soft room, like a reel left out in the sea air.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.3,
+          "tone": 0.45,
+          "output": 6.0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "highcut": 7000,
+          "level": 0.0
+        }
+      },
+      "board": [
+        {
+          "type": "mod.warble",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "wow": 0.55,
+            "flutter": 0.25,
+            "rate": 0.45,
+            "age": 0.5
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 480,
+            "repeats": 0.5,
+            "mix": 0.35,
+            "wow": 0.5,
+            "heads": "Mid+Long",
+            "age": 0.6
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.7,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Riptide Bloom",
+      "description": "Woolly fuzz pours into backwards swells and a deep hall for blurry shoegaze chords. Stomp the boost to push it into a roar.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Post",
+          "volume": 0.45,
+          "drive": 0.2,
+          "od": 0.4,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 7000,
+          "level": 0.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.boost",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 4,
+            "voice": "Fat"
+          }
+        },
+        {
+          "type": "drive.vintage",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.75,
+            "bias": 0.5,
+            "volume": 0
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 650,
+            "repeats": 0.3,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 7000,
+            "size": 0.9,
+            "mix": 0.42,
+            "lowcut": 180
+          }
+        }
+      ]
+    },
+    {
+      "name": "Nave Echoes",
+      "description": "Repeats step aside while you play and bloom into the stone-church hall the moment you stop. Clean and spacious.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.35,
+          "treble": 0.5,
+          "cut": 0.45,
+          "master": 0.62
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "level": 1.4
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.transient",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "attack": -0.3,
+            "sustain": 0.3
+          }
+        },
+        {
+          "type": "delay.ducking",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 640,
+            "repeats": 0.6,
+            "mix": 0.5,
+            "duck": 0.8
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 9000,
+            "size": 0.95,
+            "predelay": 60,
+            "mix": 0.38
+          }
+        }
+      ]
+    },
+    {
+      "name": "Monsoon Wall",
+      "description": "Thick distortion through a slow jet flanger into an endless cloud: a roaring, sweeping shoegaze wall. Stomp 4 to freeze the cloud.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.35,
+          "bass": 0.45,
+          "mid": 0.55,
+          "treble": 0.5,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "highcut": 6500,
+          "lowcut": 90,
+          "level": 1.1
+        }
+      },
+      "board": [
+        {
+          "type": "drive.distortion",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "distortion": 0.6,
+            "filter": 0.35,
+            "volume": -2,
+            "clip": "Open"
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.08,
+            "depth": 0.7,
+            "feedback": 0.4,
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 12000,
+            "size": 0.9,
+            "mix": 0.42
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 9,
+          "on": false,
+          "knobs": {
+            "decay": 30000,
+            "freeze": "On",
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deep Swell",
+      "description": "Lows and highs roll in turn under a long dark hall, like a slow ocean swell. Great for arpeggiated chords.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.55,
+          "treble": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Ribbon",
+          "level": -0.9
+        }
+      },
+      "board": [
+        {
+          "type": "mod.harmtrem",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 1.4,
+            "depth": 0.6,
+            "split": 600
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 7000,
+            "size": 0.8,
+            "damp": 0.7,
+            "mix": 0.35
+          }
+        }
+      ]
+    },
+    {
+      "name": "Frozen Choir",
+      "description": "Hold-mode freezer layers your notes into a choir-like drone, rising in fifths through a vast shimmer. Play slowly and let it stack.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.42,
+          "master": 0.75
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "micb": "Condenser",
+          "level": 1.7
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.cryotron",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "mode": "Hold",
+            "sustain": 15000,
+            "swell": 1500,
+            "drone": 0.45,
+            "shimmer": 0.35,
+            "tone": 4500
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 12000,
+            "shimmer": 0.45,
+            "interval": "Fifth",
+            "mix": 0.38
+          }
+        }
+      ]
+    },
+    {
+      "name": "Endless Ascent",
+      "description": "Shifted voices climb forever out of every note into a wide plate, a rising staircase of light. Stomp the delay for more trail.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.3,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 9000,
+          "level": 3.2
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.escalator",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "climb": 1.0,
+            "register": "Mid",
+            "mix": 0.35,
+            "wash": 0.5
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 500,
+            "repeats": 0.4,
+            "mix": 0.25,
+            "division": "1/8 dot"
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 5000,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rain On Glass",
+      "description": "Picks strike glassy bell tones that bounce across the stereo field into a bright plate. Light, chiming and wide.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.28,
+          "tone": 0.5,
+          "output": 6.0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "level": 0.0
+        }
+      },
+      "board": [
+        {
+          "type": "weird.bell",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "metal": "Glass",
+            "strike": 1500,
+            "shimmer": 0.4,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 450,
+            "repeats": 0.4,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3800,
+            "mix": 0.3
+          }
+        }
+      ]
+    }
+  ]
+}

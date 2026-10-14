@@ -1,0 +1,1163 @@
+{
+  "genre": "Hard Rock & Metal",
+  "presets": [
+    {
+      "name": "Iron Bastion",
+      "description": "Modern brick-wall rhythm: a gate and a tight boost slam the high-gain amp, with the cab's fizz trimmed off. Stomp 9 for a lead echo.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Lead",
+          "tight": "Tight",
+          "gain": 0.6,
+          "bass": 0.5,
+          "lowmid": 1,
+          "highmid": 2,
+          "treble": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.3,
+          "distance": 0.15,
+          "lowcut": 80,
+          "highcut": 6500,
+          "level": 0.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -52,
+            "release": 60
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.05,
+            "level": 6,
+            "tone": 0.6
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.3,
+            "mix": 0.18,
+            "tone": 5000
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.35,
+            "mix": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "name": "Foundry Fire",
+      "description": "Saturated modern high gain from the tube head, pushed by a tight clean boost and gated hard between chugs. Stomp 3 for a mid-heavy solo push.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Modern High Gain",
+          "gain": 0.6,
+          "bass": 0.5,
+          "mid": 0.45,
+          "treble": 0.55,
+          "presence": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.3,
+          "lowcut": 80,
+          "highcut": 6500,
+          "room": 0.08,
+          "level": -0.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -50,
+            "release": 60
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 8,
+            "tilt": 0.2,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "eq.parametric",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "midFreq": 800,
+            "midGain": 4,
+            "midQ": 0.8,
+            "output": 0
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "mix": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "name": "Thunder Gallop",
+      "description": "Scooped eighties thrash: razor-edged gain with the mids carved out and a gate for machine-gun palm mutes. Stomp 4 to put the mids back for solos.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.75,
+          "bass": 0.6,
+          "mid": 0.3,
+          "treble": 0.6,
+          "presence": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Tight 4x12",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.3,
+          "lowcut": 80,
+          "highcut": 7000,
+          "level": 0.8
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -52,
+            "release": 50
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.1,
+            "level": 5,
+            "tone": 0.65
+          }
+        },
+        {
+          "type": "eq.graphic",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "b100": 2,
+            "b200": 0,
+            "b400": -4,
+            "b800": -5,
+            "b1k6": -2,
+            "b3k2": 2,
+            "b6k4": 0
+          }
+        },
+        {
+          "type": "eq.parametric",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "midFreq": 750,
+            "midGain": 6,
+            "midQ": 0.7
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "mix": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "name": "Steel Grid",
+      "description": "Ultra-tight, compressed djent rhythm: hard-clamped lows, fast gate and a dry, close-miked cab. Stomp 6 for a wide lead delay.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Lead",
+          "tight": "Tight",
+          "gain": 0.55,
+          "bass": 0.45,
+          "lowmid": -2,
+          "highmid": 3,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Tight 4x12",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.25,
+          "lowcut": 90,
+          "highcut": 6500,
+          "level": 1.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -48,
+            "release": 30
+          }
+        },
+        {
+          "type": "dyn.compressor",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.35,
+            "attack": 2,
+            "blend": 0.6
+          }
+        },
+        {
+          "type": "drive.metal",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "gain": 0.15,
+            "tight": 0.85,
+            "low": 0,
+            "mid": 2,
+            "high": 0,
+            "level": 4
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.3,
+            "mix": 0.18,
+            "tone": 5000
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tar Pit Colossus",
+      "description": "Downtuned doom sludge: the whole rig drops a whole step, then a huge flat fuzz hits a loose, saggy high-gain channel. Stomp 2 to add a sub octave.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Crunch",
+          "tight": "Loose",
+          "gain": 0.65,
+          "bass": 0.6,
+          "lowmid": 3,
+          "highmid": -1,
+          "treble": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Ribbon",
+          "position": 0.35,
+          "distance": 0.3,
+          "lowcut": 60,
+          "highcut": 6000,
+          "level": -7.4
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -55,
+            "release": 150
+          }
+        },
+        {
+          "type": "pitch.shift",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "shift": -2,
+            "fine": 0,
+            "mix": 1,
+            "tone": 9000
+          }
+        },
+        {
+          "type": "pitch.octave",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "sub1": 0.4,
+            "dry": 1,
+            "tone": 1500
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "sustain": 0.65,
+            "tone": 0.4,
+            "volume": -4,
+            "mids": "Flat"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.65,
+            "damp": 0.6,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Storm Surge",
+      "description": "Metalcore rhythm: punchy, gated high gain with bright attack for breakdowns and open chords. Stomp 6 for a dotted-eighth lead echo and hall.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Lead",
+          "tight": "Tight",
+          "gain": 0.62,
+          "bass": 0.55,
+          "lowmid": 0,
+          "highmid": 2,
+          "treble": 0.6,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.25,
+          "lowcut": 80,
+          "highcut": 7000,
+          "room": 0.08,
+          "level": -1.4
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -50,
+            "release": 40
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 7,
+            "tilt": 0.25,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "dyn.transient",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "attack": 0.4,
+            "sustain": 0,
+            "level": 0
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 450,
+            "division": "1/8 dot",
+            "repeats": 0.35,
+            "mix": 0.2,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": false,
+          "knobs": {
+            "decay": 2400,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wildfire Shred",
+      "description": "Smooth, singing shred lead with endless sustain, a dotted echo and a hall tail behind the dry note. Stomp 3 for a harmony a third above.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Lead",
+          "tight": "Tight",
+          "gain": 0.65,
+          "bass": 0.45,
+          "lowmid": 2,
+          "highmid": 3,
+          "treble": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "lowcut": 80,
+          "highcut": 7000,
+          "level": -1.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -58,
+            "release": 150
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.2,
+            "level": 5,
+            "tone": 0.55
+          }
+        },
+        {
+          "type": "pitch.harmony",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "voice1": "+3rd",
+            "level1": 0.45,
+            "voice2": "Off",
+            "spread": 0.5,
+            "dry": 1
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 480,
+            "division": "1/8 dot",
+            "repeats": 0.35,
+            "mix": 0.22,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2600,
+            "size": 0.65,
+            "predelay": 30,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Neon Beast",
+      "description": "Big-haired eighties lead: hot-rodded distortion, lush chorus and a stereo echo bouncing behind it. Stomp 4 for a flanger sweep.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.62,
+          "bass": 0.5,
+          "mid": 0.55,
+          "treble": 0.6,
+          "presence": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.3,
+          "distance": 0.2,
+          "lowcut": 70,
+          "highcut": 7500,
+          "level": -1.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -58,
+            "release": 120
+          }
+        },
+        {
+          "type": "drive.distortion",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "distortion": 0.35,
+            "filter": 0.5,
+            "volume": 0,
+            "clip": "Silicon"
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "rate": 0.6,
+            "depth": 0.4,
+            "voices": "Two",
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 0.2,
+            "depth": 0.6,
+            "feedback": 0.4,
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.35,
+            "mix": 0.2,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 2000,
+            "mix": 0.16
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rust Hydra",
+      "description": "Scooped, downtuned nu-metal bounce with a loose low end and a dry wall of gain. Stomp 2 for a gritty octave-down riff layer.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Lead",
+          "tight": "Loose",
+          "gain": 0.6,
+          "bass": 0.65,
+          "lowmid": -4,
+          "highmid": -3,
+          "treble": 0.6,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.35,
+          "lowcut": 60,
+          "highcut": 6500,
+          "room": 0.1,
+          "level": -1.4
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -50,
+            "release": 60
+          }
+        },
+        {
+          "type": "pitch.shift",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "shift": -3,
+            "mix": 1,
+            "tone": 9000
+          }
+        },
+        {
+          "type": "pitch.divider",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "sub1": 0.45,
+            "dry": 1,
+            "tone": 900
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "mix": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "name": "Iron Engine",
+      "description": "Industrial grind: metal distortion through a touch of bitcrush and a slamming gated room. Stomp 3 for a stuttering step-filter sequence.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Crunch",
+          "tight": "Tight",
+          "gain": 0.5,
+          "bass": 0.5,
+          "lowmid": 0,
+          "highmid": 2,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Tight 4x12",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.3,
+          "lowcut": 80,
+          "highcut": 7000,
+          "level": 1.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -50,
+            "release": 40
+          }
+        },
+        {
+          "type": "drive.metal",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "gain": 0.6,
+            "tight": 0.7,
+            "low": 1,
+            "mid": -2,
+            "high": 1,
+            "level": -6
+          }
+        },
+        {
+          "type": "drive.crusher",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "bits": 10,
+            "rate": 16000,
+            "filter": 7000,
+            "mix": 0.35,
+            "level": 0
+          }
+        },
+        {
+          "type": "filter.step",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 8,
+            "steps": "8",
+            "pattern": "Zigzag",
+            "low": 300,
+            "high": 2500,
+            "resonance": 4
+          }
+        },
+        {
+          "type": "reverb.gated",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "hold": 250,
+            "decay": 1500,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Forge Hammer",
+      "description": "Classic hard-rock high gain: a hot British channel pushed by an overdrive, with a gate to keep the stops tight. Stomp 2 for a bigger lead push.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Crunch",
+          "tight": "Tight",
+          "gain": 0.7,
+          "bass": 0.5,
+          "lowmid": 2,
+          "highmid": 1,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.3,
+          "distance": 0.2,
+          "lowcut": 70,
+          "highcut": 7500,
+          "level": -3.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -58,
+            "release": 80
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "drive": 0.3,
+            "level": 5,
+            "tone": 0.55
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.25,
+            "mix": 0.14
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.45,
+            "mix": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wolfstorm",
+      "description": "A non-master British stack hot-rodded with a full-range treble booster and a gate, for raw, roaring metal riffs. Stomp 9 for a lead echo.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.85,
+          "bass": 0.4,
+          "mid": 0.65,
+          "treble": 0.6,
+          "presence": 0.45,
+          "sag": 0.35
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.3,
+          "distance": 0.2,
+          "lowcut": 80,
+          "highcut": 7000,
+          "level": -4.1
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -55,
+            "release": 70
+          }
+        },
+        {
+          "type": "drive.treble",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 0.7,
+            "range": "Full",
+            "level": 4
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "drive": 0.35,
+            "level": 3,
+            "tone": 0.55
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 400,
+            "repeats": 0.3,
+            "mix": 0.18
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Barrow Beast",
+      "description": "Massive baritone-style sludge from a bass amp's grind channel and a scooped fuzz, slow and heavy. Stomp 2 for a crushing sub octave.",
+      "amp": {
+        "type": "amp.bass",
+        "knobs": {
+          "voice": "Grind",
+          "gain": 0.6,
+          "bass": 0.55,
+          "mid": 0.55,
+          "treble": 0.5,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.25,
+          "lowcut": 60,
+          "highcut": 6000,
+          "level": -2.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -55,
+            "release": 150
+          }
+        },
+        {
+          "type": "pitch.divider",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "sub1": 0.5,
+            "dry": 1,
+            "tone": 800
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "sustain": 0.7,
+            "tone": 0.45,
+            "volume": -4,
+            "mids": "Scoop"
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3500,
+            "size": 0.7,
+            "damp": 0.6,
+            "mix": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gargoyle Lead",
+      "description": "Thick, vocal high-gain lead from a boutique overdrive amp with warm analog echo. Stomp 2 for a wah parked in the nasal sweet spot.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Post",
+          "volume": 0.5,
+          "drive": 0.85,
+          "od": 0.6,
+          "bass": 0.5,
+          "mid": 0.65,
+          "treble": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "lowcut": 80,
+          "highcut": 7000,
+          "level": 1.3
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -58,
+            "release": 150
+          }
+        },
+        {
+          "type": "filter.wah",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "position": 0.6,
+            "voice": "Modern",
+            "resonance": 0.55
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "drive": 0.15,
+            "level": 4,
+            "tone": 0.55
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 450,
+            "repeats": 0.35,
+            "mix": 0.22
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Firewall Thrash",
+      "description": "Fast, tight thrash rhythm from a metal pedal into a crunch channel, gated and dry for precise downpicking. Stomp 6 for a galloping multi-tap echo.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Crunch",
+          "tight": "Tight",
+          "gain": 0.45,
+          "bass": 0.55,
+          "lowmid": -2,
+          "highmid": 1,
+          "treble": 0.6,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.25,
+          "lowcut": 80,
+          "highcut": 7000,
+          "room": 0.08,
+          "level": 2.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -50,
+            "release": 45
+          }
+        },
+        {
+          "type": "drive.metal",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "gain": 0.4,
+            "tight": 0.7,
+            "low": 2,
+            "mid": -5,
+            "high": 2,
+            "level": -2
+          }
+        },
+        {
+          "type": "delay.multitap",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 400,
+            "pattern": "Gallop",
+            "repeats": 0.25,
+            "mix": 0.2
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "mix": 0.07
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,810 @@
+{
+  "genre": "Psych & Doom",
+  "presets": [
+    {
+      "name": "Saffron Smoke",
+      "description": "Woolly fuzz into a deep, slow phaser and drippy springs for classic late-sixties psych leads.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bright",
+          "volume": 0.45,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "sag": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 7500,
+          "level": -1.1
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.7,
+            "volume": 0
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.35,
+            "depth": 0.8,
+            "feedback": 0.45,
+            "stages": "8",
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spinning Temple",
+      "description": "Warm overdriven combo through a rotary speaker on slow; switch the rotary to fast for a swirling chorale.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.5,
+          "tone": 0.5,
+          "output": 0.0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "level": 1.9
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "drive": 0.35,
+            "level": 0
+          }
+        },
+        {
+          "type": "mod.rotary",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "speed": "Slow",
+            "drive": 0.25,
+            "mix": 1.0
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lamp Moth",
+      "description": "Lopsided photocell vibrato throb over a lightly fuzzed chime amp, with a spring tail. The classic swirling rhythm-guitar vibe.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.45,
+          "cut": 0.4,
+          "master": 0.65
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "level": 0.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.45,
+            "guitar": 0.8,
+            "volume": 2
+          }
+        },
+        {
+          "type": "mod.throb",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "speed": 2.2,
+            "intensity": 0.7,
+            "mode": "Vibrato"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2000,
+            "mix": 0.22
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inverted Spores",
+      "description": "Every note plays backwards, swelling into its own attack, through a slow phaser and tape echo. Stomp 1 to drop the reverse and hear the dry note.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "level": 3.2
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.rewind",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "length": 600,
+            "swell": 0.6,
+            "dry": 0.0,
+            "wet": 1.0
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.2,
+            "depth": 0.6,
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.4,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Warped Plateau",
+      "description": "A crunchy little combo through a tired, warbling tape machine and saturated echoes. Hazy, sun-baked and woozy.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.55,
+          "tone": 0.5,
+          "output": 0.0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x10 Open",
+          "level": -0.6
+        }
+      },
+      "board": [
+        {
+          "type": "mod.warble",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "wow": 0.45,
+            "flutter": 0.35,
+            "rate": 0.9,
+            "age": 0.55
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 330,
+            "repeats": 0.45,
+            "mix": 0.32,
+            "heads": "Short+Long",
+            "drive": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dune Engine",
+      "description": "Desert stoner rhythm: thick flat-mid fuzz into a cranked crunch amp and a big 4x12. Stomp the boost for a fatter lead.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.45,
+          "bass": 0.55,
+          "mid": 0.6,
+          "treble": 0.5,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 6500,
+          "lowcut": 70,
+          "level": -1.2
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.boost",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 4,
+            "voice": "Fat"
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.7,
+            "tone": 0.4,
+            "mids": "Lift",
+            "volume": -2
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Basalt Monolith",
+      "description": "Doom sludge: a polyphonic octave-down underneath massive fuzz into a loose high-gain amp. Slow, heavy and huge.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Crunch",
+          "tight": "Loose",
+          "gain": 0.5,
+          "bass": 0.6,
+          "treble": 0.45,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 5500,
+          "lowcut": 50,
+          "level": -2.1
+        }
+      },
+      "board": [
+        {
+          "type": "pitch.octave",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sub1": 0.6,
+            "dry": 0.8,
+            "tone": 1800
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.8,
+            "tone": 0.35,
+            "mids": "Flat",
+            "volume": -6
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.6,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tar Pit Moon",
+      "description": "Whole rig pitched down four semitones for a detuned doom crawl, through choking, starved fuzz and a sagging non-master amp.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.55,
+          "bass": 0.55,
+          "mid": 0.5,
+          "treble": 0.5,
+          "sag": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 6000,
+          "level": -2.3
+        }
+      },
+      "board": [
+        {
+          "type": "pitch.shift",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "shift": -4,
+            "mix": 1.0,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "drive.battery",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.7,
+            "battery": 0.45,
+            "volume": -6
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2500,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lunar Runaway",
+      "description": "Space rock: driven phaser into tape echo and a plate. Stomp 4 for a second echo that runs away into self-oscillating chaos.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.4,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "highcut": 7000,
+          "level": 2.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.distortion",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "distortion": 0.45,
+            "filter": 0.4,
+            "volume": -2
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.25,
+            "depth": 0.7,
+            "feedback": 0.5,
+            "stages": "6",
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 450,
+            "repeats": 0.5,
+            "mix": 0.3,
+            "heads": "All"
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 300,
+            "repeats": 0.88,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3000,
+            "mix": 0.22
+          }
+        }
+      ]
+    },
+    {
+      "name": "Moonlit Motorik",
+      "description": "Steady clean pulse for driving repetitive rhythms: compressed chime amp, quarter-note taps and a touch of chorus.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "master": 0.62
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "level": 4.0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.6,
+            "attack": 5
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.5,
+            "depth": 0.25,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "delay.multitap",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 430,
+            "pattern": "Quarters",
+            "repeats": 0.35,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Eclipse Spiral",
+      "description": "A frequency shifter turns lightly fuzzed chords into an endlessly rising barber-pole swirl. Push the shift for clang and metal.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "level": -1.1
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.45
+          }
+        },
+        {
+          "type": "weird.shift",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "shift": 4,
+            "mode": "Up",
+            "feedback": 0.6,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3000,
+            "mix": 0.22
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spore Cloud",
+      "description": "Vowel-ish wah sweeping on its own through fuzz: a slow, talking psych lead. Stomp the delay for long trails.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.5,
+          "drive": 0.3,
+          "od": 0.4,
+          "master": 0.65
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "level": -0.4
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.6,
+            "volume": 0
+          }
+        },
+        {
+          "type": "filter.vowel",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "control": "LFO",
+            "rate": 0.4,
+            "depth": 0.7,
+            "resonance": 0.6,
+            "mix": 0.8
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 480,
+            "repeats": 0.45,
+            "mix": 0.28
+          }
+        }
+      ]
+    },
+    {
+      "name": "Brass Temple",
+      "description": "Picks strike gong-like partials over a crunchy amp and slow flanger for ritual, clanging psych textures.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "level": 1.1
+        }
+      },
+      "board": [
+        {
+          "type": "weird.bell",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "metal": "Gong",
+            "strike": 2000,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.1,
+            "depth": 0.6,
+            "feedback": 0.4,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3500,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Opal Moon",
+      "description": "Octave-up fuzz screaming through a jet flanger and spring tail, best on the neck pickup for searing lead lines.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.45,
+          "mid": 0.6,
+          "sag": 0.4
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 7000,
+          "level": -0.7
+        }
+      },
+      "board": [
+        {
+          "type": "drive.octave",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.65,
+            "octave": 0.75,
+            "level": 2
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.2,
+            "depth": 0.7,
+            "feedback": 0.5,
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2000,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sandstorm Oracle",
+      "description": "A chaotic resonant filter swerves through fuzz without ever repeating, into a driven tape echo. Wild, unpredictable swirl.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.35,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "highcut": 7000,
+          "level": 1.8
+        }
+      },
+      "board": [
+        {
+          "type": "drive.fuzz",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.6,
+            "tone": 0.5,
+            "mids": "Flat",
+            "volume": -1
+          }
+        },
+        {
+          "type": "weird.chaos",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.6,
+            "depth": 2.0,
+            "center": 800,
+            "reso": 4,
+            "mix": 0.8
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.4,
+            "mix": 0.28
+          }
+        }
+      ]
+    }
+  ]
+}

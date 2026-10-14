@@ -190,6 +190,8 @@ private:
     void updateLatencyText();
     void startCapture (double seconds);
     void refreshPresetList();
+    void stepPreset (int delta);
+    void presetChosen (int id);
     void savePresetAs();
     void showLibrary (int targetSpot = -1, const juce::String& category = {});
     void toggleTuner();
@@ -206,7 +208,8 @@ private:
     woodshed::Meter inputMeter, outputMeter;
     juce::Label latencyLabel, statusLabel;
     juce::TextButton audioSetupButton { "Audio" }, captureButton { "Capture" }, savePresetButton { "Save" },
-                     libraryButton { "+ Add Pedal" }, tunerButton { "Tuner" };
+                     libraryButton { "+ Add Pedal" }, tunerButton { "Tuner" },
+                     prevPresetButton { "<" }, nextPresetButton { ">" };
 
     woodshed::BoardView board;
     woodshed::RigStack rig;
@@ -215,6 +218,8 @@ private:
     int libraryTargetSpot = -1;
 
     juce::Array<juce::File> presetFiles;
+    juce::String presetCaption;                 // genre, name and description of the loaded preset
+    static constexpr int defaultBoardId = 9999, factoryIdBase = 10000;
     juce::File captureDir, captureRequestFile;
     juce::String pendingCaptureName;
     int statusFrames = 0, frame = 0;

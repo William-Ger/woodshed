@@ -1,0 +1,839 @@
+{
+  "genre": "Cinematic",
+  "presets": [
+    {
+      "name": "High Noon Canyon",
+      "description": "Twangy compressed clean with a dry tape echo and a canyon-sized reverb for wide-open western themes. Stomp 3 for a slow tremolo.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "treble": 0.6,
+          "bass": 0.45,
+          "cut": 0.3
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "level": 4.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "attack": 12
+          }
+        },
+        {
+          "type": "drive.treble",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 0.3,
+            "range": "Treble"
+          }
+        },
+        {
+          "type": "mod.tremolo",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "rate": 3.5,
+            "depth": 0.55,
+            "wave": "Bias"
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.3,
+            "mix": 0.25,
+            "wow": 0.2
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 6000,
+            "size": 0.85,
+            "predelay": 40,
+            "mix": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ghost Town Wind",
+      "description": "Drippy spring reverb and a throbbing bias tremolo on a small combo, for tumbleweeds and empty streets. Stomp 3 for a gritty slapback.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.38,
+          "tone": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "level": -0.8
+        }
+      },
+      "board": [
+        {
+          "type": "mod.tremolo",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rate": 4.5,
+            "depth": 0.6,
+            "wave": "Bias"
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "time": 520,
+            "repeats": 0.35,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "time": 100,
+            "level": 0.45,
+            "grit": 0.4
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 3500,
+            "drip": 0.65,
+            "mix": 0.45
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cold Open",
+      "description": "Bowed swells freeze into a tense, hanging drone under a vast ambient wash, for the scene before anything happens. Stomp 3 to freeze the wash.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.45,
+          "treble": 0.5,
+          "master": 0.75
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Ribbon",
+          "level": 4.5
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rise": 700,
+            "curve": "Bloom",
+            "level": 6
+          }
+        },
+        {
+          "type": "glitch.cryotron",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "mode": "Picked",
+            "sustain": 12000,
+            "swell": 1200,
+            "drone": 0.4,
+            "shimmer": 0.1,
+            "tone": 3000
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "decay": 30000,
+            "freeze": "On",
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 20000,
+            "size": 0.9,
+            "tone": 0.65,
+            "mix": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Haunted Nursery",
+      "description": "Glassy music-box chimes an octave up, warbling like a worn tape under a long plate. Stomp 3 to detune it into something unsettling.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "treble": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x10 Open",
+          "level": 4.3
+        }
+      },
+      "board": [
+        {
+          "type": "pitch.shift",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "shift": 12,
+            "mix": 0.5,
+            "tone": 8000
+          }
+        },
+        {
+          "type": "weird.bell",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "metal": "Glass",
+            "tune": 1,
+            "strike": 1200,
+            "sustain": 0.1,
+            "shimmer": 0.35,
+            "tone": 7000,
+            "mix": 0.6
+          }
+        },
+        {
+          "type": "mod.warble",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "wow": 0.6,
+            "flutter": 0.3,
+            "rate": 0.5,
+            "age": 0.5
+          }
+        },
+        {
+          "type": "mod.warble",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "wow": 0.25,
+            "flutter": 0.15,
+            "age": 0.3
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 4500,
+            "mix": 0.35
+          }
+        }
+      ]
+    },
+    {
+      "name": "The Cellar Door",
+      "description": "Detuned, frequency-shifted clean that slides sour as it rings, with backwards swells creeping out of the dark. Stomp 4 for a clanging shift.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.35,
+          "bass": 0.55,
+          "treble": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Ribbon",
+          "level": -1.3
+        }
+      },
+      "board": [
+        {
+          "type": "pitch.doubler",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "detune": 25,
+            "delay": 15,
+            "mix": 0.6
+          }
+        },
+        {
+          "type": "weird.shift",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "shift": 0.8,
+            "mode": "Down",
+            "feedback": 0.4,
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "time": 900,
+            "repeats": 0.3,
+            "mix": 0.35,
+            "tone": 4000
+          }
+        },
+        {
+          "type": "weird.shift",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "shift": 180,
+            "mode": "Up",
+            "feedback": 0.2,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 6000,
+            "mix": 0.35,
+            "damp": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deep Space Relay",
+      "description": "Slow-swelling chorused pad with a choir of octaves rising from the tail, for starfields and long tracking shots. Stomp 3 for an endless rise.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.3,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "room": 0.3,
+          "level": 5.3
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rise": 500,
+            "curve": "Smooth",
+            "level": 3
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "rate": 0.25,
+            "depth": 0.5,
+            "voices": "Three",
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "glitch.escalator",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "climb": 1,
+            "mix": 0.4,
+            "wash": 0.6
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 600,
+            "repeats": 0.45,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 12000,
+            "shimmer": 0.5,
+            "mix": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Last Light Overture",
+      "description": "Bowed, doubled swells with a low octave underneath for a string-section crescendo. Stomp 3 to add a fifth above for the big finale.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.5,
+          "drive": 0.1,
+          "od": 0.2,
+          "bass": 0.5,
+          "treble": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Ribbon",
+          "micb": "Condenser",
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rise": 450,
+            "curve": "Smooth"
+          }
+        },
+        {
+          "type": "pitch.harmony",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "voice1": "-Oct",
+            "level1": 0.45,
+            "voice2": "Off",
+            "dry": 1,
+            "spread": 0.6
+          }
+        },
+        {
+          "type": "pitch.harmony",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "voice1": "+5th",
+            "level1": 0.35,
+            "voice2": "Off",
+            "dry": 1
+          }
+        },
+        {
+          "type": "mod.doubler",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 5000,
+            "size": 0.8,
+            "mix": 0.38
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rooftop Pursuit",
+      "description": "Choppy square-wave tremolo over a pushed crunch with dotted-eighth repeats driving the tempo of a chase. Stomp 2 for an overdrive lift.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bright",
+          "volume": 0.45,
+          "treble": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "highcut": 8000,
+          "level": 0.8
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.4,
+            "level": 0
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "drive": 0.3,
+            "level": 6,
+            "tone": 0.55
+          }
+        },
+        {
+          "type": "mod.tremolo",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "rate": 8,
+            "depth": 0.85,
+            "wave": "Square"
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 450,
+            "division": "1/8 dot",
+            "repeats": 0.35,
+            "mix": 0.22
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Storm Front",
+      "description": "Thick, saturated swells with a seasick modulated echo and a thunderous hall, for the moment the clouds roll in. Stomp 3 to add gritty fuzz.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.45,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 7000,
+          "level": -1.0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rise": 350
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "gain": 0.5,
+            "blend": 0.4
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "sustain": 0.45,
+            "volume": -4,
+            "mids": "Flat"
+          }
+        },
+        {
+          "type": "delay.modulated",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 650,
+            "repeats": 0.45,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 7000,
+            "size": 0.9,
+            "mix": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Harbor Fog",
+      "description": "A dark, slow filter sweep and tape warble disappear into a drifting cloud of reverb, for nights on the docks. Stomp 3 for a spinning rotary.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "treble": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Ribbon",
+          "level": -1.4
+        }
+      },
+      "board": [
+        {
+          "type": "filter.lfo",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rate": 0.12,
+            "depth": 0.5,
+            "centre": 700,
+            "resonance": 2,
+            "mix": 0.7
+          }
+        },
+        {
+          "type": "mod.warble",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "wow": 0.3,
+            "flutter": 0.1,
+            "age": 0.4
+          }
+        },
+        {
+          "type": "mod.rotary",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "speed": "Slow",
+            "mix": 0.7
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 15000,
+            "tone": 0.7,
+            "mix": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Heat Mirage",
+      "description": "Shimmering vibrato and backwards echoes rippling up off the sand, under a bright plate. Stomp 3 to let the reverse delay run longer.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.35,
+          "tone": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "level": 2.5
+        }
+      },
+      "board": [
+        {
+          "type": "mod.vibrato",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rate": 3,
+            "depth": 0.2
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "time": 700,
+            "repeats": 0.25,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "time": 1300,
+            "repeats": 0.5,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 4000,
+            "mix": 0.32
+          }
+        }
+      ]
+    },
+    {
+      "name": "Polar Night",
+      "description": "Sympathetic strings ringing a D minor chord under ducked echoes and an octave shimmer, for frozen wastes. Stomp 2 to add a high fifths drone above the chord.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.28,
+          "treble": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Condenser",
+          "distance": 0.4,
+          "level": 5.4
+        }
+      },
+      "board": [
+        {
+          "type": "weird.strings",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "key": "D",
+            "chord": "Minor",
+            "decay": 8000,
+            "bright": 0.5,
+            "mix": 0.5,
+            "range": "Low"
+          }
+        },
+        {
+          "type": "weird.strings",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "key": "D",
+            "chord": "Fifths",
+            "decay": 10000,
+            "bright": 0.45,
+            "mix": 0.4,
+            "range": "High"
+          }
+        },
+        {
+          "type": "delay.ducking",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 550,
+            "repeats": 0.45,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 10000,
+            "shimmer": 0.35,
+            "mix": 0.35
+          }
+        }
+      ]
+    }
+  ]
+}

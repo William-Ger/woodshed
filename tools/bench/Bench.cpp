@@ -1,16 +1,25 @@
 // woodshed-bench: offline checks for every pedal in the registry.
 //
 //   woodshed-bench list
+//   woodshed-bench knobs [type ...]
 //   woodshed-bench run [type ...] [--wav guitar.wav] [--render outDir]
+//   woodshed-bench presets [file.json ...] [--wav guitar.wav] [--render outDir]
 //
 // Each pedal runs alone at 48 kHz in 64-sample blocks, through the same Chain
 // code the app uses. A pedal fails if it produces NaN/inf, makes noise from
 // silence, changes the level of a guitar DI by more than 3 dB at default
 // settings, blows up at any knob extreme or under random knob automation, or
 // costs more than 100 us per 64-sample stereo block.
+//
+// `presets` builds each factory preset's whole rig (board, amp, cab) and plays the
+// guitar DI through it. A preset fails if its file is malformed, it produces NaN/inf,
+// peaks above 0 dBFS, lands outside the shared loudness window (so switching presets
+// doesn't jump in volume), or the whole rig costs more than 600 us per block.
 
 #include "../../Source/engine/Chain.h"
 #include "../../Source/engine/PitchDetector.h"
+#include "../../Source/engine/Presets.h"
+#include <deque>
 #include <juce_audio_formats/juce_audio_formats.h>
 
 using namespace woodshed;
@@ -305,6 +314,166 @@ Result test (const PedalType& t, const Signal& guitar, const juce::File& renderD
     return res;
 }
 
+
+//==============================================================================
+// Whole-preset checks.
+constexpr float presetLevelMin = -3.0f, presetLevelMax = 3.0f;     // output RMS vs the DI, dB
+constexpr float presetPeakLimit = 1.0f;                            // 0 dBFS, before the safety clip
+constexpr double presetCpuBudgetUs = 600.0;
+
+struct BoardRig
+{
+    struct Slot
+    {
+        std::shared_ptr<Pedal> pedal;
+        std::atomic<float> on { 1.0f };
+        std::array<std::atomic<float>, Pedal::maxKnobs> knobs;
+        bool startsOn = true;
+    };
+
+    std::deque<Slot> slots;
+    Chain chain;
+
+    explicit BoardRig (const Preset& preset)
+    {
+        for (auto& p : preset.pedals)
+        {
+            const auto& t = *Registry::get().find (p.type);
+            auto& s = slots.emplace_back();
+            s.startsOn = p.on;
+            s.on = p.on ? 1.0f : 0.0f;
+
+            std::array<const std::atomic<float>*, Pedal::maxKnobs> sources {};
+            for (size_t k = 0; k < s.knobs.size(); ++k)
+            {
+                s.knobs[k] = p.knobs[k];
+                sources[k] = &s.knobs[k];
+            }
+
+            s.pedal = t.create();
+            chain.entries.push_back (Chain::makeEntry (s.pedal, t.info, &s.on, sources.data()));
+        }
+
+        restart();
+    }
+
+    void restart()
+    {
+        for (auto& s : slots)
+        {
+            s.pedal->prepare (sampleRate, blockSize);
+            s.pedal->engaged.reset (sampleRate, 0.015);
+            s.pedal->engaged.setCurrentAndTargetValue (s.startsOn ? 1.0f : 0.0f);
+        }
+    }
+
+    std::pair<Signal, Signal> run (const Signal& in, double& microsPerBlock)
+    {
+        Signal l (in), r (in.size());
+        float scratchL[blockSize], scratchR[blockSize];
+        juce::ScopedNoDenormals noDenormals;
+        const auto t0 = juce::Time::getHighResolutionTicks();
+        int blocks = 0;
+
+        for (size_t pos = 0; pos < in.size(); pos += blockSize, ++blocks)
+        {
+            const int n = (int) juce::jmin ((size_t) blockSize, in.size() - pos);
+            chain.process (l.data() + pos, r.data() + pos, scratchL, scratchR, n);
+        }
+
+        microsPerBlock = juce::Time::highResolutionTicksToSeconds (juce::Time::getHighResolutionTicks() - t0) * 1.0e6 / juce::jmax (1, blocks);
+        return { std::move (l), std::move (r) };
+    }
+};
+
+int runPresets (const juce::Array<juce::File>& files, const Signal& guitar, const juce::File& renderDir)
+{
+    juce::StringArray seen;
+    int failures = 0, tested = 0;
+
+    // The DI, then six seconds of silence so tails can be checked.
+    Signal input (guitar);
+    input.resize (guitar.size() + (size_t) (sampleRate * 6.0), 0.0f);
+    const float inRms = rms (guitar);
+
+    std::cout << juce::String ("genre").paddedRight (' ', 20) << juce::String ("preset").paddedRight (' ', 26)
+              << "level  peak   tail  cpu(us)  result\n";
+
+    for (auto& file : files)
+    {
+        juce::StringArray errors;
+        const auto presets = parsePresets (file.loadFileAsString(), errors);
+
+        for (auto& e : errors)
+        {
+            std::cout << file.getFileName() << ": FAIL: " << e << "\n";
+            ++failures;
+        }
+
+        for (auto& p : presets)
+        {
+            ++tested;
+            juce::StringArray problems;
+
+            if (seen.contains (p.name, true)) problems.add ("duplicate name");
+            seen.add (p.name);
+
+            BoardRig rig (p);
+            double cpu = 0.0;
+            auto [l, r] = rig.run (input, cpu);
+
+            Signal playedL (l.begin(), l.begin() + (long) guitar.size()), playedR (r.begin(), r.begin() + (long) guitar.size());
+            const float level = toDb (0.5f * (rms (playedL) + rms (playedR))) - toDb (inRms);
+            const float pk = juce::jmax (peak (l), peak (r));
+            const size_t lastSecond = input.size() - (size_t) sampleRate;
+            const float tail = toDb (juce::jmax (peak (l, lastSecond), peak (r, lastSecond)));
+
+            if (! allFinite (l) || ! allFinite (r))                    problems.add ("NaN/inf");
+            if (pk > presetPeakLimit)                                  problems.add ("peaks at " + juce::String (toDb (pk), 1) + " dBFS");
+            if (level < presetLevelMin || level > presetLevelMax)      problems.add ("level " + juce::String (level, 1) + " dB (window "
+                                                                                     + juce::String (presetLevelMin, 0) + ".." + juce::String (presetLevelMax, 0) + ")");
+            if (cpu > presetCpuBudgetUs)                               problems.add ("CPU " + juce::String (cpu, 0) + " us/block");
+
+            failures += problems.isEmpty() ? 0 : 1;
+
+            std::cout << p.genre.paddedRight (' ', 20) << p.name.paddedRight (' ', 26)
+                      << juce::String (level, 1).paddedLeft (' ', 5)
+                      << juce::String (toDb (pk), 1).paddedLeft (' ', 6)
+                      << juce::String (juce::roundToInt (juce::jmax (tail, -99.0f))).paddedLeft (' ', 7)
+                      << juce::String (juce::roundToInt (cpu)).paddedLeft (' ', 9) << "  "
+                      << (problems.isEmpty() ? "PASS" : "FAIL: " + problems.joinIntoString ("; ")) << "\n";
+
+            if (renderDir != juce::File())
+                writeWav (renderDir.getChildFile (juce::File::createLegalFileName (p.genre + " - " + p.name) + ".wav"), l, r);
+        }
+    }
+
+    std::cout << tested << " presets tested, " << failures << " failed\n";
+    return failures == 0 ? 0 : 1;
+}
+
+void printKnobs (const juce::StringArray& only)
+{
+    for (auto& t : Registry::get().all())
+    {
+        if (! only.isEmpty() && ! only.contains (t.info.type))
+            continue;
+
+        std::cout << t.info.type << "  " << t.info.name << "  [" << t.info.category << "]  " << t.info.subtitle
+                  << " - " << t.info.description << "\n";
+
+        for (auto& k : t.info.knobs)
+        {
+            std::cout << "    " << k.id.paddedRight (' ', 12) << k.label.paddedRight (' ', 14);
+            if (k.isChoice())
+                std::cout << "choice: " << k.choices.joinIntoString (" | ") << "  (default " << k.choices[(int) k.def] << ")\n";
+            else
+                std::cout << k.min << " .. " << k.max << (k.unit.isEmpty() ? "" : " " + k.unit)
+                          << "  (default " << k.def << ")" << (k.unit == "%" ? "  [% knobs: 0..1]" : "") << "\n";
+        }
+    }
+}
+
 } // namespace
 
 int main (int argc, char* argv[])
@@ -354,9 +523,17 @@ int main (int argc, char* argv[])
         return worstCents < 1.0f ? 0 : 1;
     }
 
-    if (args[0] != "run")
+    if (args[0] == "knobs")
     {
-        std::cerr << "usage: woodshed-bench list | run [type ...] [--wav file] [--render dir]\n";
+        args.remove (0);
+        printKnobs (args);
+        return 0;
+    }
+
+    if (args[0] != "run" && args[0] != "presets")
+    {
+        std::cerr << "usage: woodshed-bench list | knobs [type ...] | run [type ...] [--wav file] [--render dir]"
+                     " | presets [file.json ...] [--wav file] [--render dir]\n";
         return 2;
     }
 
@@ -379,6 +556,21 @@ int main (int argc, char* argv[])
     {
         std::cerr << "note: no guitar recording at " << wavFile.getFullPathName() << ", using synthetic plucks\n";
         guitar = syntheticGuitar();
+    }
+
+    if (args[0] == "presets")
+    {
+        juce::Array<juce::File> files;
+        for (auto& o : only)
+            files.add (juce::File::getCurrentWorkingDirectory().getChildFile (o));
+
+        if (files.isEmpty())
+        {
+            files = juce::File::getCurrentWorkingDirectory().getChildFile ("presets").findChildFiles (juce::File::findFiles, false, "*.json");
+            files.sort();
+        }
+
+        return runPresets (files, guitar, renderDir);
     }
 
     std::cout << juce::String ("type").paddedRight (' ', 26) << "level  peak  silence  worst   cpu(us)  lat  result\n";

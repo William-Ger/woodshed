@@ -1001,20 +1001,21 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
     addAndMakeVisible (latencyLabel);
 
     statusLabel.setFont (juce::FontOptions (12.0f));
-    statusLabel.setJustificationType (juce::Justification::centred);
+    statusLabel.setJustificationType (juce::Justification::centredRight);
     statusLabel.setColour (juce::Label::textColourId, palette::accent);
     addAndMakeVisible (statusLabel);
 
     presetChoice.setTextWhenNothingSelected ("Presets");
-    presetChoice.onChange = [this]
-    {
-        const int id = presetChoice.getSelectedId();
-        if (id == 9999)
-            woodshedProcessor.loadDefaultBoard();
-        else if (juce::isPositiveAndBelow (id - 1, presetFiles.size()))
-            woodshedProcessor.loadPreset (presetFiles[id - 1]);
-    };
+    presetChoice.setTooltip ("Factory sounds by genre, then your saved boards");
+    presetChoice.onChange = [this] { presetChosen (presetChoice.getSelectedId()); };
     addAndMakeVisible (presetChoice);
+
+    prevPresetButton.setTooltip ("Previous preset (left arrow)");
+    prevPresetButton.onClick = [this] { stepPreset (-1); };
+    addAndMakeVisible (prevPresetButton);
+    nextPresetButton.setTooltip ("Next preset (right arrow)");
+    nextPresetButton.onClick = [this] { stepPreset (1); };
+    addAndMakeVisible (nextPresetButton);
 
     savePresetButton.setTooltip ("Save this board as a preset");
     savePresetButton.onClick = [this] { savePresetAs(); };
@@ -1074,7 +1075,7 @@ WoodshedEditor::WoodshedEditor (WoodshedProcessor& p)
 
     setWantsKeyboardFocus (true);
     setResizable (true, true);
-    setResizeLimits (1000, 560, 3000, 1400);
+    setResizeLimits (1000, 560, 8192, 8192);
     setSize (1320, 700);
     startTimerHz (30);
 }
@@ -1125,9 +1126,16 @@ void WoodshedEditor::paint (juce::Graphics& g)
     for (auto spot : woodshedProcessor.getSpots())
         onBoard += spot >= 0 ? 1 : 0;
 
-    g.drawText (juce::String (onBoard) + " / " + juce::String (WoodshedProcessor::boardSpots)
-                    + " spots   ·   1-0 stomp   ·   T tuner   ·   click an empty spot or press A to add   ·   drag pedals to rearrange   ·   double-click a knob to reset",
-                footer.reduced (16, 0), juce::Justification::centredLeft);
+    footer.reduce (16, 0);
+    const auto hints = juce::String (onBoard) + " / " + juce::String (WoodshedProcessor::boardSpots)
+                     + juce::String::fromUTF8 (" spots   \u00b7   1-0 stomp   \u00b7   \u2190 \u2192 presets   \u00b7   T tuner   \u00b7   F full screen   \u00b7   A add pedal   \u00b7   drag to rearrange");
+    g.drawText (hints, footer.removeFromLeft (juce::jmin (footer.getWidth() / 2, 560)), juce::Justification::centredLeft);
+
+    if (presetCaption.isNotEmpty() && statusLabel.getText().isEmpty())
+    {
+        g.setColour (palette::text.withAlpha (0.8f));
+        g.drawFittedText (presetCaption, footer.withTrimmedLeft (16), juce::Justification::centredRight, 1, 0.85f);
+    }
 }
 
 void WoodshedEditor::resized()
@@ -1145,11 +1153,11 @@ void WoodshedEditor::resized()
     bar.removeFromLeft (8);
     inputGain.setBounds (bar.removeFromLeft (52).withTrimmedTop (8).withHeight (48));
     bar.removeFromLeft (8);
-    inputMeter.setBounds (bar.removeFromLeft (120).withTrimmedTop (28).withHeight (20));
+    inputMeter.setBounds (bar.removeFromLeft (90).withTrimmedTop (28).withHeight (20));
 
     master.setBounds (bar.removeFromRight (52).withTrimmedTop (8).withHeight (48));
     bar.removeFromRight (8);
-    outputMeter.setBounds (bar.removeFromRight (120).withTrimmedTop (28).withHeight (20));
+    outputMeter.setBounds (bar.removeFromRight (90).withTrimmedTop (28).withHeight (20));
     bar.removeFromRight (18);
 
     auto button = [&bar] (juce::Component& c, int w)
@@ -1167,9 +1175,17 @@ void WoodshedEditor::resized()
     button (tunerButton, 64);
     bar.removeFromRight (8);
     button (savePresetButton, 56);
-    button (presetChoice, 170);
+    nextPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
+    bar.removeFromRight (4);
+    // The preset box takes whatever the bar has left, within reason.
+    const int presetWidth = juce::jlimit (130, 260, bar.getWidth() - 28 - 4 - 16);
+    presetChoice.setBounds (bar.removeFromRight (presetWidth).withSizeKeepingCentre (presetWidth, 28));
+    bar.removeFromRight (4);
+    prevPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
+    bar.removeFromRight (8);
 
-    statusLabel.setBounds (bar.reduced (8, 22));
+    // Status messages show in the footer, over the preset caption.
+    statusLabel.setBounds (getLocalBounds().removeFromBottom (24).withTrimmedLeft (getWidth() / 2).withTrimmedRight (16));
 
     r.removeFromBottom (24);
     r.reduce (14, 14);
@@ -1196,6 +1212,19 @@ bool WoodshedEditor::keyPressed (const juce::KeyPress& key)
     if (c == 'a' || c == 'A')
     {
         showLibrary();
+        return true;
+    }
+
+    if (c == 'f' || c == 'F')
+    {
+        if (auto* window = findParentComponentOfClass<juce::ResizableWindow>())
+            window->setFullScreen (! window->isFullScreen());
+        return true;
+    }
+
+    if (key.isKeyCode (juce::KeyPress::leftKey) || key.isKeyCode (juce::KeyPress::rightKey))
+    {
+        stepPreset (key.isKeyCode (juce::KeyPress::leftKey) ? -1 : 1);
         return true;
     }
 
@@ -1241,6 +1270,7 @@ void WoodshedEditor::pickFromLibrary (const juce::String& type)
 void WoodshedEditor::flash (const juce::String& message)
 {
     statusLabel.setText (message, juce::dontSendNotification);
+    repaint (getLocalBounds().removeFromBottom (24));
     statusFrames = 120;
 }
 
@@ -1257,19 +1287,79 @@ void WoodshedEditor::refreshPresetList()
     std::sort (presetFiles.begin(), presetFiles.end(),
                [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; });
 
+    const int selected = presetChoice.getSelectedId();
     presetChoice.clear (juce::dontSendNotification);
-    for (int i = 0; i < presetFiles.size(); ++i)
-        presetChoice.addItem (presetFiles[i].getFileNameWithoutExtension(), i + 1);
+    auto* menu = presetChoice.getRootMenu();
+
+    // Factory sounds, one submenu per genre.
+    const auto& factory = WoodshedProcessor::factoryPresets();
+    for (size_t i = 0; i < factory.size();)
+    {
+        const auto genre = factory[i].genre;
+        juce::PopupMenu sub;
+        for (; i < factory.size() && factory[i].genre == genre; ++i)
+            sub.addItem (factoryIdBase + (int) i, factory[i].name);
+        menu->addSubMenu (genre, sub);
+    }
+
+    menu->addSeparator();
 
     if (! presetFiles.isEmpty())
-        presetChoice.addSeparator();
-    presetChoice.addItem ("Default board", 9999);
+    {
+        menu->addSectionHeader ("My presets");
+        for (int i = 0; i < presetFiles.size(); ++i)
+            menu->addItem (i + 1, presetFiles[i].getFileNameWithoutExtension());
+        menu->addSeparator();
+    }
+
+    menu->addItem (defaultBoardId, "Default board");
+
+    if (selected != 0)
+        presetChoice.setSelectedId (selected, juce::dontSendNotification);
+}
+
+void WoodshedEditor::presetChosen (int id)
+{
+    const auto& factory = WoodshedProcessor::factoryPresets();
+
+    if (id == defaultBoardId)
+    {
+        woodshedProcessor.loadDefaultBoard();
+        presetCaption = {};
+    }
+    else if (juce::isPositiveAndBelow (id - factoryIdBase, (int) factory.size()))
+    {
+        const auto& p = factory[(size_t) (id - factoryIdBase)];
+        woodshedProcessor.loadFactoryPreset (p);
+        presetCaption = p.genre + juce::String::fromUTF8 ("  \u00b7  ") + p.name + "   " + p.description;
+    }
+    else if (juce::isPositiveAndBelow (id - 1, presetFiles.size()))
+    {
+        woodshedProcessor.loadPreset (presetFiles[id - 1]);
+        presetCaption = juce::String::fromUTF8 ("My presets  \u00b7  ") + presetFiles[id - 1].getFileNameWithoutExtension();
+    }
+
+    repaint();
+}
+
+void WoodshedEditor::stepPreset (int delta)
+{
+    // Factory sounds in menu order, then the player's own.
+    juce::Array<int> ids;
+    for (int i = 0; i < (int) WoodshedProcessor::factoryPresets().size(); ++i) ids.add (factoryIdBase + i);
+    for (int i = 0; i < presetFiles.size(); ++i) ids.add (i + 1);
+    if (ids.isEmpty())
+        return;
+
+    const int at = ids.indexOf (presetChoice.getSelectedId());
+    const int next = at < 0 ? (delta > 0 ? 0 : ids.size() - 1) : (at + delta + ids.size()) % ids.size();
+    presetChoice.setSelectedId (ids[next], juce::sendNotificationSync);
 }
 
 void WoodshedEditor::savePresetAs()
 {
     auto* window = new juce::AlertWindow ("Save preset", "Name this board:", juce::MessageBoxIconType::NoIcon, this);
-    window->addTextEditor ("name", presetChoice.getSelectedId() > 0 && presetChoice.getSelectedId() != 9999 ? presetChoice.getText() : juce::String());
+    window->addTextEditor ("name", presetChoice.getSelectedId() > 0 && presetChoice.getSelectedId() != defaultBoardId ? presetChoice.getText() : juce::String());
     window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
     window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
@@ -1284,6 +1374,7 @@ void WoodshedEditor::savePresetAs()
             refreshPresetList();
             presetChoice.setSelectedId (presetFiles.indexOf (file) + 1, juce::dontSendNotification);
             statusLabel.setText (ok ? "Saved \"" + name + "\"" : "Couldn't save preset", juce::dontSendNotification);
+            repaint (getLocalBounds().removeFromBottom (24));
             statusFrames = 90;
         }
     }), true);
@@ -1294,6 +1385,7 @@ void WoodshedEditor::startCapture (double seconds)
     woodshedProcessor.armCapture (seconds);
     pendingCaptureName = "capture-" + juce::Time::getCurrentTime().formatted ("%Y%m%d-%H%M%S") + ".wav";
     statusLabel.setText ("Recording " + juce::String ((int) seconds) + "s... play something", juce::dontSendNotification);
+    repaint (getLocalBounds().removeFromBottom (24));
     statusFrames = -1;
 }
 
@@ -1314,7 +1406,7 @@ void WoodshedEditor::updateLatencyText()
                  + juce::String (rate / 1000.0, 1) + "k";
 
             if (const int xruns = device->getXRunCount(); xruns > 0)
-                text << "  ·  " << xruns << " dropouts";
+                text << "  ·  " << xruns << (xruns == 1 ? " dropout" : " dropouts");
         }
         else
         {
@@ -1353,9 +1445,13 @@ void WoodshedEditor::timerCallback()
         const auto file = captureDir.getChildFile (pendingCaptureName.isEmpty() ? "capture.wav" : pendingCaptureName);
         const bool ok = woodshedProcessor.writeCapture (file);
         statusLabel.setText (ok ? "Saved " + file.getFileName() : "Capture failed", juce::dontSendNotification);
+        repaint (getLocalBounds().removeFromBottom (24));
         statusFrames = 150;
     }
 
     if (statusFrames > 0 && --statusFrames == 0)
+    {
         statusLabel.setText ({}, juce::dontSendNotification);
+        repaint (getLocalBounds().removeFromBottom (24));
+    }
 }

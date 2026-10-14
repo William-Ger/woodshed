@@ -1,0 +1,106 @@
+{ "genre": "Bass",
+  "presets": [
+    { "name": "Bedrock",
+      "description": "Clean, DI-style bass with an even optical squeeze and a solid low end. A neutral starting point for any style.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Studio Clean", "gain": 0.4, "bass": 0.55, "mid": 0.5, "treble": 0.45, "presence": 0.35, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "8x10 Bass", "mic": "Dynamic", "position": 0.3, "distance": 0.15, "lowcut": 30, "highcut": 6000, "level": 0.4}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.45, "attack": 15, "level": 0}} ] },
+
+    { "name": "Cellar Door",
+      "description": "Warm tube bass through a vintage 1x15 and a ribbon mic: round, woody and old-school. Stomp 1 for a fat push.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Tube Warm", "gain": 0.45, "bass": 0.6, "mid": 0.5, "treble": 0.35, "presence": 0.3, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "1x15 Vintage", "mic": "Ribbon", "position": 0.35, "distance": 0.2, "lowcut": 30, "highcut": 5000, "level": -3.2}},
+      "board": [
+        {"type": "dyn.boost", "spot": 0, "on": false, "knobs": {"boost": 3, "tilt": -0.2, "voice": "Fat"}},
+        {"type": "dyn.compressor", "spot": 1, "on": true, "knobs": {"sustain": 0.35, "attack": 20}} ] },
+
+    { "name": "Iron Foundry",
+      "description": "Gritty, growling bass with the low end kept clean under the dirt. Good for rock and punk. Stomp 2 for extra mid snarl.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Grind", "gain": 0.55, "bass": 0.55, "mid": 0.55, "treble": 0.5, "presence": 0.45, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "2x10 Bass", "mic": 0.3, "lowcut": 35, "highcut": 5500, "room": 0.05, "level": -2.2}},
+      "board": [
+        {"type": "dyn.gate", "spot": 0, "on": true, "knobs": {"threshold": -62}},
+        {"type": "eq.graphic", "spot": 1, "on": false, "knobs": {"b400": 2, "b800": 4, "b1k6": 2}} ] },
+
+    { "name": "Magma Chamber",
+      "description": "Thick, sustaining fuzz bass with a hard-clipped wall and a lifted midrange so it cuts. Stomp 1 to switch the gate off for long tails.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Tube Warm", "gain": 0.4, "bass": 0.5, "mid": 0.55, "treble": 0.45, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "8x10 Bass", "mic": "Dynamic", "lowcut": 35, "highcut": 4500, "level": -3.7}},
+      "board": [
+        {"type": "dyn.gate", "spot": 0, "on": true, "knobs": {"threshold": -60, "release": 120}},
+        {"type": "drive.fuzz", "spot": 1, "on": true, "knobs": {"sustain": 0.6, "tone": 0.4, "volume": 0, "mids": "Lift"}},
+        {"type": "eq.parametric", "spot": 2, "on": true, "knobs": {"lowFreq": 90, "lowGain": 3, "midFreq": 2500, "midGain": -3, "midQ": 1}} ] },
+
+    { "name": "Turbine Hall",
+      "description": "Analog-style synth bass an octave down: a detuned saw through a snapping resonant filter. Play single notes cleanly.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Studio Clean", "gain": 0.35, "bass": 0.55, "mid": 0.5, "treble": 0.5, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "2x10 Bass", "lowcut": 30, "highcut": 7000, "room": 0.05, "level": -0.2}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.5, "attack": 8}},
+        {"type": "weird.synth", "spot": 1, "on": true, "knobs": {"wave": "Saw", "octave": "-1", "sub": 0.5, "glide": 20, "cutoff": 450, "reso": 5, "env": 0.6, "mix": 1}} ] },
+
+    { "name": "Sump Pump",
+      "description": "Funk bass that quacks open on every note through an envelope filter. Stomp 3 for a bass-voiced wah instead.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Studio Clean", "gain": 0.4, "bass": 0.5, "mid": 0.55, "treble": 0.5, "presence": 0.4, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "2x10 Bass", "lowcut": 35, "highcut": 7000, "level": 1.9}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.5, "attack": 6}},
+        {"type": "filter.envelope", "spot": 1, "on": true, "knobs": {"sens": 0.55, "range": 0.55, "q": 5, "direction": "Up", "mode": "Low-pass", "decay": 180, "mix": 0.8}},
+        {"type": "filter.wah", "spot": 2, "on": false, "knobs": {"position": 0.5, "voice": "Bass", "resonance": 0.5, "level": 1.5}} ] },
+
+    { "name": "Tidal Trench",
+      "description": "Liquid chorus bass for fretless-style melodies and clean grooves. The chorus stays wide while the lows stay centered.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Studio Clean", "gain": 0.4, "bass": 0.55, "mid": 0.45, "treble": 0.55, "presence": 0.45, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "1x15 Vintage", "mic": "Condenser", "distance": 0.25, "lowcut": 30, "highcut": 8000, "level": 1.1}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.45, "attack": 12}},
+        {"type": "mod.chorus", "spot": 4, "on": true, "knobs": {"rate": 0.5, "depth": 0.45, "delay": 12, "voices": "Two", "tone": 6000, "width": 0.9, "mix": 0.4}},
+        {"type": "reverb.room", "spot": 9, "on": false, "knobs": {"size": 0.4, "mix": 0.12}} ] },
+
+    { "name": "Piston Slap",
+      "description": "Snappy slap tone: fast compression, sharpened attack and a scooped graphic EQ for popped highs and thumbed lows.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Studio Clean", "gain": 0.35, "bass": 0.6, "mid": 0.4, "treble": 0.6, "presence": 0.55, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "2x10 Bass", "mic": 0.4, "lowcut": 30, "highcut": 9000, "room": 0.05, "level": -1.5}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.65, "attack": 3}},
+        {"type": "dyn.transient", "spot": 1, "on": true, "knobs": {"attack": 0.5, "sustain": -0.1}},
+        {"type": "eq.graphic", "spot": 2, "on": true, "knobs": {"b100": 3, "b200": 1, "b400": -3, "b800": -4, "b1k6": -1, "b3k2": 3, "b6k4": 2}},
+        {"type": "dyn.limiter", "spot": 3, "on": true, "knobs": {"drive": 2, "ceiling": -10, "release": 60, "level": 0}} ] },
+
+    { "name": "Mineshaft",
+      "description": "Turns a guitar into a bass: a clean polyphonic octave down replaces the dry signal through a bass rig. Works with chords too.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Tube Warm", "gain": 0.4, "bass": 0.55, "mid": 0.5, "treble": 0.4, "presence": 0.3, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "8x10 Bass", "mic": "Dynamic", "lowcut": 30, "highcut": 5000, "level": -2.6}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.5, "attack": 10}},
+        {"type": "pitch.octave", "spot": 1, "on": true, "knobs": {"sub1": 1, "sub2": 0, "up": 0, "dry": 0.15, "tone": 2000}} ] },
+
+    { "name": "Fault Line",
+      "description": "Single-note guitar-as-bass with a square-wave analog sub and grinding amp, for heavy riffs an octave down. Stomp 3 to add a second sub.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Grind", "gain": 0.5, "bass": 0.55, "mid": 0.55, "treble": 0.45, "presence": 0.4, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "2x10 Bass", "lowcut": 35, "highcut": 5000, "level": -1.8}},
+      "board": [
+        {"type": "dyn.gate", "spot": 0, "on": true, "knobs": {"threshold": -60}},
+        {"type": "pitch.divider", "spot": 1, "on": true, "knobs": {"sub1": 0.8, "sub2": 0, "up": 0, "dry": 0.3, "tone": 700, "track": 320}},
+        {"type": "pitch.divider", "spot": 2, "on": false, "knobs": {"sub1": 0, "sub2": 0.5, "up": 0, "dry": 1, "tone": 500, "track": 320}} ] },
+
+    { "name": "Sub Basement",
+      "description": "Square-wave synth bass two octaves down with a slow sweeping filter on top. Stomp 3 for a stepped filter sequence instead.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Studio Clean", "gain": 0.35, "bass": 0.5, "mid": 0.5, "treble": 0.5, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "8x10 Bass", "mic": "Condenser", "distance": 0.3, "lowcut": 30, "highcut": 7000, "level": -4.4}},
+      "board": [
+        {"type": "weird.synth", "spot": 0, "on": true, "knobs": {"wave": "Square", "octave": "-2", "sub": 0.3, "glide": 40, "cutoff": 700, "reso": 3, "env": 0.4, "mix": 1}},
+        {"type": "filter.lfo", "spot": 1, "on": true, "knobs": {"rate": 0.25, "depth": 0.5, "centre": 600, "resonance": 3, "mode": "Low-pass", "mix": 1}},
+        {"type": "filter.step", "spot": 2, "on": false, "knobs": {"rate": 4, "steps": "8", "pattern": "Rise", "low": 150, "high": 1500, "resonance": 4, "glide": 0.2}} ] },
+
+    { "name": "Quarry Floor",
+      "description": "Baritone-range tone: the guitar is shifted down a fourth into a growling bass amp for dark, heavy riffs. Stomp 3 for a phaser swirl.",
+      "amp":   {"type": "amp.bass", "knobs": {"voice": "Grind", "gain": 0.45, "bass": 0.5, "mid": 0.6, "treble": 0.5, "presence": 0.45, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "1x15 Vintage", "mic": "Dynamic", "lowcut": 40, "highcut": 5500, "level": -2.4}},
+      "board": [
+        {"type": "dyn.gate", "spot": 0, "on": true, "knobs": {"threshold": -60}},
+        {"type": "pitch.shift", "spot": 1, "on": true, "knobs": {"shift": -5, "fine": 0, "mix": 1, "tone": 6000}},
+        {"type": "mod.phaser", "spot": 4, "on": false, "knobs": {"rate": 0.3, "depth": 0.6, "stages": "6", "mix": 0.4}},
+        {"type": "reverb.room", "spot": 9, "on": true, "knobs": {"size": 0.35, "mix": 0.08}} ] }
+  ] }

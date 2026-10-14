@@ -1,0 +1,159 @@
+{ "genre": "Leads",
+  "presets": [
+    { "name": "Nightingale",
+      "description": "Singing, compressed sustain lead with a smooth vocal midrange and a delay tucked behind the note. Stomp 1 for a solo boost.",
+      "amp":   {"type": "amp.limousine", "knobs": {"voicing": "Pre", "volume": 0.5, "drive": 0.62, "od": 0.55, "bass": 0.45, "mid": 0.65, "treble": 0.5, "master": 0.5}},
+      "cab":   {"type": "cab.sidecar", "knobs": {"cabinet": "2x12 Open", "mica": "Dynamic", "micb": "Ribbon", "blend": 0.35, "highcut": 7500, "level": 1.0}},
+      "board": [
+        {"type": "dyn.boost", "spot": 0, "on": false, "knobs": {"boost": 6, "tilt": 0.1, "voice": "Flat"}},
+        {"type": "dyn.compressor", "spot": 1, "on": true, "knobs": {"sustain": 0.55, "attack": 12, "level": 0}},
+        {"type": "delay.analog", "spot": 7, "on": true, "knobs": {"time": 420, "repeats": 0.3, "mix": 0.2}},
+        {"type": "reverb.hall", "spot": 9, "on": true, "knobs": {"decay": 2200, "mix": 0.16}} ] },
+
+    { "name": "Bowed Wing",
+      "description": "Violin-like swells: every note fades in from silence and blooms into a long, airy tail. Pick softly and let notes ring.",
+      "amp":   {"type": "amp.head", "knobs": {"voice": "Hot Lead", "gain": 0.5, "bass": 0.45, "mid": 0.6, "treble": 0.5, "presence": 0.35, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "2x12 Closed", "highcut": 7000, "room": 0.2, "level": 0.5}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.6, "attack": 20}},
+        {"type": "dyn.swell", "spot": 1, "on": true, "knobs": {"sense": -48, "rise": 450, "curve": "Bloom", "level": 0}},
+        {"type": "delay.modulated", "spot": 7, "on": true, "knobs": {"time": 520, "repeats": 0.4, "mix": 0.25, "depth": 0.3}},
+        {"type": "reverb.hall", "spot": 9, "on": true, "knobs": {"decay": 4500, "size": 0.75, "predelay": 40, "mix": 0.3}} ] },
+
+    { "name": "Choir Of Larks",
+      "description": "Harmonized lead with a third above riding under the melody and a sweet overdrive. Stomp 3 to add a fifth on top.",
+      "amp":   {"type": "amp.head", "knobs": {"voice": "British Crunch", "gain": 0.55, "mid": 0.6, "treble": 0.55, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "Warm 4x12", "mic": "Dynamic", "highcut": 8000, "level": -1.0}},
+      "board": [
+        {"type": "drive.overdrive", "spot": 0, "on": true, "knobs": {"drive": 0.35, "tone": 0.55, "level": 0}},
+        {"type": "pitch.harmony", "spot": 1, "on": true, "knobs": {"voice1": "+3rd", "level1": 0.45, "voice2": "Off", "spread": 0.5, "tone": 5000}},
+        {"type": "pitch.harmony", "spot": 2, "on": false, "knobs": {"voice1": "+5th", "level1": 0.35, "voice2": "Off", "spread": 0.7, "tone": 5000}},
+        {"type": "delay.digital", "spot": 7, "on": true, "knobs": {"time": 450, "repeats": 0.3, "mix": 0.2, "division": "1/4", "tone": 6000}},
+        {"type": "reverb.room", "spot": 9, "on": true, "knobs": {"size": 0.6, "mix": 0.18}} ] },
+
+    { "name": "Crow Call",
+      "description": "Vocal wah lead parked half open over a hot British crunch, ready for crying bends. Stomp 2 for a fuzz push.",
+      "amp":   {"type": "amp.stadium", "knobs": {"input": "Bridged", "volume": 0.6, "bass": 0.45, "mid": 0.65, "treble": 0.55, "presence": 0.45, "sag": 0.4}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "Warm 4x12", "mic": "Dynamic", "highcut": 7500, "level": -3.4}},
+      "board": [
+        {"type": "filter.wah", "spot": 0, "on": true, "knobs": {"position": 0.6, "voice": "Vintage", "resonance": 0.6, "level": 0}},
+        {"type": "drive.vintage", "spot": 1, "on": false, "knobs": {"fuzz": 0.6, "bias": 0.55, "volume": 0}},
+        {"type": "drive.touch", "spot": 2, "on": true, "knobs": {"gain": 0.45, "tone": 0.5, "level": 0}},
+        {"type": "delay.tape", "spot": 7, "on": true, "knobs": {"time": 380, "repeats": 0.3, "mix": 0.18}},
+        {"type": "reverb.spring", "spot": 9, "on": true, "knobs": {"decay": 1600, "mix": 0.15}} ] },
+
+    { "name": "Phoenix Wail",
+      "description": "Searing octave-up fuzz lead, best on the neck pickup above the 12th fret. Stomp 3 for a dotted-eighth echo.",
+      "amp":   {"type": "amp.stadium", "knobs": {"input": "Normal", "volume": 0.5, "bass": 0.4, "mid": 0.6, "treble": 0.5, "sag": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "4x12 Closed", "highcut": 6500, "level": 0}},
+      "board": [
+        {"type": "drive.octave", "spot": 0, "on": true, "knobs": {"fuzz": 0.65, "octave": 0.75, "tone": 0.5, "level": 0}},
+        {"type": "mod.vibrato", "spot": 4, "on": false, "knobs": {"rate": 5.5, "depth": 0.2}},
+        {"type": "delay.digital", "spot": 7, "on": false, "knobs": {"time": 480, "repeats": 0.35, "mix": 0.22, "division": "1/8 dot"}},
+        {"type": "reverb.room", "spot": 9, "on": true, "knobs": {"size": 0.5, "mix": 0.15}} ] },
+
+    { "name": "Swift Current",
+      "description": "Fusion lead: tight compression, smooth mid-forward drive and stereo ping-pong repeats for fast legato lines.",
+      "amp":   {"type": "amp.limousine", "knobs": {"voicing": "Post", "drive": 0.55, "od": 0.55, "bass": 0.4, "mid": 0.6, "treble": 0.55, "master": 0.5}},
+      "cab":   {"type": "cab.sidecar", "knobs": {"cabinet": "1x12 Closed", "mica": "Dynamic", "micb": "Condenser", "blend": 0.3, "highcut": 8000, "level": -1.8}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.6, "attack": 6, "level": 0}},
+        {"type": "drive.blend", "spot": 1, "on": true, "knobs": {"gain": 0.45, "treble": 0.5, "blend": 0.3, "level": 0}},
+        {"type": "mod.chorus", "spot": 5, "on": true, "knobs": {"rate": 0.5, "depth": 0.25, "mix": 0.2}},
+        {"type": "delay.pingpong", "spot": 7, "on": true, "knobs": {"time": 360, "repeats": 0.35, "mix": 0.22, "tone": 6000}},
+        {"type": "reverb.plate", "spot": 9, "on": true, "knobs": {"decay": 1800, "mix": 0.14}} ] },
+
+    { "name": "Evening Heron",
+      "description": "Ballad lead with a wide, slow delay and a big hall that swells behind sustained notes. Ducking repeats stay out of the way while you play.",
+      "amp":   {"type": "amp.head", "knobs": {"voice": "Hot Lead", "gain": 0.45, "bass": 0.5, "mid": 0.55, "treble": 0.5, "presence": 0.35, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "Warm 4x12", "mic": "Ribbon", "distance": 0.3, "highcut": 8000, "level": -2.5}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.5, "attack": 15}},
+        {"type": "delay.ducking", "spot": 6, "on": true, "knobs": {"time": 650, "repeats": 0.5, "mix": 0.4, "duck": 0.7, "tone": 5000}},
+        {"type": "delay.modulated", "spot": 7, "on": true, "knobs": {"time": 975, "repeats": 0.35, "mix": 0.2, "depth": 0.3}},
+        {"type": "reverb.hall", "spot": 9, "on": true, "knobs": {"decay": 5000, "size": 0.8, "predelay": 50, "mix": 0.3}} ] },
+
+    { "name": "Skylark Leap",
+      "description": "Octave-jump lead: a pitch bend parked a full octave up over a hot drive, for screaming dive-and-return lines. Stomp 2 to drop it out.",
+      "amp":   {"type": "amp.fortress", "knobs": {"channel": "Lead", "tight": "Tight", "gain": 0.45, "bass": 0.45, "lowmid": 0, "highmid": 1, "treble": 0.5, "master": 0.5}},
+      "cab":   {"type": "cab.sidecar", "knobs": {"cabinet": "Tight 4x12", "highcut": 7000, "level": 2.0}},
+      "board": [
+        {"type": "dyn.gate", "spot": 0, "on": true, "knobs": {"threshold": -60}},
+        {"type": "pitch.bend", "spot": 1, "on": true, "knobs": {"position": 1, "range": "+1 Oct", "mix": 0.6, "glide": 60}},
+        {"type": "delay.digital", "spot": 7, "on": true, "knobs": {"time": 400, "repeats": 0.3, "mix": 0.18}},
+        {"type": "reverb.plate", "spot": 9, "on": true, "knobs": {"decay": 1800, "mix": 0.14}} ] },
+
+    { "name": "Highland Wren",
+      "description": "Clean, ringing lead with a touch of chime, slapback and a high octave shimmer for lilting folk melodies and ornaments. Stomp 2 to add the octave.",
+      "amp":   {"type": "amp.bandstand", "knobs": {"channel": "Brilliant", "volume": 0.4, "treble": 0.55, "bass": 0.45, "cut": 0.4, "master": 0.5}},
+      "cab":   {"type": "cab.sidecar", "knobs": {"cabinet": "2x12 Open", "mica": "Condenser", "micb": "Ribbon", "blend": 0.4, "level": 4.3}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.4, "attack": 10, "blend": 0.7}},
+        {"type": "pitch.octave", "spot": 1, "on": false, "knobs": {"sub1": 0, "up": 0.35, "dry": 1, "tone": 5000}},
+        {"type": "delay.slapback", "spot": 6, "on": true, "knobs": {"time": 140, "level": 0.3, "grit": 0.1}},
+        {"type": "reverb.hall", "spot": 9, "on": true, "knobs": {"decay": 3000, "mix": 0.25}} ] },
+
+    { "name": "Redtail Twang",
+      "description": "Bright country lead: squashed and snappy with slapback and a spring, for chicken-pickin' runs and double-stop bends. Stomp 3 for a little hair.",
+      "amp":   {"type": "amp.head", "knobs": {"voice": "American Clean", "gain": 0.4, "bass": 0.45, "mid": 0.45, "treble": 0.7, "presence": 0.5, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "1x12 Open", "mic": 0.35, "room": 0.1, "level": 1.0}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.6, "attack": 4}},
+        {"type": "dyn.transient", "spot": 1, "on": true, "knobs": {"attack": 0.4, "sustain": 0}},
+        {"type": "drive.touch", "spot": 2, "on": false, "knobs": {"gain": 0.3, "tone": 0.6, "level": 2.5}},
+        {"type": "delay.slapback", "spot": 6, "on": true, "knobs": {"time": 95, "level": 0.4, "grit": 0.25}},
+        {"type": "reverb.spring", "spot": 9, "on": true, "knobs": {"decay": 1500, "mix": 0.18}} ] },
+
+    { "name": "Ember Tongue",
+      "description": "Thick, woolly fuzz lead with endless sustain and a dark tape echo. Roll the tone back for smoky bends.",
+      "amp":   {"type": "amp.roadhouse", "knobs": {"channel": "Normal", "volume": 0.4, "tone": 0.5, "output": 0}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "1x12 Closed", "mic": "Ribbon", "highcut": 6500, "level": -2.2}},
+      "board": [
+        {"type": "drive.fuzz", "spot": 0, "on": true, "knobs": {"sustain": 0.6, "tone": 0.45, "volume": 0, "mids": "Lift"}},
+        {"type": "delay.tape", "spot": 7, "on": true, "knobs": {"time": 420, "repeats": 0.35, "mix": 0.22, "heads": "Mid+Long"}},
+        {"type": "reverb.room", "spot": 9, "on": true, "knobs": {"size": 0.6, "mix": 0.15}} ] },
+
+    { "name": "Siren Song",
+      "description": "Smooth high-gain lead with a gentle vibrato and a shimmer that rises behind held notes. Stomp 3 to kill the vibrato.",
+      "amp":   {"type": "amp.head", "knobs": {"voice": "Modern High Gain", "gain": 0.5, "bass": 0.45, "mid": 0.6, "treble": 0.5, "presence": 0.35, "master": 0.5}},
+      "cab":   {"type": "cab.sidecar", "knobs": {"cabinet": "Warm 4x12", "highcut": 6500, "lowcut": 80, "level": 1.5}},
+      "board": [
+        {"type": "dyn.gate", "spot": 0, "on": true, "knobs": {"threshold": -58}},
+        {"type": "drive.overdrive", "spot": 1, "on": true, "knobs": {"drive": 0.1, "tone": 0.5, "level": 0}},
+        {"type": "mod.vibrato", "spot": 5, "on": true, "knobs": {"rate": 5, "depth": 0.15}},
+        {"type": "delay.analog", "spot": 7, "on": true, "knobs": {"time": 460, "repeats": 0.35, "mix": 0.2}},
+        {"type": "reverb.shimmer", "spot": 9, "on": true, "knobs": {"decay": 5000, "shimmer": 0.35, "mix": 0.2}} ] },
+
+    { "name": "Torch Singer",
+      "description": "Vowel-filtered lead that talks through every note, over a warm crunch. Stomp 1 to switch to an auto-wah quack instead.",
+      "amp":   {"type": "amp.bandstand", "knobs": {"channel": "Normal", "volume": 0.65, "treble": 0.5, "bass": 0.5, "cut": 0.35, "master": 0.5}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "2x12 Open", "mic": "Dynamic", "highcut": 8000, "level": 1.2}},
+      "board": [
+        {"type": "filter.envelope", "spot": 0, "on": false, "knobs": {"sens": 0.5, "range": 0.6, "q": 5, "decay": 200}},
+        {"type": "filter.vowel", "spot": 1, "on": true, "knobs": {"control": "Envelope", "depth": 0.6, "resonance": 0.5}},
+        {"type": "drive.treble", "spot": 2, "on": true, "knobs": {"boost": 0.4, "range": "Mid", "level": 0}},
+        {"type": "delay.digital", "spot": 7, "on": true, "knobs": {"time": 400, "repeats": 0.3, "mix": 0.18}},
+        {"type": "reverb.plate", "spot": 9, "on": true, "knobs": {"decay": 2000, "mix": 0.16}} ] },
+
+    { "name": "Kestrel Dive",
+      "description": "Modern rock lead with a tight distortion and dotted-eighth echoes that fill out fast runs. Stomp 2 for a doubled octave down underneath.",
+      "amp":   {"type": "amp.fortress", "knobs": {"channel": "Crunch", "tight": "Tight", "gain": 0.5, "bass": 0.45, "lowmid": 1, "highmid": 2, "treble": 0.5, "master": 0.5}},
+      "cab":   {"type": "cab.speaker", "knobs": {"cabinet": "4x12 Closed", "lowcut": 80, "highcut": 7000, "level": 1.2}},
+      "board": [
+        {"type": "drive.distortion", "spot": 0, "on": true, "knobs": {"distortion": 0.35, "filter": 0.45, "volume": 0, "clip": "Silicon"}},
+        {"type": "pitch.harmony", "spot": 1, "on": false, "knobs": {"voice1": "-Oct", "level1": 0.4, "voice2": "Off", "spread": 0.3, "tone": 4000}},
+        {"type": "delay.digital", "spot": 7, "on": true, "knobs": {"time": 480, "repeats": 0.3, "mix": 0.2, "division": "1/8 dot"}},
+        {"type": "reverb.room", "spot": 9, "on": true, "knobs": {"size": 0.5, "mix": 0.14}} ] },
+
+    { "name": "Feather And Flame",
+      "description": "Glassy clean-blended drive lead with a lush chorus and plate, for melodic pop and worship solos. Stomp 4 for a phaser swirl.",
+      "amp":   {"type": "amp.head", "knobs": {"voice": "Chime", "gain": 0.45, "bass": 0.45, "mid": 0.55, "treble": 0.55, "presence": 0.4, "master": 0.5}},
+      "cab":   {"type": "cab.sidecar", "knobs": {"cabinet": "2x12 Open", "mica": "Dynamic", "micb": "Ribbon", "blend": 0.45, "highcut": 9000, "level": 1.0}},
+      "board": [
+        {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.45, "attack": 10}},
+        {"type": "drive.blend", "spot": 1, "on": true, "knobs": {"gain": 0.55, "treble": 0.5, "blend": 0.4, "level": 0}},
+        {"type": "mod.chorus", "spot": 4, "on": true, "knobs": {"rate": 0.6, "depth": 0.35, "mix": 0.3}},
+        {"type": "mod.phaser", "spot": 5, "on": false, "knobs": {"rate": 0.5, "depth": 0.6, "mix": 0.4}},
+        {"type": "delay.digital", "spot": 7, "on": true, "knobs": {"time": 500, "repeats": 0.35, "mix": 0.22}},
+        {"type": "reverb.plate", "spot": 9, "on": true, "knobs": {"decay": 2600, "mix": 0.22}} ] }
+  ] }

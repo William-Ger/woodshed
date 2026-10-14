@@ -1,0 +1,1008 @@
+{
+  "genre": "Jazz & Country",
+  "presets": [
+    {
+      "name": "Smoke Room Archtop",
+      "description": "Dark, round archtop jazz tone with the treble rolled back and a small room around it. Stomp 1 for a fat boost on solos.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "bass": 0.6,
+          "mid": 0.55,
+          "treble": 0.3,
+          "presence": 0.25,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Ribbon",
+          "position": 0.35,
+          "distance": 0.25,
+          "lowcut": 60,
+          "highcut": 6500,
+          "level": 3.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.boost",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 3,
+            "tilt": -0.2,
+            "voice": "Flat"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "damp": 0.65,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Back Booth",
+      "description": "Warm, slightly compressed jazz clean that leans dark and blooms on chord melodies. Stomp 3 for a faint chorus on ballads.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.4,
+          "drive": 0.1,
+          "od": 0.0,
+          "bass": 0.6,
+          "mid": 0.55,
+          "treble": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mica": "Ribbon",
+          "micb": "Dynamic",
+          "blend": 0.3,
+          "lowcut": 60,
+          "highcut": 6500,
+          "level": 0.0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.3,
+            "attack": 25,
+            "blend": 0.6
+          }
+        },
+        {
+          "type": "eq.tilt",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "tilt": -2,
+            "highCut": 7000
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 0.4,
+            "depth": 0.3,
+            "voices": "One",
+            "tone": 5000,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1500,
+            "damp": 5000,
+            "mix": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Last Set Trio",
+      "description": "Thick, warm jazz voice through a tube bass amp, with the mud trimmed for clear walking lines and comping. Stomp 1 for touch-sensitive hair.",
+      "amp": {
+        "type": "amp.bass",
+        "knobs": {
+          "voice": "Tube Warm",
+          "gain": 0.3,
+          "bass": 0.45,
+          "mid": 0.55,
+          "treble": 0.35,
+          "presence": 0.3,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Ribbon",
+          "position": 0.3,
+          "distance": 0.3,
+          "lowcut": 70,
+          "highcut": 6000,
+          "level": 1.5
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "gain": 0.3,
+            "tone": 0.45,
+            "body": 0.6,
+            "level": 1
+          }
+        },
+        {
+          "type": "eq.parametric",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "lowFreq": 120,
+            "lowGain": -3,
+            "midFreq": 700,
+            "midGain": 2,
+            "midQ": 0.8,
+            "highFreq": 4000,
+            "highGain": -3
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.45,
+            "damp": 0.6,
+            "mix": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cigar Lounge",
+      "description": "Mellow, late-night jazz tone with a slow vibrato shimmer and a soft hall. Stomp 2 to drop the vibrato for straight comping.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.28,
+          "bass": 0.55,
+          "mid": 0.5,
+          "treble": 0.35,
+          "presence": 0.3,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.25,
+          "lowcut": 60,
+          "highcut": 6500,
+          "room": 0.2,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.3,
+            "attack": 20,
+            "blend": 0.6
+          }
+        },
+        {
+          "type": "mod.vibrato",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 4.5,
+            "depth": 0.12,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2000,
+            "size": 0.45,
+            "damp": 0.6,
+            "mix": 0.16
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chicken Coop Pickin",
+      "description": "Squashed, snappy country twang with a tight slapback for fast hybrid picking. Stomp 3 for a treble-booster push on solos.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.4,
+          "mid": 0.4,
+          "treble": 0.7,
+          "presence": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.45,
+          "lowcut": 100,
+          "highcut": 9500,
+          "room": 0.1,
+          "level": 3.4
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.65,
+            "attack": 3,
+            "blend": 0.9
+          }
+        },
+        {
+          "type": "dyn.transient",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "attack": 0.4,
+            "sustain": 0.1
+          }
+        },
+        {
+          "type": "drive.treble",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "boost": 0.35,
+            "range": "Mid",
+            "level": 3
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 95,
+            "level": 0.4,
+            "tone": 5000,
+            "grit": 0.2,
+            "spill": 0.05
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1400,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Feed Store Twang",
+      "description": "Bright, hairy twang from a little vintage combo with a quick slap and a splash of spring. Stomp 1 to lift it for the solo.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.35,
+          "tone": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.15,
+          "lowcut": 90,
+          "highcut": 9000,
+          "level": 1.3
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.boost",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 6,
+            "tilt": 0.25,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "dyn.compressor",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.55,
+            "attack": 5,
+            "blend": 0.8
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 110,
+            "level": 0.35,
+            "tone": 4500,
+            "grit": 0.3,
+            "spill": 0.08
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1600,
+            "drip": 0.45,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Main Street Twang",
+      "description": "Glassy, scooped twang with a tight analog echo, perfect for chicken-pickin' runs and double stops. Stomp 2 for a mid-forward overdrive.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.3,
+          "treble": 0.6,
+          "bass": 0.45,
+          "cut": 0.4,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.4,
+          "lowcut": 100,
+          "highcut": 9500,
+          "room": 0.1,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.6,
+            "attack": 4,
+            "blend": 0.85
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "drive": 0.25,
+            "tone": 0.6,
+            "level": 8
+          }
+        },
+        {
+          "type": "eq.parametric",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "lowFreq": 120,
+            "lowGain": 0,
+            "midFreq": 600,
+            "midGain": -4,
+            "midQ": 1,
+            "highFreq": 3500,
+            "highGain": 2
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 140,
+            "repeats": 0.15,
+            "mix": 0.22
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hayloft Steel",
+      "description": "Steel-guitar swells: notes bloom in from silence with a gentle quiver and a long plate. Stomp 1 to turn the swell off and pick normally.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "bass": 0.5,
+          "mid": 0.5,
+          "treble": 0.62,
+          "presence": 0.45,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.35,
+          "lowcut": 80,
+          "highcut": 10000,
+          "room": 0.15,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sense": -50,
+            "rise": 380,
+            "curve": "Smooth",
+            "level": 2.5
+          }
+        },
+        {
+          "type": "dyn.compressor",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.6,
+            "attack": 15,
+            "blend": 0.8
+          }
+        },
+        {
+          "type": "mod.vibrato",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 5,
+            "depth": 0.08,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.3,
+            "mix": 0.2
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2800,
+            "damp": 8000,
+            "mix": 0.24
+          }
+        }
+      ]
+    },
+    {
+      "name": "Barn Rafters",
+      "description": "Slow, bowed swells that hang in the air of a tall wooden barn, for steel-style pads behind a ballad. Stomp 2 for a glowing clean-blend grit.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.45,
+          "drive": 0.15,
+          "od": 0.0,
+          "bass": 0.5,
+          "mid": 0.55,
+          "treble": 0.5,
+          "master": 1
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.4,
+          "lowcut": 80,
+          "highcut": 9500,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sense": -52,
+            "rise": 700,
+            "curve": "Bloom",
+            "level": 6
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "gain": 0.3,
+            "treble": 0.5,
+            "blend": 0.55
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 520,
+            "division": "1/4",
+            "repeats": 0.35,
+            "mix": 0.22,
+            "tone": 5000
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3600,
+            "size": 0.7,
+            "predelay": 30,
+            "mix": 0.26
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pier Town Surf",
+      "description": "Wet, drippy spring reverb cranked over a bright clean for reverb-drenched surf picking. Stomp 2 for a choppy tremolo.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.45,
+          "mid": 0.45,
+          "treble": 0.68,
+          "presence": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.4,
+          "lowcut": 90,
+          "highcut": 9500,
+          "room": 0.05,
+          "level": 2.8
+        }
+      },
+      "board": [
+        {
+          "type": "reverb.spring",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "decay": 2800,
+            "tone": 4200,
+            "drip": 0.8,
+            "boing": 0.5,
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "mod.tremolo",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 6.5,
+            "depth": 0.6,
+            "wave": "Triangle"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Coastal Highway",
+      "description": "Pulsing tremolo through a chimey amp and a wash of spring, for twangy instrumentals and moody surf. Stomp 2 for a long tape echo.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.32,
+          "treble": 0.6,
+          "bass": 0.45,
+          "cut": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.35,
+          "lowcut": 90,
+          "highcut": 10000,
+          "room": 0.1,
+          "level": 4.0
+        }
+      },
+      "board": [
+        {
+          "type": "mod.tremolo",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "rate": 5.5,
+            "depth": 0.55,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.35,
+            "mix": 0.22,
+            "wow": 0.25,
+            "heads": "Long"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "drip": 0.6,
+            "boing": 0.4,
+            "mix": 0.32
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dance Hall Slap",
+      "description": "Rockabilly slapback over a warmly breaking-up combo, with a little spring in the room. Stomp 1 for a boost into the amp for the solo.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.45,
+          "tone": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.35,
+          "lowcut": 80,
+          "highcut": 8500,
+          "room": 0.15,
+          "level": 0.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.boost",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 5,
+            "tilt": 0.1,
+            "voice": "Flat"
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 120,
+            "level": 0.5,
+            "tone": 4000,
+            "grit": 0.35,
+            "spill": 0.1
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1400,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gas Station Bop",
+      "description": "Gritty tape slap through a lightly pushed vintage head, for rockabilly rhythm with some hair on it. Stomp 1 for a treble booster that bites.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bright",
+          "volume": 0.4,
+          "bass": 0.4,
+          "mid": 0.6,
+          "treble": 0.6,
+          "presence": 0.45,
+          "sag": 0.3
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.2,
+          "lowcut": 90,
+          "highcut": 8000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "drive.treble",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 0.4,
+            "range": "Treble",
+            "level": 0
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 130,
+            "repeats": 0.1,
+            "mix": 0.3,
+            "wow": 0.15,
+            "drive": 0.4,
+            "age": 0.4,
+            "heads": "Long"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1200,
+            "mix": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ghost Town Road",
+      "description": "Dusty western twang: slow tremolo, long tape echo and a deep spring for wide-open desert melodies. Stomp 2 to add a seasick vibrato.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.3,
+          "bass": 0.55,
+          "mid": 0.5,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Ribbon",
+          "position": 0.35,
+          "distance": 0.35,
+          "lowcut": 70,
+          "highcut": 8000,
+          "level": 0.0
+        }
+      },
+      "board": [
+        {
+          "type": "mod.tremolo",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "rate": 3.2,
+            "depth": 0.45,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "mod.vibrato",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "rate": 4,
+            "depth": 0.2,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 480,
+            "repeats": 0.4,
+            "mix": 0.25,
+            "wow": 0.35,
+            "age": 0.5,
+            "heads": "Mid+Long"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3000,
+            "drip": 0.5,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Grain Elevator",
+      "description": "Open Americana tone with a touch of grit, warm repeats and a tall hall for ringing open chords. Stomp 2 for a slow pulsing tremolo.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.35,
+          "treble": 0.55,
+          "bass": 0.5,
+          "cut": 0.4,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "lowcut": 80,
+          "highcut": 9000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.3,
+            "tone": 0.5,
+            "body": 0.5
+          }
+        },
+        {
+          "type": "mod.tremolo",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 3.5,
+            "depth": 0.45,
+            "wave": "Bias"
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 440,
+            "repeats": 0.3,
+            "mix": 0.22
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 3200,
+            "size": 0.7,
+            "mix": 0.24
+          }
+        }
+      ]
+    }
+  ]
+}

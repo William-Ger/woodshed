@@ -1,0 +1,899 @@
+{
+  "genre": "Punk & Alt",
+  "presets": [
+    {
+      "name": "Basement Show",
+      "description": "Fast, bright '77-style crunch from a cranked non-master amp, all chords and no frills. Stomp 2 for extra grit and sustain on the lead break.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.72,
+          "bass": 0.45,
+          "mid": 0.7,
+          "treble": 0.65,
+          "presence": 0.5,
+          "sag": 0.35
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.35,
+          "highcut": 7500,
+          "room": 0.1,
+          "level": -2.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -60,
+            "release": 70
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "drive": 0.25,
+            "level": 7,
+            "tone": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "name": "Skate Park Ramp",
+      "description": "Tight, saturated pop-punk power chords with a scooped low end that stays punchy at speed. Stomp 3 for a lead delay.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.6,
+          "bass": 0.55,
+          "mid": 0.45,
+          "treble": 0.6,
+          "presence": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.3,
+          "lowcut": 80,
+          "highcut": 7000,
+          "room": 0.08,
+          "level": -0.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -58,
+            "release": 60
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 4,
+            "tilt": 0.1,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 5,
+          "on": false,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.25,
+            "mix": 0.2,
+            "division": "1/8 dot"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Flyer On A Pole",
+      "description": "Raw, buzzing hardcore distortion straight into a crunchy amp: tight, loud and ugly in the right way.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.5,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.6,
+          "presence": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.3,
+          "lowcut": 90,
+          "highcut": 6500,
+          "room": 0.05,
+          "level": -1.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -54,
+            "release": 40
+          }
+        },
+        {
+          "type": "drive.distortion",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "distortion": 0.7,
+            "filter": 0.45,
+            "volume": -4,
+            "clip": "Silicon"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rust And Static",
+      "description": "Quiet/loud grunge board: a watery chorus clean for verses, then stomp 2 for a thick fuzz wall on the chorus.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.3,
+          "bass": 0.55,
+          "mid": 0.5,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.35,
+          "highcut": 7500,
+          "room": 0.15,
+          "level": 2.3
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -64,
+            "release": 90
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "sustain": 0.6,
+            "tone": 0.45,
+            "volume": -6,
+            "mids": "Flat"
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "rate": 0.6,
+            "depth": 0.45,
+            "voices": "Two",
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.45,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cheap Motel Ice",
+      "description": "Dark, sludgy grunge distortion into a saggy amp, with a stompable flanger (2) for that swirly bridge.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.6,
+          "bass": 0.55,
+          "mid": 0.5,
+          "treble": 0.5,
+          "presence": 0.35,
+          "sag": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.2,
+          "lowcut": 70,
+          "highcut": 7000,
+          "level": -2.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.distortion",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "distortion": 0.55,
+            "filter": 0.3,
+            "volume": -3,
+            "clip": "LED"
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 4,
+          "on": false,
+          "knobs": {
+            "rate": 0.15,
+            "depth": 0.6,
+            "manual": 1.2,
+            "feedback": 0.4,
+            "mix": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quiet Loud Quiet",
+      "description": "'90s alt-rock split board: a clean edge-of-breakup verse; stomp 2 for overdrive, 3 for the full fuzz wall on top.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.35,
+          "bass": 0.5,
+          "mid": 0.55,
+          "treble": 0.6,
+          "presence": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.35,
+          "highcut": 8000,
+          "level": 5.3
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.35,
+            "attack": 10,
+            "level": 0,
+            "blend": 0.6
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "drive": 0.5,
+            "level": 0,
+            "tone": 0.55
+          }
+        },
+        {
+          "type": "drive.vintage",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "fuzz": 0.75,
+            "bias": 0.55,
+            "volume": 0
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1500,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Noise Complaint",
+      "description": "Abrasive noise-rock: splatty fuzz, a ring mod you can stomp (2) for clang, and slapback that smears it all.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.45,
+          "bass": 0.5,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.35,
+          "highcut": 7000,
+          "room": 0.2,
+          "level": -0.7
+        }
+      },
+      "board": [
+        {
+          "type": "drive.battery",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.7,
+            "battery": 0.5,
+            "tone": 0.55,
+            "volume": -3
+          }
+        },
+        {
+          "type": "mod.ring",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "freq": 420,
+            "mix": 0.35,
+            "sweep": "LFO",
+            "amount": 0.4,
+            "rate": 0.5
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 120,
+            "level": 0.35,
+            "grit": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Junkyard Garage",
+      "description": "Trashy garage rock from a busted transistor amp: fuzzy, rattly and loud. Stomp 2 for spring splash.",
+      "amp": {
+        "type": "amp.jalopy",
+        "knobs": {
+          "voice": "Practice",
+          "gain": 0.7,
+          "tone": 0.55,
+          "battery": 0.85,
+          "rattle": 0.35,
+          "volume": 0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.3,
+          "highcut": 7000,
+          "room": 0.2,
+          "level": -0.5
+        }
+      },
+      "board": [
+        {
+          "type": "drive.treble",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "boost": 0.5,
+            "range": "Mid",
+            "level": 0
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": false,
+          "knobs": {
+            "decay": 1800,
+            "drip": 0.6,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rust Belt Stomp",
+      "description": "Hairy, cranked little combo with a woolly vintage fuzz up front for primitive garage riffs. Stomp 1 to drop the fuzz.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.6,
+          "tone": 0.55,
+          "output": 0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.35,
+          "highcut": 8000,
+          "room": 0.18,
+          "level": 0.7
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.6,
+            "bias": 0.5,
+            "volume": -4
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 95,
+            "level": 0.3,
+            "grit": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pale Concrete",
+      "description": "Cold, angular post-punk clean: chorus and a slow flanger shimmer over a bright amp, with a short echo behind it.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.35,
+          "bass": 0.4,
+          "mid": 0.5,
+          "treble": 0.65,
+          "presence": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.25,
+          "highcut": 10000,
+          "room": 0.15,
+          "level": 4.6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.4,
+            "attack": 12,
+            "blend": 0.7
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.9,
+            "depth": 0.55,
+            "voices": "Three",
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "rate": 0.1,
+            "depth": 0.5,
+            "manual": 1.5,
+            "feedback": 0.3,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 300,
+            "repeats": 0.25,
+            "mix": 0.2,
+            "division": "1/8"
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1600,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Night Bus Shelter",
+      "description": "Gloomy post-punk bass-heavy lead tone: driven chorus with a phaser bed and a dark room. Stomp 4 for long echoes.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.3,
+          "bass": 0.55,
+          "mid": 0.45,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.3,
+          "highcut": 8500,
+          "room": 0.2,
+          "level": 3.1
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.35,
+            "tone": 0.5,
+            "body": 0.55
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.4,
+            "depth": 0.6,
+            "voices": "Two",
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.2,
+            "depth": 0.6,
+            "stages": "6",
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 450,
+            "repeats": 0.4,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.6,
+            "damp": 0.6,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Torn Sleeve Hardcore",
+      "description": "Modern hardcore crunch: tight high-gain amp, clamped lows and a gate that stops on a dime.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Crunch",
+          "tight": "Tight",
+          "gain": 0.6,
+          "bass": 0.5,
+          "lowmid": -1,
+          "highmid": 2,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Tight 4x12",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.3,
+          "lowcut": 80,
+          "highcut": 6500,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -52,
+            "release": 35
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.1,
+            "level": 0,
+            "tone": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dented Van Door",
+      "description": "Thick sludge-alt fuzz with lifted mids so it cuts the mix; octave-up fuzz on 3 for a screaming lead.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.35,
+          "bass": 0.5,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Ribbon",
+          "position": 0.3,
+          "distance": 0.25,
+          "highcut": 7500,
+          "level": 0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -60,
+            "release": 80
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.65,
+            "tone": 0.5,
+            "volume": -6,
+            "mids": "Lift"
+          }
+        },
+        {
+          "type": "drive.octave",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "fuzz": 0.5,
+            "octave": 0.6,
+            "tone": 0.55,
+            "level": -2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Futon Floor",
+      "description": "Bouncy pop-punk on a chimey class-A amp pushed by an overdrive, with a little room. Stomp 2 to double-track it wide.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.65,
+          "treble": 0.55,
+          "bass": 0.55,
+          "cut": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.3,
+          "highcut": 8000,
+          "room": 0.1,
+          "level": -2.9
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "drive": 0.55,
+            "level": 0,
+            "tone": 0.5
+          }
+        },
+        {
+          "type": "mod.doubler",
+          "spot": 4,
+          "on": false,
+          "knobs": {
+            "time": 18,
+            "drift": 0.3,
+            "width": 0.8,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dead Mall Feedback",
+      "description": "Feedback-drenched noise wall: fuzz into a cranked amp with held notes that howl an octave up. Stomp 3 to kill the howl.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bright",
+          "volume": 0.65,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.4,
+          "sag": 0.4
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.35,
+          "highcut": 7000,
+          "room": 0.15,
+          "level": -3.4
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -64,
+            "release": 120
+          }
+        },
+        {
+          "type": "drive.fuzz",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.55,
+            "tone": 0.5,
+            "volume": -6,
+            "mids": "Scoop"
+          }
+        },
+        {
+          "type": "weird.feedback",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "harmonic": "Octave",
+            "bloom": 900,
+            "level": 0.5,
+            "sustain": -50
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "mix": 0.15
+          }
+        }
+      ]
+    }
+  ]
+}

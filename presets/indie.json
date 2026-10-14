@@ -1,0 +1,877 @@
+{
+  "genre": "Indie & Dream Pop",
+  "presets": [
+    {
+      "name": "Postcard Chime",
+      "description": "Bright, jangly class-A chime for open chords and arpeggios, with a touch of compression and spring.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.4,
+          "treble": 0.6,
+          "bass": 0.45,
+          "cut": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.25,
+          "highcut": 11000,
+          "room": 0.15,
+          "level": 2.5
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "attack": 15,
+            "blend": 0.8
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1500,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Instant Photo Haze",
+      "description": "Dreamy wash of slow chorus into a long hall; clean and soft-focus. Stomp 2 for a modulated echo.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.5,
+          "mid": 0.45,
+          "treble": 0.55,
+          "presence": 0.35,
+          "master": 0.655
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.3,
+          "highcut": 9000,
+          "room": 0.2,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "mod.chorus",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.35,
+            "depth": 0.6,
+            "voices": "Three",
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "delay.modulated",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 450,
+            "repeats": 0.4,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 4000,
+            "size": 0.7,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bedroom Four-Track",
+      "description": "Lo-fi bedroom recording: a tiny practice amp, warbling tape and a crunchy little echo.",
+      "amp": {
+        "type": "amp.jalopy",
+        "knobs": {
+          "voice": "Practice",
+          "gain": 0.35,
+          "tone": 0.5,
+          "battery": 0.9,
+          "rattle": 0.15,
+          "volume": 0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x8 Tiny",
+          "mic": 0.3,
+          "highcut": 8000,
+          "room": 0.25,
+          "level": 3.0
+        }
+      },
+      "board": [
+        {
+          "type": "mod.warble",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "wow": 0.35,
+            "flutter": 0.25,
+            "age": 0.4
+          }
+        },
+        {
+          "type": "delay.lofi",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 340,
+            "repeats": 0.3,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cul-De-Sac Radio",
+      "description": "Small, warm transistor-radio tone with a tape echo, for hushed verses and lo-fi leads. Stomp 1 for wobble.",
+      "amp": {
+        "type": "amp.jalopy",
+        "knobs": {
+          "voice": "Radio",
+          "gain": 0.4,
+          "tone": 0.55,
+          "battery": 0.85,
+          "rattle": 0.2,
+          "volume": 0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x10 Open",
+          "mic": 0.3,
+          "highcut": 9000,
+          "room": 0.2,
+          "level": 2.3
+        }
+      },
+      "board": [
+        {
+          "type": "mod.vibrato",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 4.5,
+            "depth": 0.2
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.35,
+            "mix": 0.22,
+            "wow": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Late Summer Arps",
+      "description": "Crisp math-rock clean: compressed, sharp attack, tight lows, for tapped and fingerpicked lines.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "bass": 0.4,
+          "mid": 0.55,
+          "treble": 0.6,
+          "presence": 0.45,
+          "master": 0.8
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.4,
+          "highcut": 12000,
+          "level": 2.1
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.55,
+            "attack": 6,
+            "blend": 0.85,
+            "level": 5
+          }
+        },
+        {
+          "type": "dyn.transient",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "attack": 0.35,
+            "sustain": -0.1
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.35,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Garage Sale Fuzz",
+      "description": "Mid-fi fuzz with a fat midrange that blends with clean chords, into a small open combo. Stomp 2 to add drive.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.45,
+          "tone": 0.55,
+          "output": 0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.35,
+          "highcut": 8500,
+          "room": 0.2,
+          "level": 4.1
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.55,
+            "bias": 0.55,
+            "volume": -3
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "gain": 0.5,
+            "blend": 0.5,
+            "level": -2.5
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sunburnt Boardwalk",
+      "description": "Surf-tinged indie: bright clean, drippy springs and a quick slap. Stomp 1 for tremolo.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "treble": 0.6,
+          "bass": 0.45,
+          "cut": 0.3,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.25,
+          "highcut": 11000,
+          "room": 0.15,
+          "level": 1.9
+        }
+      },
+      "board": [
+        {
+          "type": "mod.tremolo",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 5.5,
+            "depth": 0.5,
+            "wave": "Triangle"
+          }
+        },
+        {
+          "type": "delay.slapback",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 90,
+            "level": 0.3,
+            "grit": 0.2
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2400,
+            "drip": 0.7,
+            "boing": 0.4,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seasick Postcard",
+      "description": "Vibrato-drenched clean that bends every chord out of shape, with a soft plate behind it.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.3,
+          "bass": 0.5,
+          "mid": 0.5,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.3,
+          "highcut": 9500,
+          "room": 0.15,
+          "level": 4.7
+        }
+      },
+      "board": [
+        {
+          "type": "mod.vibrato",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 3.2,
+            "depth": 0.45,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2600,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Moth Light Porch",
+      "description": "Lopsided photocell throb over a clean amp for wobbling chords. Stomp 2 for a hazy reverse echo.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.5,
+          "mid": 0.45,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.655
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.3,
+          "highcut": 9500,
+          "room": 0.15,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "mod.throb",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "speed": 2.2,
+            "intensity": 0.6,
+            "mode": "Vibrato"
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 650,
+            "repeats": 0.2,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rewound Summer",
+      "description": "Backwards-sounding swells: each note fades in, blooms through reverse echoes and a big reverb.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.5,
+          "mid": 0.45,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.3,
+          "highcut": 9000,
+          "room": 0.15,
+          "level": 5.5
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sense": -48,
+            "rise": 450,
+            "curve": "Bloom",
+            "level": 6
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 700,
+            "repeats": 0.3,
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 5000,
+            "size": 0.75,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Overpass At Dusk",
+      "description": "Post-rock build board: a glassy clean with dotted echoes; stomp 1 for volume swells, 2 for overdrive, 4 for ducked long delays.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.45,
+          "drive": 0.3,
+          "od": 0.5,
+          "bass": 0.5,
+          "mid": 0.55,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "highcut": 10000,
+          "level": 1.8
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "rise": 600,
+            "curve": "Smooth",
+            "level": 5.5
+          }
+        },
+        {
+          "type": "drive.touch",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "gain": 0.55,
+            "tone": 0.55,
+            "level": 0
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.4,
+            "mix": 0.25,
+            "division": "1/8 dot"
+          }
+        },
+        {
+          "type": "delay.ducking",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 800,
+            "repeats": 0.55,
+            "mix": 0.35,
+            "duck": 0.7
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 6000,
+            "shimmer": 0.3,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Water Tower Swell",
+      "description": "Huge post-rock crescendo: drive into a drifting ambient cloud with long echoes. Stomp 2 to freeze each note into a pad.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.35,
+          "bass": 0.5,
+          "mid": 0.5,
+          "treble": 0.55,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.3,
+          "highcut": 8500,
+          "room": 0.15,
+          "level": -0.7
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.5,
+            "tone": 0.5,
+            "body": 0.5
+          }
+        },
+        {
+          "type": "glitch.cryotron",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "mode": "Picked",
+            "drone": 0.4,
+            "swell": 600
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 520,
+            "repeats": 0.45,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 10000,
+            "size": 0.8,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Faded Home Movie",
+      "description": "Warm, dusty tape-saturated clean with gentle wow and a soft spring, like an old home movie.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.35,
+          "tone": 0.5,
+          "output": 0
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "position": 0.35,
+          "distance": 0.3,
+          "highcut": 9000,
+          "level": 4.5
+        }
+      },
+      "board": [
+        {
+          "type": "drive.blend",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.3,
+            "blend": 0.6,
+            "treble": 0.45
+          }
+        },
+        {
+          "type": "mod.warble",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "wow": 0.25,
+            "flutter": 0.15,
+            "age": 0.5,
+            "mix": 0.8
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.3,
+            "mix": 0.18,
+            "heads": "Mid+Long"
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1600,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Suburb Sprinklers",
+      "description": "Shimmering harmonic tremolo over a jangly class-A amp, for rolling, phasey rhythm parts. Stomp 2 for ping-pong echo.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.4,
+          "treble": 0.55,
+          "bass": 0.5,
+          "cut": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.3,
+          "highcut": 10500,
+          "room": 0.15,
+          "level": 2.9
+        }
+      },
+      "board": [
+        {
+          "type": "mod.harmtrem",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 4.2,
+            "depth": 0.6
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 360,
+            "repeats": 0.35,
+            "mix": 0.22
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shoegaze Daydream",
+      "description": "Wall of fuzzy, detuned haze: doubled fuzz smeared by a reverse echo and a vast cloud of reverb.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.35,
+          "bass": 0.5,
+          "mid": 0.5,
+          "treble": 0.5,
+          "presence": 0.35,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.35,
+          "highcut": 7500,
+          "room": 0.2,
+          "level": 5.5
+        }
+      },
+      "board": [
+        {
+          "type": "drive.fuzz",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "tone": 0.4,
+            "volume": -6,
+            "mids": "Flat"
+          }
+        },
+        {
+          "type": "pitch.doubler",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "detune": 12,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "delay.reverse",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 600,
+            "repeats": 0.3,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 8000,
+            "size": 0.85,
+            "mix": 0.35
+          }
+        }
+      ]
+    }
+  ]
+}

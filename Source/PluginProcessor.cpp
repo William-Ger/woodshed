@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "PresetData.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <numeric>
 
@@ -669,14 +670,95 @@ bool WoodshedProcessor::loadPreset (const juce::File& file)
     {
         if (xml->hasTagName (params.state.getType()))
         {
-            for (auto& i : instances) i.reset();
-            for (auto& t : instanceTypes) t = {};
-            params.replaceState (juce::ValueTree::fromXml (*xml));
+            replaceStateKeepingLevels (juce::ValueTree::fromXml (*xml));
             return true;
         }
     }
 
     return false;
+}
+
+void WoodshedProcessor::replaceStateKeepingLevels (const juce::ValueTree& state)
+{
+    // A preset is a sound, not a setup: the interface input and the levels stay put.
+    std::vector<std::pair<juce::String, float>> kept;
+    for (auto* id : { "input", "input_gain", "master" })
+        if (auto* p = params.getParameter (id))
+            kept.emplace_back (id, p->getValue());
+
+    for (auto& i : instances) i.reset();
+    for (auto& t : instanceTypes) t = {};
+    params.replaceState (state);
+
+    for (auto& [id, value] : kept)
+        params.getParameter (id)->setValueNotifyingHost (value);
+}
+
+const juce::StringArray& WoodshedProcessor::factoryGenres()
+{
+    // Menu order; a genre file not listed here goes at the end.
+    static const juce::StringArray genres { "Clean", "Blues", "Classic Rock", "Hard Rock & Metal", "Punk & Alt",
+                                            "Indie & Dream Pop", "Funk & Soul", "Jazz & Country", "Leads",
+                                            "Ambient & Shoegaze", "Psych & Doom", "Cinematic", "Weird", "Bass" };
+    return genres;
+}
+
+const std::vector<woodshed::Preset>& WoodshedProcessor::factoryPresets()
+{
+    static const auto presets = []
+    {
+        std::vector<woodshed::Preset> all;
+
+        for (int i = 0; i < PresetData::namedResourceListSize; ++i)
+        {
+            int size = 0;
+            const auto* data = PresetData::getNamedResource (PresetData::namedResourceList[i], size);
+            juce::StringArray errors;
+            auto parsed = woodshed::parsePresets (juce::String::fromUTF8 (data, size), errors);
+            jassert (errors.isEmpty());     // woodshed-bench presets catches these before they ship
+            all.insert (all.end(), parsed.begin(), parsed.end());
+        }
+
+        auto rank = [] (const juce::String& genre)
+        {
+            const int i = factoryGenres().indexOf (genre);
+            return i < 0 ? factoryGenres().size() : i;
+        };
+
+        std::stable_sort (all.begin(), all.end(), [&] (auto& a, auto& b) { return rank (a.genre) < rank (b.genre); });
+        return all;
+    }();
+
+    return presets;
+}
+
+void WoodshedProcessor::loadFactoryPreset (const woodshed::Preset& preset)
+{
+    for (auto& i : instances) i.reset();
+    for (auto& t : instanceTypes) t = {};
+
+    std::vector<Placement> places;
+    for (auto& p : preset.pedals)
+        places.push_back ({ p.type, p.spot });
+
+    applyPlacements (places, std::vector<int> (places.size(), -1));
+
+    const auto board = getBoard();
+    const auto spots = getSpots();
+
+    for (int slot = 0; slot < board.size(); ++slot)
+    {
+        for (auto& p : preset.pedals)
+        {
+            if (p.type != board[slot] || p.spot != spots[(size_t) slot])
+                continue;
+
+            params.getParameter (onParamId (slot))->setValueNotifyingHost (p.on ? 1.0f : 0.0f);
+            for (int k = 0; k < woodshed::Pedal::maxKnobs; ++k)
+                params.getParameter (knobParamId (slot, k))->setValueNotifyingHost (p.knobs[(size_t) k]);
+            break;
+        }
+    }
 }
 
 void WoodshedProcessor::getStateInformation (juce::MemoryBlock& dest)

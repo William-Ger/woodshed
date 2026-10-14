@@ -19,6 +19,7 @@ option(WOODSHED_BENCH_ONLY "Only configure the offline pedal bench (fast builds 
 set(WOODSHED_ENGINE_SOURCES
     Source/engine/Registry.cpp
     Source/engine/Chain.cpp
+    Source/engine/Presets.cpp
     Source/pedals/Dynamics.cpp
     Source/pedals/Drive.cpp
     Source/pedals/AmpCab.cpp
@@ -51,6 +52,10 @@ if(NOT WOODSHED_BENCH_ONLY)
     file(GLOB WOODSHED_ART CONFIGURE_DEPENDS art/renders/*.png art/renders/*.jpg art/renders/*.json)
     juce_add_binary_data(WoodshedArt SOURCES ${WOODSHED_ART})
 
+    # Factory presets (presets/*.json; check them with `woodshed-bench presets`).
+    file(GLOB WOODSHED_PRESETS CONFIGURE_DEPENDS presets/*.json)
+    juce_add_binary_data(WoodshedPresets HEADER_NAME PresetData.h NAMESPACE PresetData SOURCES ${WOODSHED_PRESETS})
+
     target_sources(Woodshed PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
@@ -76,6 +81,7 @@ if(NOT WOODSHED_BENCH_ONLY)
     target_link_libraries(Woodshed
         PRIVATE
             WoodshedArt
+            WoodshedPresets
             juce::juce_audio_utils
             juce::juce_dsp
         PUBLIC

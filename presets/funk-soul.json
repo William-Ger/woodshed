@@ -1,0 +1,819 @@
+{
+  "genre": "Funk & Soul",
+  "presets": [
+    {
+      "name": "Velvet Rope Quack",
+      "description": "Snappy envelope filter that quacks open on every pick, into a sparkling clean amp. Dig in harder for a wider sweep.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.45,
+          "mid": 0.5,
+          "treble": 0.6,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 10000,
+          "level": 5.0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.45,
+            "attack": 6,
+            "blend": 0.8
+          }
+        },
+        {
+          "type": "filter.envelope",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sens": 0.6,
+            "range": 0.65,
+            "q": 6,
+            "direction": "Up",
+            "mode": "Low-pass",
+            "decay": 120
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rhythm Section Tight",
+      "description": "Squashed, percussive clean with a sharpened pick attack for sixteenth-note chicken-scratch. Stomp the room for a little air.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "bass": 0.4,
+          "mid": 0.55,
+          "treble": 0.65,
+          "presence": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.3,
+          "lowcut": 100,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.6,
+            "attack": 3,
+            "blend": 1,
+            "level": 3.5
+          }
+        },
+        {
+          "type": "dyn.transient",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "attack": 0.5,
+            "sustain": -0.4
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": false,
+          "knobs": {
+            "size": 0.3,
+            "mix": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wah Street Strut",
+      "description": "Vintage wah parked on the throaty part of the sweep with a compressor behind it, for rhythmic wah-wah chops.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.35,
+          "bass": 0.45,
+          "mid": 0.5,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x10 Vintage",
+          "highcut": 9500,
+          "level": 4.0
+        }
+      },
+      "board": [
+        {
+          "type": "filter.wah",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "position": 0.45,
+            "voice": "Vintage",
+            "resonance": 0.6
+          }
+        },
+        {
+          "type": "dyn.compressor",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sustain": 0.4,
+            "attack": 5
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "mix": 0.12,
+            "decay": 1200
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sunday Satin",
+      "description": "Lush, watery chorus over a warm clean for soul ballads and double-stop fills. Stomp the plate for a bigger room.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.5,
+          "mid": 0.45,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "highcut": 9000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.35,
+            "attack": 12,
+            "blend": 0.6,
+            "level": 0.7
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.6,
+            "depth": 0.45,
+            "voices": "Two",
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 9,
+          "on": false,
+          "knobs": {
+            "decay": 2000,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Brass Section Octave",
+      "description": "Analog octave-down sub under a gritty, horn-like drive for unison funk lines that hit like a bass and a trumpet at once.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.35,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 8000,
+          "level": 3.0
+        }
+      },
+      "board": [
+        {
+          "type": "pitch.divider",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sub1": 0.55,
+            "dry": 0.9,
+            "tone": 1100
+          }
+        },
+        {
+          "type": "drive.touch",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "gain": 0.35,
+            "tone": 0.55,
+            "body": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "name": "Afterhours Phase",
+      "description": "Slow, gentle 4-stage phaser on a compressed clean for swirling rhythm grooves. Stomp the drive for a dirtier phased lead.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.45,
+          "treble": 0.55,
+          "bass": 0.5,
+          "cut": 0.35
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Dynamic",
+          "highcut": 9000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.45,
+            "attack": 5,
+            "level": 0.7
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "drive": 0.4,
+            "level": 3
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.5,
+            "depth": 0.7,
+            "stages": "4",
+            "feedback": 0.25,
+            "mix": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "name": "Neon Avenue Soul",
+      "description": "Slick, warm neo-soul clean with a light shimmer of chorus and a soft delay. Great for extended chords and slides.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.4,
+          "drive": 0.1,
+          "od": 0,
+          "bass": 0.5,
+          "mid": 0.5,
+          "treble": 0.45,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mica": "Ribbon",
+          "micb": "Condenser",
+          "blend": 0.35,
+          "highcut": 9000,
+          "level": 2.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.3,
+            "attack": 15,
+            "blend": 0.5
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.4,
+            "depth": 0.3,
+            "voices": "Three",
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.2,
+            "mix": 0.12,
+            "division": "1/8 dot",
+            "tone": 5000
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 2000,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mirrorball Chop",
+      "description": "Bright, scooped clean with a touch of flanger for four-on-the-floor disco chops. Stomp the clean boost to jump out of the mix.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "bass": 0.4,
+          "mid": 0.4,
+          "treble": 0.7,
+          "presence": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "lowcut": 110,
+          "highcut": 11000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.55,
+            "attack": 2,
+            "level": 1.7
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "boost": 3,
+            "tilt": 0.3,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "mod.flanger",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 0.2,
+            "depth": 0.5,
+            "feedback": 0.3,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Choir Loft Trem",
+      "description": "Gospel-style clean with a steady, deep tremolo and a warm hall, for church-chord swells and sustained voicings.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "treble": 0.5,
+          "bass": 0.55,
+          "cut": 0.4
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 9000,
+          "level": 2.7
+        }
+      },
+      "board": [
+        {
+          "type": "mod.tremolo",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "rate": 5.5,
+            "depth": 0.5,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 2800,
+            "mix": 0.22
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spinning Vinyl",
+      "description": "Rotary speaker on the slow setting over a warm, slightly driven clean for organ-style soul comping.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "tone": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Ribbon",
+          "highcut": 8000,
+          "level": -1.5
+        }
+      },
+      "board": [
+        {
+          "type": "mod.rotary",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "speed": "Slow",
+            "drive": 0.25,
+            "balance": 0.55,
+            "mix": 1
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.45,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Talkbox Boulevard",
+      "description": "Envelope-steered vowel filter that makes chords and single notes say 'wow'. Stomp the octave for a synth-bass growl underneath.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.35,
+          "bass": 0.45,
+          "mid": 0.55,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 9000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "attack": 6,
+            "level": 0.5
+          }
+        },
+        {
+          "type": "pitch.octave",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "sub1": 0.45,
+            "dry": 1
+          }
+        },
+        {
+          "type": "filter.vowel",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "control": "Envelope",
+            "depth": 0.7,
+            "resonance": 0.55,
+            "mix": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Horn Stab Downtown",
+      "description": "Band-pass envelope filter sweeping down into a gritty small combo for nasty, sputtering funk riffs.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.5,
+          "tone": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "highcut": 8000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "filter.envelope",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sens": 0.55,
+            "range": 0.6,
+            "q": 5,
+            "direction": "Down",
+            "mode": "Band-pass",
+            "decay": 200
+          }
+        },
+        {
+          "type": "drive.distortion",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "distortion": 0.3,
+            "filter": 0.45,
+            "clip": "Silicon"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Late Night Groove",
+      "description": "Clean-blend drive with a doubler for a fat, wide rhythm tone that still keeps every string clear. Stomp the delay for fills.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.3,
+          "bass": 0.45,
+          "mid": 0.5,
+          "treble": 0.6,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.4,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "drive.blend",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "gain": 0.3,
+            "treble": 0.55,
+            "blend": 0.6,
+            "level": 2.5
+          }
+        },
+        {
+          "type": "mod.doubler",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "time": 14,
+            "mix": 0.5,
+            "width": 0.7
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 7,
+          "on": false,
+          "knobs": {
+            "time": 330,
+            "repeats": 0.3,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Crate Digger",
+      "description": "Dusty, lo-fi soul sample tone: warbling tape, a narrowed band and a crunchy echo, like a record pulled from the bargain bin.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.5,
+          "mid": 0.55,
+          "treble": 0.5,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "highcut": 7000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "mod.warble",
+          "spot": 4,
+          "on": true,
+          "knobs": {
+            "wow": 0.25,
+            "flutter": 0.15,
+            "age": 0.4
+          }
+        },
+        {
+          "type": "eq.tilt",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "tilt": -2,
+            "lowCut": 120,
+            "highCut": 6000
+          }
+        },
+        {
+          "type": "delay.lofi",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 300,
+            "repeats": 0.3,
+            "mix": 0.2,
+            "crush": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uptown Swagger",
+      "description": "Compressed, slightly hairy crunch with a fast filter throb for strutting single-note funk-rock lines. Stomp the wah for solos.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.3,
+          "bass": 0.45,
+          "mid": 0.6,
+          "treble": 0.55,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "highcut": 8000,
+          "level": 2.1
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "attack": 4
+          }
+        },
+        {
+          "type": "filter.wah",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "position": 0.6,
+            "voice": "Modern",
+            "resonance": 0.5
+          }
+        },
+        {
+          "type": "filter.lfo",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "rate": 4,
+            "depth": 0.45,
+            "centre": 1100,
+            "resonance": 2.5,
+            "mode": "Band-pass",
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.35,
+            "mix": 0.12
+          }
+        }
+      ]
+    }
+  ]
+}

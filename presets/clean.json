@@ -1,0 +1,1047 @@
+{
+  "genre": "Clean",
+  "presets": [
+    {
+      "name": "Sunup Studio",
+      "description": "A pristine, hi-fi studio clean with gentle compression and a short hall. Stomp 2 for a clean boost when the part needs to speak up.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "bass": 0.45,
+          "mid": 0.5,
+          "treble": 0.6,
+          "presence": 0.45,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.35,
+          "lowcut": 80,
+          "highcut": 10000,
+          "room": 0.1,
+          "level": 5.2
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.35,
+            "attack": 12,
+            "blend": 0.7
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "boost": 3.5,
+            "tilt": 0.1,
+            "voice": "Flat"
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1800,
+            "size": 0.5,
+            "predelay": 25,
+            "mix": 0.16
+          }
+        }
+      ]
+    },
+    {
+      "name": "Glass Harbor",
+      "description": "Sparkling, squeezed clean with a chimey top end and a bright plate behind it. Stomp 3 for dotted-eighth repeats.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.3,
+          "treble": 0.62,
+          "bass": 0.45,
+          "cut": 0.35,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.4,
+          "lowcut": 90,
+          "highcut": 11000,
+          "room": 0.1,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.65,
+            "attack": 18,
+            "blend": 0.85
+          }
+        },
+        {
+          "type": "eq.tilt",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "tilt": 1.5,
+            "lowCut": 80
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 480,
+            "division": "1/8 dot",
+            "repeats": 0.3,
+            "mix": 0.24,
+            "tone": 7000
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "predelay": 15,
+            "damp": 9000,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Daybreak Chorus",
+      "description": "Wide, watery chorus clean that fills a room on its own. Stomp 1 for a light overdrive that keeps the shimmer.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.28,
+          "bass": 0.45,
+          "mid": 0.45,
+          "treble": 0.6,
+          "presence": 0.4,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.3,
+          "lowcut": 80,
+          "highcut": 10000,
+          "room": 0.15,
+          "level": 4.5
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "drive": 0.25,
+            "tone": 0.55,
+            "level": 8
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.6,
+            "depth": 0.45,
+            "delay": 12,
+            "voices": "Two",
+            "tone": 7000,
+            "width": 0.9,
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "damp": 0.4,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cathedral Morning",
+      "description": "Bowed swells into dotted-eighth echoes and an octave-shimmer wash for worship pads. Stomp 2 to thicken the swells with clean-blend grit.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.45,
+          "drive": 0.2,
+          "od": 0.0,
+          "bass": 0.45,
+          "mid": 0.55,
+          "treble": 0.5,
+          "master": 0.8
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "lowcut": 90,
+          "highcut": 9500,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.swell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sense": -50,
+            "rise": 450,
+            "curve": "Smooth"
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "gain": 0.35,
+            "treble": 0.45,
+            "blend": 0.5
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 500,
+            "division": "1/8 dot",
+            "repeats": 0.4,
+            "mix": 0.3,
+            "tone": 6500
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 9000,
+            "shimmer": 0.4,
+            "interval": "Octave",
+            "tone": 0.45,
+            "mix": 0.35
+          }
+        }
+      ]
+    },
+    {
+      "name": "Millpond",
+      "description": "Glassy clean floating on a slow, gently wavering delay and a huge ambient cloud. Stomp 1 for a soft touch-sensitive edge.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.22,
+          "bass": 0.45,
+          "mid": 0.5,
+          "treble": 0.55,
+          "presence": 0.35,
+          "master": 0.9
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Condenser",
+          "position": 0.35,
+          "distance": 0.3,
+          "lowcut": 90,
+          "highcut": 10000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "gain": 0.35,
+            "tone": 0.5,
+            "body": 0.5,
+            "level": 1.5
+          }
+        },
+        {
+          "type": "delay.modulated",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 620,
+            "repeats": 0.45,
+            "mix": 0.28,
+            "rate": 0.4,
+            "depth": 0.35,
+            "tone": 4000
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 14000,
+            "size": 0.85,
+            "tone": 0.6,
+            "mod": 0.5,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bright Ripple",
+      "description": "Snappy, compressed funk clean with an exaggerated pick attack for tight sixteenth strumming. Stomp 3 for an auto-wah quack.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.2,
+          "bass": 0.35,
+          "mid": 0.45,
+          "treble": 0.7,
+          "presence": 0.5,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.45,
+          "lowcut": 110,
+          "highcut": 9500,
+          "room": 0.05,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.6,
+            "attack": 4,
+            "blend": 0.9
+          }
+        },
+        {
+          "type": "dyn.transient",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "attack": 0.45,
+            "sustain": -0.3
+          }
+        },
+        {
+          "type": "filter.envelope",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "sens": 0.55,
+            "range": 0.6,
+            "q": 4,
+            "direction": "Up",
+            "mode": "Low-pass",
+            "decay": 120,
+            "mix": 0.9
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "damp": 0.5,
+            "mix": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prism Funk",
+      "description": "Quacky envelope-filter funk over a clean, punchy amp. Stomp 3 to add a slow phaser swirl.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.32,
+          "bass": 0.4,
+          "mid": 0.55,
+          "treble": 0.6,
+          "presence": 0.45,
+          "sag": 0.2
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "mic": 0.4,
+          "lowcut": 100,
+          "highcut": 9000,
+          "room": 0.08,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "attack": 6,
+            "blend": 0.8,
+            "level": 6
+          }
+        },
+        {
+          "type": "filter.envelope",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "sens": 0.6,
+            "range": 0.65,
+            "q": 5,
+            "direction": "Up",
+            "mode": "Band-pass",
+            "decay": 140,
+            "mix": 0.85
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 0.35,
+            "depth": 0.6,
+            "stages": "4",
+            "feedback": 0.25,
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "damp": 0.5,
+            "mix": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Warm Window",
+      "description": "A warm, round little-combo clean with a natural room around it, sweet for chords and soft lines. Stomp 1 to push it into gentle hair.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.28,
+          "tone": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Ribbon",
+          "position": 0.3,
+          "distance": 0.25,
+          "lowcut": 70,
+          "highcut": 9000,
+          "level": 3.4
+        }
+      },
+      "board": [
+        {
+          "type": "drive.touch",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "gain": 0.4,
+            "tone": 0.5,
+            "body": 0.55
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.6,
+            "damp": 0.5,
+            "mix": 0.24
+          }
+        }
+      ]
+    },
+    {
+      "name": "Amber Hour",
+      "description": "Smooth neo-soul clean with a lamp-lit chorus throb and a soft plate, made for extended chords and double stops. Stomp 2 for a glowing clean-blend drive.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Post",
+          "volume": 0.42,
+          "drive": 0.15,
+          "od": 0.0,
+          "bass": 0.55,
+          "mid": 0.55,
+          "treble": 0.42,
+          "master": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.55,
+          "lowcut": 70,
+          "highcut": 8000,
+          "level": 0.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.4,
+            "attack": 20,
+            "blend": 0.7
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "gain": 0.3,
+            "treble": 0.4,
+            "blend": 0.55,
+            "level": 1
+          }
+        },
+        {
+          "type": "mod.throb",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "speed": 1.2,
+            "intensity": 0.45,
+            "mode": "Chorus"
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 1800,
+            "predelay": 20,
+            "damp": 6500,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Honey Light",
+      "description": "Dark, rounded neo-soul tone with a slow harmonic pulse rolling underneath. Stomp 3 for warm analog repeats on the fills.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.6,
+          "mid": 0.5,
+          "treble": 0.4,
+          "presence": 0.3,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Ribbon",
+          "micb": "Condenser",
+          "blend": 0.35,
+          "lowcut": 70,
+          "highcut": 7500,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "eq.tilt",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "tilt": -1.5,
+            "highCut": 9000
+          }
+        },
+        {
+          "type": "mod.harmtrem",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 2.2,
+            "depth": 0.35,
+            "split": 700
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 6,
+          "on": false,
+          "knobs": {
+            "time": 360,
+            "repeats": 0.3,
+            "mix": 0.22
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.55,
+            "damp": 0.55,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sunroom",
+      "description": "An acoustic-flavored clean: scooped boxiness, crisp top, a subtle doubled shimmer and an open-room mic. Best on the neck or middle pickup.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.15,
+          "bass": 0.4,
+          "mid": 0.4,
+          "treble": 0.65,
+          "presence": 0.5,
+          "master": 0.9
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Condenser",
+          "position": 0.5,
+          "distance": 0.45,
+          "lowcut": 100,
+          "highcut": 14000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "attack": 10,
+            "blend": 0.8,
+            "level": 5
+          }
+        },
+        {
+          "type": "eq.parametric",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "lowFreq": 150,
+            "lowGain": -3,
+            "midFreq": 500,
+            "midGain": -6,
+            "midQ": 1.2,
+            "highFreq": 5000,
+            "highGain": 6
+          }
+        },
+        {
+          "type": "pitch.doubler",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "detune": 6,
+            "delay": 9,
+            "width": 0.8,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.45,
+            "damp": 0.3,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spring Creek",
+      "description": "Bright, jangling twelve-string-style strum with an octave voice ringing above the dry note. Stomp 4 for a long, airy hall.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.3,
+          "treble": 0.6,
+          "bass": 0.4,
+          "cut": 0.4,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "mic": 0.45,
+          "lowcut": 110,
+          "highcut": 12000,
+          "room": 0.2,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.55,
+            "attack": 10,
+            "blend": 0.8,
+            "level": 4
+          }
+        },
+        {
+          "type": "eq.graphic",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "b100": -4,
+            "b200": -2,
+            "b400": -3,
+            "b800": 0,
+            "b1k6": 1,
+            "b3k2": 3,
+            "b6k4": 4
+          }
+        },
+        {
+          "type": "pitch.harmony",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "voice1": "+Oct",
+            "level1": 0.35,
+            "voice2": "Off",
+            "spread": 0.6,
+            "tone": 8000
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": false,
+          "knobs": {
+            "decay": 3000,
+            "size": 0.65,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lighthouse Lamp",
+      "description": "A clean chime amp through a slowly turning rotary speaker, lovely for organ-like chord pads. Stomp 1 for a bit of grit into the spinning horn.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.32,
+          "treble": 0.55,
+          "bass": 0.5,
+          "cut": 0.35,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "mic": 0.35,
+          "lowcut": 80,
+          "highcut": 10000,
+          "room": 0.15,
+          "level": 5.5
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "drive": 0.3,
+            "tone": 0.5,
+            "level": 6
+          }
+        },
+        {
+          "type": "mod.rotary",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "speed": "Slow",
+            "ramp": 1,
+            "balance": 0.5,
+            "drive": 0.1,
+            "width": 0.8,
+            "mix": 1
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "damp": 0.45,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Frost Pane",
+      "description": "Crisp, wide double-tracked clean with bouncing stereo repeats and a bright plate. Stomp 1 for a clean lift on lead lines.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.25,
+          "bass": 0.45,
+          "mid": 0.5,
+          "treble": 0.62,
+          "presence": 0.45,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x10 Open",
+          "mic": 0.35,
+          "lowcut": 90,
+          "highcut": 11000,
+          "room": 0.1,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.boost",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "boost": 4,
+            "tilt": 0.2,
+            "voice": "Tight"
+          }
+        },
+        {
+          "type": "mod.doubler",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "time": 14,
+            "drift": 0.3,
+            "width": 0.85,
+            "mix": 0.5,
+            "mode": "Double"
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 380,
+            "repeats": 0.3,
+            "mix": 0.2,
+            "tone": 6500,
+            "width": 0.9
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2000,
+            "damp": 9000,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Window Rain",
+      "description": "Gently drifting auto-pan clean with a scattered pattern of taps falling across the stereo field. Stomp 3 for a slow filter swell.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.25,
+          "bass": 0.45,
+          "mid": 0.5,
+          "treble": 0.58,
+          "presence": 0.4,
+          "master": 0.9
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Condenser",
+          "blend": 0.4,
+          "lowcut": 80,
+          "highcut": 10000,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.35,
+            "attack": 15,
+            "blend": 0.7
+          }
+        },
+        {
+          "type": "mod.autopan",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.3,
+            "depth": 0.5,
+            "wave": "Sine"
+          }
+        },
+        {
+          "type": "filter.lfo",
+          "spot": 4,
+          "on": false,
+          "knobs": {
+            "rate": 0.15,
+            "depth": 0.45,
+            "centre": 1400,
+            "resonance": 1.5,
+            "mode": "Low-pass",
+            "shape": "Sine",
+            "mix": 0.7
+          }
+        },
+        {
+          "type": "delay.multitap",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "time": 450,
+            "pattern": "Scatter",
+            "repeats": 0.3,
+            "mix": 0.25,
+            "tone": 6500,
+            "spread": 0.8
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 8,
+          "on": true,
+          "knobs": {
+            "decay": 2400,
+            "size": 0.55,
+            "mix": 0.18
+          }
+        }
+      ]
+    }
+  ]
+}

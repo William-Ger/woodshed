@@ -1,0 +1,1350 @@
+{
+  "genre": "Weird",
+  "presets": [
+    {
+      "name": "Broken Arcade",
+      "description": "Bit-crushed chords with laser zaps firing off every hard pick, bounced across a ping-pong delay. Stomp 4 to let the glitch sequencer chew up the riff.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.35,
+          "treble": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "level": -1.3
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -64
+          }
+        },
+        {
+          "type": "drive.crusher",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "bits": 6,
+            "rate": 7000,
+            "filter": 5000,
+            "mix": 0.85
+          }
+        },
+        {
+          "type": "weird.zap",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "start": 4200,
+            "end": 120,
+            "time": 180,
+            "wave": "Square",
+            "burst": 3,
+            "sense": 0.55,
+            "level": 0.4
+          }
+        },
+        {
+          "type": "glitch.gremlin",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "tempo": 128,
+            "step": "1/16",
+            "chaos": 0.45,
+            "seed": 42
+          }
+        },
+        {
+          "type": "delay.pingpong",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 350,
+            "repeats": 0.35,
+            "mix": 0.25,
+            "tone": 5000
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cold-Blooded Synth",
+      "description": "Monophonic saw-synth bass lead with a resonant filter that snaps open on every note. Stomp 3 to drive it into a snarling distortion.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.5,
+          "drive": 0.15,
+          "od": 0.3,
+          "bass": 0.55,
+          "treble": 0.45,
+          "master": 0.65
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Tight 4x12",
+          "highcut": 8000,
+          "level": 4.0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.55,
+            "attack": 10
+          }
+        },
+        {
+          "type": "weird.synth",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "wave": "Saw",
+            "octave": "-1",
+            "sub": 0.5,
+            "glide": 40,
+            "cutoff": 420,
+            "reso": 7,
+            "env": 0.75,
+            "mix": 0.85
+          }
+        },
+        {
+          "type": "drive.distortion",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "distortion": 0.45,
+            "filter": 0.45,
+            "volume": 0
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 0.25,
+            "depth": 0.6,
+            "stages": "6",
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 320,
+            "repeats": 0.3,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Barber Pole Beacon",
+      "description": "A slow frequency-shift spiral that never stops climbing, over a chimey clean. Stomp 3 for a deep 12-stage phaser that thickens the swirl.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "treble": 0.55,
+          "cut": 0.35
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Ribbon",
+          "level": 2.4
+        }
+      },
+      "board": [
+        {
+          "type": "weird.shift",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "shift": 2.5,
+            "mode": "Up",
+            "feedback": 0.6,
+            "delay": 12,
+            "drift": 0.25,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "rate": 0.3,
+            "depth": 0.35,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "rate": 0.15,
+            "depth": 0.8,
+            "stages": "12",
+            "feedback": 0.5,
+            "mix": 0.35
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 4200,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ice Harp Engine",
+      "description": "Eight drone strings in E minor seven ring along with every note, smeared into an endless ambient cloud. Stomp 3 to freeze the cloud and solo over it.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.3,
+          "treble": 0.55,
+          "presence": 0.35
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "room": 0.25,
+          "level": 1.7
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.4,
+            "attack": 15
+          }
+        },
+        {
+          "type": "weird.strings",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "key": "E",
+            "chord": "Min7",
+            "decay": 6000,
+            "bright": 0.6,
+            "mix": 0.55,
+            "range": "Mid"
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "decay": 20000,
+            "freeze": "On",
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 14000,
+            "size": 0.85,
+            "mix": 0.32
+          }
+        }
+      ]
+    },
+    {
+      "name": "Howling Loon",
+      "description": "Hold any note and controlled amp feedback blooms in an octave above it, through a cranked crunch stack. Stomp 4 for a long tape echo on the howl.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.6,
+          "treble": 0.55,
+          "sag": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 7500,
+          "level": -3.9
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -70
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "drive": 0.55,
+            "tone": 0.5,
+            "level": 0
+          }
+        },
+        {
+          "type": "weird.feedback",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "harmonic": "Octave",
+            "bloom": 900,
+            "level": 0.55,
+            "wobble": 0.4,
+            "drive": 0.35
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.45,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "size": 0.6,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bell Foundry",
+      "description": "Every pick strikes a tuned bronze gong that rings out under a long plate. Stomp 3 for dotted-eighth repeats that turn chords into a carillon.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.45,
+          "treble": 0.6,
+          "master": 0.65
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x12 Open",
+          "level": 4.0
+        }
+      },
+      "board": [
+        {
+          "type": "weird.bell",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "metal": "Gong",
+            "tune": 1.0,
+            "strike": 2200,
+            "sustain": 0.25,
+            "shimmer": 0.45,
+            "tone": 5000,
+            "mix": 0.65
+          }
+        },
+        {
+          "type": "mod.chorus",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "rate": 0.4,
+            "depth": 0.3,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "time": 480,
+            "division": "1/8 dot",
+            "repeats": 0.4,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 3800,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Machine Gun Relay",
+      "description": "Tight, gated high-gain riffing that machine-guns sixteenth-note slices of whatever you just played. Stomp 3 to let the stutter loose; it fires on picked notes.",
+      "amp": {
+        "type": "amp.fortress",
+        "knobs": {
+          "channel": "Lead",
+          "tight": "Tight",
+          "gain": 0.55,
+          "lowmid": -2,
+          "highmid": 1,
+          "treble": 0.5,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Tight 4x12",
+          "lowcut": 80,
+          "highcut": 6500,
+          "level": 2.0
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -55,
+            "release": 60
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 6,
+            "voice": "Tight",
+            "tilt": 0.1
+          }
+        },
+        {
+          "type": "glitch.relay",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "tempo": 140,
+            "slice": "1/16",
+            "mode": "Picked",
+            "chance": 0.6,
+            "fade": 0.1,
+            "mix": 1
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dying Transistor",
+      "description": "A starved, sputtering fuzz through a busted pocket radio, with the tape stop braking every phrase you pick. Stomp 2 to bypass the brakes.",
+      "amp": {
+        "type": "amp.jalopy",
+        "knobs": {
+          "voice": "Radio",
+          "gain": 0.5,
+          "tone": 0.55,
+          "battery": 0.6,
+          "rattle": 0.35,
+          "volume": 0
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x8 Tiny",
+          "room": 0.2,
+          "level": -2.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.battery",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.6,
+            "battery": 0.5,
+            "tone": 0.55,
+            "volume": -4
+          }
+        },
+        {
+          "type": "glitch.flywheel",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "mode": "Picked",
+            "brake": 700,
+            "start": 200,
+            "sense": -38
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 1500,
+            "mix": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Needle Skips",
+      "description": "Every phrase gets scratched back and forth on a crackly old turntable through a narrow, nasal speaker. Stomp 2 for a lo-fi crush on the scratches.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Normal",
+          "volume": 0.4,
+          "tone": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x10 Open",
+          "level": 1.9
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.stylus",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rate": 3,
+            "depth": 180,
+            "hand": "Tear",
+            "fader": 0.3,
+            "mix": 0.6
+          }
+        },
+        {
+          "type": "drive.crusher",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "bits": 8,
+            "rate": 9000,
+            "filter": 4500,
+            "mix": 0.6
+          }
+        },
+        {
+          "type": "filter.telephone",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "low": 350,
+            "high": 3500,
+            "bump": 5,
+            "drive": 0.3
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "size": 0.35,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Backwards Lighthouse",
+      "description": "Each note blooms in backwards, swelling into its own attack, with seasick repeats and a wide hall behind it. Stomp 2 to add a second reversed voice an octave down.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "treble": 0.55,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mic": "Condenser",
+          "distance": 0.35,
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.rewind",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "length": 650,
+            "swell": 0.6,
+            "spread": 0.6,
+            "dry": 0.5,
+            "wet": 0.9
+          }
+        },
+        {
+          "type": "glitch.rewind",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "length": 900,
+            "octave": "Down",
+            "swell": 0.6,
+            "dry": 1,
+            "wet": 0.5
+          }
+        },
+        {
+          "type": "delay.modulated",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 480,
+            "repeats": 0.35,
+            "mix": 0.25,
+            "depth": 0.5
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "decay": 3800,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scrapyard Swarm",
+      "description": "A granular cloud of splintered, re-pitched fragments steered by a chaotic resonant filter. Stomp 3 to hit chaos pitching for full sci-fi debris.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Chime",
+          "gain": 0.35,
+          "master": 0.7
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "level": 6
+        }
+      },
+      "board": [
+        {
+          "type": "weird.chaos",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "rate": 0.6,
+            "depth": 2,
+            "center": 900,
+            "reso": 5,
+            "mode": "Band",
+            "mix": 0.6
+          }
+        },
+        {
+          "type": "glitch.scrapyard",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "density": 18,
+            "size": 120,
+            "scatter": 600,
+            "pitch": "Fifths",
+            "reverse": 0.35,
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "glitch.scrapyard",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "density": 30,
+            "size": 80,
+            "scatter": 1200,
+            "pitch": "Chaos",
+            "reverse": 0.5,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "reverb.ambient",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 8000,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cryo Chamber",
+      "description": "Every note you pick freezes into a drone you can play over, drifting through a slow frequency shift and an octave-up shimmer. Stomp 3 to hold the current drone.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3,
+          "bass": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x12 Closed",
+          "mic": "Ribbon",
+          "level": 1.2
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.cryotron",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "mode": "Picked",
+            "sustain": 8000,
+            "swell": 600,
+            "drone": 0.45,
+            "shimmer": 0.3,
+            "tone": 4500
+          }
+        },
+        {
+          "type": "weird.shift",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "shift": 1.2,
+            "mode": "Split",
+            "feedback": 0.3,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "glitch.cryotron",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "mode": "Hold",
+            "sustain": 30000,
+            "drone": 0.4
+          }
+        },
+        {
+          "type": "reverb.shimmer",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 9000,
+            "shimmer": 0.4,
+            "mix": 0.28
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gremlin in the Rack",
+      "description": "A glitch sequencer repeats, reverses and drops steps of a crunchy riff, with crumbling lo-fi echoes. Stomp 3 to stack a wilder two-bar gremlin on top.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.5,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "4x12 Closed",
+          "highcut": 7500,
+          "level": 4.7
+        }
+      },
+      "board": [
+        {
+          "type": "drive.distortion",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "distortion": 0.35,
+            "filter": 0.45,
+            "volume": -2,
+            "clip": "LED"
+          }
+        },
+        {
+          "type": "glitch.gremlin",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "tempo": 120,
+            "step": "1/16",
+            "chaos": 0.45,
+            "seed": 7,
+            "loop": "1 Bar",
+            "mix": 1
+          }
+        },
+        {
+          "type": "glitch.gremlin",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "tempo": 120,
+            "step": "1/32",
+            "chaos": 0.65,
+            "seed": 71,
+            "loop": "2 Bars",
+            "mix": 0.8
+          }
+        },
+        {
+          "type": "delay.lofi",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 330,
+            "repeats": 0.35,
+            "mix": 0.2,
+            "crush": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "name": "Elevator to Nowhere",
+      "description": "Shifted voices climb forever and wrap back to the bottom, an endless rise under a slow phaser. Stomp 2 to reverse the escalator into an endless fall.",
+      "amp": {
+        "type": "amp.bandstand",
+        "knobs": {
+          "channel": "Brilliant",
+          "volume": 0.4,
+          "cut": 0.4
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "level": 2.2
+        }
+      },
+      "board": [
+        {
+          "type": "glitch.escalator",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "climb": 1.5,
+            "register": "Mid",
+            "mix": 0.45,
+            "wash": 0.5,
+            "tone": 6000
+          }
+        },
+        {
+          "type": "glitch.escalator",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "climb": -2,
+            "register": "Low",
+            "mix": 0.5,
+            "wash": 0.5
+          }
+        },
+        {
+          "type": "mod.phaser",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "rate": 0.2,
+            "depth": 0.6,
+            "mix": 0.3
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 5000,
+            "mix": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ghost Transmitter",
+      "description": "Echoes alternate between ghostly pitch-shifted and backwards as they bounce through a crackly radio band. Stomp 2 to open the band back up to full range.",
+      "amp": {
+        "type": "amp.roadhouse",
+        "knobs": {
+          "channel": "Bright",
+          "volume": 0.4,
+          "tone": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "level": 0.6
+        }
+      },
+      "board": [
+        {
+          "type": "filter.telephone",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "low": 450,
+            "high": 2800,
+            "bump": 6,
+            "drive": 0.4
+          }
+        },
+        {
+          "type": "eq.tilt",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "tilt": 0.5
+          }
+        },
+        {
+          "type": "glitch.degauss",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "feedback": 0.5,
+            "shift": "Ghost",
+            "mix": 0.45
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 2200,
+            "mix": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "name": "Abyssal Diver",
+      "description": "Muffled, swaying and seasick with bubbles rising out of every note, dragged down by a sub-octave through a bass rig. Stomp 3 to add the second sub.",
+      "amp": {
+        "type": "amp.bass",
+        "knobs": {
+          "voice": "Tube Warm",
+          "gain": 0.4,
+          "bass": 0.55,
+          "treble": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "8x10 Bass",
+          "level": -0.8
+        }
+      },
+      "board": [
+        {
+          "type": "pitch.octave",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sub1": 0.5,
+            "sub2": 0,
+            "dry": 1,
+            "tone": 1800
+          }
+        },
+        {
+          "type": "weird.underwater",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "depth": 0.6,
+            "wobble": 0.55,
+            "current": 0.5,
+            "bubbles": 0.6,
+            "mix": 0.85
+          }
+        },
+        {
+          "type": "pitch.octave",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "sub1": 0,
+            "sub2": 0.5,
+            "dry": 1,
+            "tone": 1500
+          }
+        },
+        {
+          "type": "reverb.hall",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 3200,
+            "mix": 0.25,
+            "damp": 0.7
+          }
+        }
+      ]
+    },
+    {
+      "name": "Murmuration",
+      "description": "Woolly fuzz swept by a chaotic filter that loops and swerves like a flock in flight, never repeating. Stomp 3 for a choppy square tremolo.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Normal",
+          "volume": 0.45,
+          "treble": 0.5
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 7000,
+          "level": 2.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.vintage",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.7,
+            "bias": 0.55,
+            "volume": -6
+          }
+        },
+        {
+          "type": "weird.chaos",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "rate": 1.2,
+            "depth": 2.6,
+            "center": 800,
+            "reso": 6,
+            "mode": "Low",
+            "drive": 0.25,
+            "mix": 1
+          }
+        },
+        {
+          "type": "mod.tremolo",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "rate": 7,
+            "depth": 0.8,
+            "wave": "Square"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "mix": 0.18
+          }
+        }
+      ]
+    },
+    {
+      "name": "Night Modem",
+      "description": "Chirping modem tones hop and warble with your dynamics over a crushed clean, with line hiss on every pick. Stomp 3 for eighth-note repeats.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.3
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "1x10 Open",
+          "level": 1.9
+        }
+      },
+      "board": [
+        {
+          "type": "weird.dialup",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "baud": 14,
+            "tone": 1200,
+            "chirp": 0.5,
+            "hiss": 0.25,
+            "ring": 0.5,
+            "mix": 0.5
+          }
+        },
+        {
+          "type": "drive.crusher",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "bits": 10,
+            "rate": 16000,
+            "filter": 7000,
+            "mix": 0.6
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "time": 400,
+            "division": "1/8",
+            "repeats": 0.35,
+            "mix": 0.25
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "size": 0.4,
+            "mix": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tin Can Satellite",
+      "description": "Ring-modulated octave fuzz with an LFO-swept carrier that clangs like a satellite beacon. Stomp 3 to add a pitch shift a fifth down.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "British Crunch",
+          "gain": 0.35,
+          "master": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.speaker",
+        "knobs": {
+          "cabinet": "2x12 Closed",
+          "highcut": 8000,
+          "level": 4.4
+        }
+      },
+      "board": [
+        {
+          "type": "drive.octave",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "fuzz": 0.5,
+            "octave": 0.6,
+            "level": -3
+          }
+        },
+        {
+          "type": "mod.ring",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "freq": 440,
+            "mix": 0.4,
+            "sweep": "LFO",
+            "amount": 0.4,
+            "rate": 0.5
+          }
+        },
+        {
+          "type": "pitch.shift",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "shift": -7,
+            "mix": 0.4
+          }
+        },
+        {
+          "type": "reverb.plate",
+          "spot": 6,
+          "on": true,
+          "knobs": {
+            "decay": 2500,
+            "mix": 0.22
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mutant Siren",
+      "description": "A fuzz lead harmonised a minor seventh up with a wide, seasick vibrato. Stomp 2 to dive-bomb the whole thing down two octaves.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Post",
+          "volume": 0.45,
+          "drive": 0.4,
+          "od": 0.5,
+          "mid": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "highcut": 7500,
+          "level": 3.4
+        }
+      },
+      "board": [
+        {
+          "type": "drive.fuzz",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.5,
+            "tone": 0.5,
+            "mids": "Lift",
+            "volume": -6
+          }
+        },
+        {
+          "type": "pitch.bend",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "position": 1,
+            "range": "Dive",
+            "mix": 0.5,
+            "glide": 300
+          }
+        },
+        {
+          "type": "pitch.harmony",
+          "spot": 2,
+          "on": true,
+          "knobs": {
+            "voice1": "+m7",
+            "level1": 0.45,
+            "voice2": "Off",
+            "dry": 1
+          }
+        },
+        {
+          "type": "mod.vibrato",
+          "spot": 3,
+          "on": true,
+          "knobs": {
+            "rate": 4,
+            "depth": 0.3
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 5,
+          "on": true,
+          "knobs": {
+            "time": 450,
+            "repeats": 0.35,
+            "mix": 0.22
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "engine/Chain.h"
+#include "engine/Presets.h"
 
 /**
     The board is a list of up to maxSlots pedals. Slot i always holds the i-th
@@ -66,10 +67,16 @@ public:
     static juce::String onParamId (int slot)               { return "s" + juce::String (slot) + "_on"; }
     static juce::String knobParamId (int slot, int knob)   { return "s" + juce::String (slot) + "_p" + juce::String (knob); }
 
-    // Presets are plain state files.
+    // User presets are plain state files. Loading one (or a factory preset) changes the
+    // board, amp and cab but leaves the input, input gain and master where the player set them.
     static juce::File presetFolder();
     bool savePreset (const juce::File&);
     bool loadPreset (const juce::File&);
+
+    // Factory presets ship inside the app (presets/*.json), in genre order.
+    static const std::vector<woodshed::Preset>& factoryPresets();
+    static const juce::StringArray& factoryGenres();
+    void loadFactoryPreset (const woodshed::Preset&);
 
     juce::AudioProcessorValueTreeState params;
 
@@ -101,6 +108,7 @@ private:
     void rebuildChain();
     void resetSlotValues (int slot, const juce::String& type);
     void holdAllKnobs();
+    void replaceStateKeepingLevels (const juce::ValueTree&);
 
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeRedirected (juce::ValueTree&) override;
