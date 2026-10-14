@@ -651,7 +651,7 @@ private:
 };
 
 //==============================================================================
-// UNDERTOW: modulated delay. The repeats drift in pitch like a slow chorus and smear further each pass.
+// RIPTIDE: modulated delay. The repeats drift in pitch like a slow chorus and smear further each pass.
 class ModulatedDelay final : public Pedal
 {
 public:
@@ -716,7 +716,7 @@ private:
 };
 
 //==============================================================================
-// CRUMBLE: lo-fi delay. Every pass is band-limited, sample-rate reduced and bit-truncated (no added noise).
+// CORRODE: lo-fi delay. Every pass is band-limited, sample-rate reduced and bit-truncated (no added noise).
 class LoFiDelay final : public Pedal
 {
 public:
@@ -811,7 +811,7 @@ private:
 };
 
 //==============================================================================
-// HUSH: ducking delay. Repeats stay tucked under while you play and bloom when you stop.
+// SHADOW: ducking delay. Repeats stay tucked under while you play and bloom when you stop.
 class DuckingDelay final : public Pedal
 {
 public:
@@ -940,7 +940,7 @@ void registerDelayPedals (Registry& r)
                          knob ("grit", "Grit", 0.0f, 1.0f, 0.3f, "%"),
                          knob ("spill", "Spill", 0.0f, 0.4f, 0.05f, "%") } });
 
-    r.add<ModulatedDelay> ({ "delay.modulated", "UNDERTOW", "modulated delay", "Delay",
+    r.add<ModulatedDelay> ({ "delay.modulated", "RIPTIDE", "modulated delay", "Delay",
                              "Repeats that sway in pitch like a slow, seasick chorus",
                              juce::Colour (0xff1f6f78), juce::Colour (0xffdff5f2),
                              { knob ("time", "Time", 40.0f, 1200.0f, 420.0f, "ms", 0.6f),
@@ -950,7 +950,7 @@ void registerDelayPedals (Registry& r)
                                knob ("depth", "Depth", 0.0f, 1.0f, 0.45f, "%"),
                                knob ("tone", "Tone", 1000.0f, 12000.0f, 4500.0f, "Hz", 0.5f) } });
 
-    r.add<LoFiDelay> ({ "delay.lofi", "CRUMBLE", "lo-fi delay", "Delay",
+    r.add<LoFiDelay> ({ "delay.lofi", "CORRODE", "lo-fi delay", "Delay",
                         "Crunchy, narrow repeats that wear away a little more each time",
                         juce::Colour (0xffe6a3a3), juce::Colour (0xff3b1d1d),
                         { knob ("time", "Time", 40.0f, 1500.0f, 380.0f, "ms", 0.5f),
@@ -961,7 +961,7 @@ void registerDelayPedals (Registry& r)
                           knob ("band", "Band", 0.0f, 1.0f, 0.4f, "%"),
                           knob ("warble", "Warble", 0.0f, 1.0f, 0.25f, "%") } });
 
-    r.add<DuckingDelay> ({ "delay.ducking", "HUSH", "ducking delay", "Delay",
+    r.add<DuckingDelay> ({ "delay.ducking", "SHADOW", "ducking delay", "Delay",
                            "Repeats step aside while you play and bloom when you stop",
                            juce::Colour (0xff2c2f3a), juce::Colour (0xff9fe0c8),
                            { knob ("time", "Time", 40.0f, 1500.0f, 450.0f, "ms", 0.5f),
