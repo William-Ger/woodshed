@@ -76,7 +76,7 @@ void BoardLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     }
 
     // The rendered knob, sized so its skirt sits just inside the scale.
-    const float skirt = radius * 0.82f;
+    const float skirt = radius * 0.9f;
     const float imageSize = skirt / art.knobSkirt;
     g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
     g.drawImage (art.knob, juce::Rectangle<float> (imageSize, imageSize).withCentre (centre));
@@ -211,8 +211,8 @@ PedalView::PedalView (WoodshedProcessor& p, int s, const juce::String& t, bool c
         const int position = slot;
         juce::MessageManager::callAsync ([&proc, position] { proc.removePedal (position); });
     };
-    removeButton.setColour (juce::TextButton::buttonColourId, juce::Colours::black.withAlpha (0.25f));
-    removeButton.setColour (juce::TextButton::textColourOffId, juce::Colours::white.withAlpha (0.6f));
+    removeButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2a2724));
+    removeButton.setColour (juce::TextButton::textColourOffId, juce::Colours::white.withAlpha (0.85f));
     addChildComponent (removeButton);
     removeButton.setVisible (draggable);
 
@@ -343,7 +343,8 @@ void PedalView::paint (juce::Graphics& g)
 void PedalView::resized()
 {
     const auto body = bodyArea().toNearestInt();
-    removeButton.setBounds (body.getRight() - 26, body.getY() + 8, 18, 18);
+    // Hangs off the enclosure's top-right corner, clear of the knobs.
+    removeButton.setBounds (body.getRight() - 9, body.getY() - 9, 18, 18);
 
     if (type == nullptr)
         return;
@@ -732,9 +733,11 @@ void RigStack::resized()
     chooseAmp.setBounds (ampBody.toNearestInt().withSizeKeepingCentre (130, 32));
     chooseCab.setBounds (cabBody.toNearestInt().withSizeKeepingCentre (130, 32));
 
-    auto changeButton = [] (juce::Rectangle<float> grille) { return juce::Rectangle<float> (64.0f, 22.0f).withCentre ({ grille.getX() + 82.0f, grille.getCentreY() }).toNearestInt(); };
-    swapAmp.setBounds (changeButton (Art::regionIn (Art::imageBoundsFor (ampBody, art.ampRect), art.ampGrille)));
-    swapCab.setBounds (changeButton (Art::regionIn (Art::imageBoundsFor (cabBody, art.cabRect), art.cabGrille)));
+    // Small tabs sitting on the top edge of each box, out of the way of the controls and name.
+    auto changeButton = [] (juce::Rectangle<float> box) { return juce::Rectangle<float> (60.0f, 20.0f).withCentre ({ box.getRight() - 58.0f, box.getY() - 2.0f }).toNearestInt(); };
+    swapAmp.setBounds (changeButton (ampBody));
+    const auto cabGrille = Art::regionIn (Art::imageBoundsFor (cabBody, art.cabRect), art.cabGrille);
+    swapCab.setBounds (juce::Rectangle<float> (60.0f, 20.0f).withCentre ({ cabGrille.getRight() - 96.0f, cabGrille.getBottom() - 18.0f }).toNearestInt());
     swapAmp.toFront (false);
     swapCab.toFront (false);
 }
