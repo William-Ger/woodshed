@@ -3,7 +3,7 @@
   "presets": [
     {
       "name": "Breakwall Bounce",
-      "description": "Early-2000s nu-metal wall: a hard gate for the stop-start riffs, a tight boost into a modern high-gain channel, and a wide double-track so it sounds like two guitars. Stomp 3 to go mono, 4 for a lead echo.",
+      "description": "Early-2000s nu-metal wall: a hard gate for the stop-start riffs and a tight boost into a modern high-gain channel, bone dry so every chug lands exactly when you pick. Stomp 3 for a lead echo.",
       "amp": {
         "type": "amp.fortress",
         "knobs": {
@@ -50,19 +50,6 @@
           }
         },
         {
-          "type": "mod.doubler",
-          "spot": 5,
-          "on": true,
-          "knobs": {
-            "time": 14,
-            "drift": 0.3,
-            "width": 0.9,
-            "tone": 7000,
-            "mix": 0.6,
-            "mode": "Double"
-          }
-        },
-        {
           "type": "delay.digital",
           "spot": 8,
           "on": false,
@@ -71,15 +58,6 @@
             "repeats": 0.3,
             "mix": 0.18,
             "tone": 5000
-          }
-        },
-        {
-          "type": "reverb.room",
-          "spot": 9,
-          "on": true,
-          "knobs": {
-            "size": 0.3,
-            "mix": 0.06
           }
         }
       ]
