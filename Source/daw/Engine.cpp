@@ -522,7 +522,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         tp.armed = (bool) t[ids::arm];
         tp.monitor = (bool) t[ids::monitor];
         tp.rigOn = (bool) t.getProperty (ids::rigOn, true);
-        tp.input = (int) t.getProperty (ids::input, 1);
+        tp.input = (int) t.getProperty (ids::input, 0);
 
         for (auto r : t)
         {

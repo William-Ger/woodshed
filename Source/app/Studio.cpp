@@ -261,6 +261,24 @@ void Studio::selectTrack (int trackId)
 {
     if (trackId == getSelectedTrackId())
         return;
+
+    // Record-arm follows the selection when only the previously selected track was armed,
+    // so recording track after track never leaves an old track armed by accident.
+    if (! engineInstance->isRecording())
+    {
+        auto previous = getSelectedTrack();
+        auto next = currentProject->trackById (trackId);
+        int armed = 0;
+        for (auto t : currentProject->state)
+            armed += t.hasType (daw::ids::TRACK) && (bool) t[daw::ids::arm] ? 1 : 0;
+
+        if (armed == 1 && previous.isValid() && (bool) previous[daw::ids::arm] && next.isValid())
+        {
+            previous.setProperty (daw::ids::arm, false, nullptr);
+            next.setProperty (daw::ids::arm, true, nullptr);
+        }
+    }
+
     currentProject->state.setProperty (daw::ids::selectedTrack, trackId, nullptr);
     sendChangeMessage();
 }

@@ -160,7 +160,7 @@ juce::ValueTree Project::addTrack (const juce::String& name, int insertIndex)
     t.setProperty (ids::solo, false, nullptr);
     t.setProperty (ids::arm, false, nullptr);
     t.setProperty (ids::monitor, false, nullptr);
-    t.setProperty (ids::input, 1, nullptr);     // Scarlett Solo: the instrument jack is input 2
+    t.setProperty (ids::input, 0, nullptr);     // interface input 1, where William's guitar is plugged in
     t.setProperty (ids::rigOn, true, nullptr);
     state.addChild (t, insertIndex, &undo);
     return t;
