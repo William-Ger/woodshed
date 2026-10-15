@@ -17,7 +17,8 @@ namespace woodshed::daw
              mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool)
         RIG     state (XML string of the track's rig: its board, amp, cab and knobs)
         REGION  id (int, unique), name, file (path relative to the project folder),
-                start (timeline sample), offset (sample in the file), length (samples), gain (dB)
+                start (timeline sample), offset (sample in the file), length (samples), gain (dB),
+                fadeIn, fadeOut (samples; equal-power, so overlapping fades cross-fade)
 
     All positions and lengths are in samples at the project sample rate.
 */
@@ -31,6 +32,7 @@ namespace ids
     WOODSHED_ID (id) WOODSHED_ID (colour) WOODSHED_ID (volume) WOODSHED_ID (pan) WOODSHED_ID (mute) WOODSHED_ID (solo)
     WOODSHED_ID (arm) WOODSHED_ID (monitor) WOODSHED_ID (input) WOODSHED_ID (rigOn) WOODSHED_ID (state)
     WOODSHED_ID (file) WOODSHED_ID (start) WOODSHED_ID (offset) WOODSHED_ID (length) WOODSHED_ID (gain)
+    WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut)
 #undef WOODSHED_ID
 }
 

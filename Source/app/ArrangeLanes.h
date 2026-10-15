@@ -14,7 +14,8 @@ namespace woodshed::app::arrange
 /**
     The track lanes: grid, regions with their waveforms, the loop range, the playhead and takes
     being recorded. Click / shift-click / rubber-band to select; drag to move (across tracks too),
-    drag an edge to trim, Alt-drag to copy. Snaps to beats unless Cmd is held. Audio files dropped
+    drag an edge to trim, Alt-drag to copy, drag a top corner to fade in or out (as Logic does).
+    Snaps to beats unless Cmd is held. Audio files dropped
     from the desktop are copied into the project and placed where they land.
 */
 class Lanes final : public juce::Component,
@@ -44,8 +45,8 @@ public:
     bool isDragging() const                                 { return gesture != Gesture::none; }
 
 private:
-    enum class Part { none, body, leftEdge, rightEdge };
-    enum class Gesture { none, pendingRegion, move, trimLeft, trimRight, pendingEmpty, rubber };
+    enum class Part { none, body, leftEdge, rightEdge, fadeIn, fadeOut };
+    enum class Gesture { none, pendingRegion, move, trimLeft, trimRight, fadeIn, fadeOut, pendingEmpty, rubber };
 
     struct Hit
     {
@@ -57,13 +58,18 @@ private:
     struct RegionLook
     {
         juce::int64 start = 0, offset = 0, length = 0;
+        juce::int64 fadeIn = 0, fadeOut = 0;
         bool selected = false, ghost = false, muted = false;
     };
+
+    /** The fades as stored, fitted to `length` the way the engine fits them. */
+    static void fitFades (juce::int64 length, juce::int64& fadeIn, juce::int64& fadeOut);
 
     Hit regionAt (juce::Point<int>) const;
     juce::Rectangle<float> regionRect (int trackIndex, juce::int64 start, juce::int64 length) const;
     void drawGrid (juce::Graphics&, int contentBottom) const;
     void drawRegion (juce::Graphics&, const juce::ValueTree& region, int trackIndex, const RegionLook&);
+    void drawFades (juce::Graphics&, juce::Rectangle<float> rect, juce::Rectangle<float> wave, const RegionLook&) const;
     void drawTakes (juce::Graphics&);
     void drawHint (juce::Graphics&, int contentBottom) const;
     void showRegionMenu();
@@ -72,6 +78,8 @@ private:
     juce::int64 minimumLength() const;
     void commitMove (bool copy);
     void commitTrim();
+    void commitFade();
+    void removeFadesFromSelection();
     void updateRubberBand (const juce::MouseEvent&);
     void dropTarget (int x, int y);
 
@@ -86,7 +94,7 @@ private:
     bool shiftAtDown = false;
 
     // Live preview of the gesture; committed on mouse up as one undo step.
-    juce::int64 moveDelta = 0, trimStart = 0, trimOffset = 0, trimLength = 0;
+    juce::int64 moveDelta = 0, trimStart = 0, trimOffset = 0, trimLength = 0, fadeLength = 0;
     int trackDelta = 0;
     bool copying = false;
 

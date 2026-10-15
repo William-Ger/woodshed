@@ -45,6 +45,7 @@ struct RegionPlayback
 {
     AudioPool::Audio audio;
     juce::int64 start = 0, offset = 0, length = 0;
+    juce::int64 fadeIn = 0, fadeOut = 0;    // at least the de-click edge, together at most `length`
     float gain = 1.0f;
 };
 

@@ -214,8 +214,10 @@ juce::ValueTree Project::splitRegion (juce::ValueTree region, juce::int64 at)
     right.setProperty (ids::start, at, nullptr);
     right.setProperty (ids::offset, (juce::int64) region[ids::offset] + (at - start), nullptr);
     right.setProperty (ids::length, start + length - at, nullptr);
-
+    right.removeProperty (ids::fadeIn, nullptr);        // the cut is a butt splice: each half
+                                                        // keeps only its outer fade
     region.setProperty (ids::length, at - start, &undo);
+    region.removeProperty (ids::fadeOut, &undo);
     region.getParent().addChild (right, region.getParent().indexOf (region) + 1, &undo);
     return right;
 }

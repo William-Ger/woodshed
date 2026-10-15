@@ -116,6 +116,69 @@ int runProjectTest()
         check (a.getNumChildren() == 1 && (juce::int64) a.getChild (0)[ids::length] == 6000, "undo puts the region back whole");
     }
 
+    std::cout << "fades\n";
+    {
+        // A steady 0.5 tone (DC) region, so the gain envelope is the output.
+        juce::AudioBuffer<float> dc (1, 20000);
+        for (int i = 0; i < dc.getNumSamples(); ++i)
+            dc.setSample (0, i, 0.5f);
+        const auto file = project->audioFolder().getChildFile ("dc.wav");
+        file.deleteFile();
+        {
+            std::unique_ptr<juce::OutputStream> stream (file.createOutputStream());
+            juce::WavAudioFormat wav;
+            auto writer = wav.createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (rate).withNumChannels (1).withBitsPerSample (24));
+            writer->writeFromAudioSampleBuffer (dc, 0, dc.getNumSamples());
+        }
+
+        auto f = project->addTrack ("Fades");
+        f.setProperty (ids::rigOn, false, nullptr);
+        a.setProperty (ids::mute, true, nullptr);
+        auto region = project->addRegion (f, "Audio/dc.wav", 1000, 0, 10000, "dc");
+        region.setProperty (ids::fadeIn, 2000, nullptr);
+        region.setProperty (ids::fadeOut, 4000, nullptr);
+
+        auto r = offline (*project, pool, 12000);
+        const float halfPower = 0.5f * std::sin (juce::MathConstants<float>::pi * 0.25f);
+        check (std::abs (r.left[1000]) < 1.0e-4f, "fade-in starts from silence");
+        check (std::abs (r.left[2000] - halfPower) < 0.002f, "half way into the fade-in is at half power");
+        check (std::abs (r.left[5000] - 0.5f) < 0.002f, "full level between the fades");
+        check (std::abs (r.left[9000] - halfPower) < 0.002f, "half way through the fade-out is at half power");
+        check (std::abs (r.left[10999]) < 0.002f, "fade-out ends at silence");
+
+        region.setProperty (ids::fadeIn, 9000, nullptr);       // overlaps the fade-out: gives way to it
+        r = offline (*project, pool, 12000);
+        check (r.left[6999] > 0.49f, "an overlong fade-in stops where the fade-out begins");
+
+        // Two regions overlapping by 2000 samples with matching fades cross-fade at constant power.
+        region.setProperty (ids::fadeIn, 0, nullptr);
+        region.setProperty (ids::fadeOut, 2000, nullptr);
+        auto g = project->addTrack ("Fades 2");
+        g.setProperty (ids::rigOn, false, nullptr);
+        project->addRegion (g, "Audio/dc.wav", 9000, 0, 3000, "dc 2").setProperty (ids::fadeIn, 2000, nullptr);
+        r = offline (*project, pool, 12000);
+        float worst = 0.0f;
+        for (int i = 9000; i < 11000; ++i)
+        {
+            // Equal power: the squares of the two gains sum to one.
+            const float out = std::sin ((float) (11000 - 1 - i) / 2000.0f * juce::MathConstants<float>::halfPi);
+            const float in = std::sin ((float) (i - 9000) / 2000.0f * juce::MathConstants<float>::halfPi);
+            worst = juce::jmax (worst, std::abs (r.left[(size_t) i] - 0.5f * (out + in)));
+        }
+        check (worst < 0.002f && r.left[10000] > 0.5f, "cross-fade follows both equal-power curves");
+
+        project->undo.beginNewTransaction ("Split");
+        auto right = project->splitRegion (region, 5000);
+        check (! region.hasProperty (ids::fadeOut) && ! right.hasProperty (ids::fadeIn)
+                 && (int) right[ids::fadeOut] == 2000, "a split keeps only each half's outer fade");
+        project->undo.undo();
+        check ((int) region[ids::fadeOut] == 2000, "undoing the split brings the fade-out back");
+
+        project->removeTrack (g);
+        project->removeTrack (f);
+        a.setProperty (ids::mute, false, nullptr);
+    }
+
     std::cout << "pan, mute, solo\n";
     {
         a.setProperty (ids::pan, -1.0, nullptr);

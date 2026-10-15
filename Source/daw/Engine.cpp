@@ -11,6 +11,18 @@ constexpr int bounceBlock = 512;
 
 float dbToGain (double db)                     { return db <= -96.0 ? 0.0f : juce::Decibels::decibelsToGain ((float) db); }
 
+/** Equal-power: a fade-out over a fade-in of the same length keeps the level steady. */
+float fadeCurve (float x)                      { return std::sin (juce::jlimit (0.0f, 1.0f, x) * juce::MathConstants<float>::halfPi); }
+
+/** A region's fades as played: never shorter than the de-click edge, and the two together never
+    longer than the region (a fade-in that would overlap the fade-out gives way to it). */
+void clampFades (juce::int64 length, juce::int64 wantIn, juce::int64 wantOut, juce::int64& in, juce::int64& out)
+{
+    const auto edge = juce::jmin ((juce::int64) edgeFadeSamples, length / 2);
+    out = juce::jlimit (edge, juce::jmax (edge, length - edge), wantOut);
+    in = juce::jlimit (edge, juce::jmax (edge, length - out), wantIn);
+}
+
 void restoreRig (juce::AudioProcessor& rig, const juce::ValueTree& track)
 {
     const auto encoded = track.getChildWithName (ids::RIG)[ids::state].toString();
@@ -117,8 +129,8 @@ void Mixer::render (const Snapshot& snap, const Block& b)
                     const auto intoRegion = t - r.start;
                     const auto fromEnd = r.start + r.length - 1 - t;
                     float g = r.gain;
-                    if (intoRegion < edgeFadeSamples) g *= (float) intoRegion / edgeFadeSamples;
-                    if (fromEnd < edgeFadeSamples)    g *= (float) fromEnd / edgeFadeSamples;
+                    if (intoRegion < r.fadeIn) g *= fadeCurve ((float) intoRegion / (float) r.fadeIn);
+                    if (fromEnd < r.fadeOut)   g *= fadeCurve ((float) fromEnd / (float) r.fadeOut);
                     a[t - b.position] += src[r.offset + intoRegion] * g;
                 }
             }
@@ -540,6 +552,8 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
             rp.offset = juce::jlimit ((juce::int64) 0, (juce::int64) rp.audio->getNumSamples(), (juce::int64) r[ids::offset]);
             rp.length = juce::jmin ((juce::int64) r[ids::length], (juce::int64) rp.audio->getNumSamples() - rp.offset);
             rp.gain = dbToGain ((double) r.getProperty (ids::gain, 0.0));
+            clampFades (rp.length, (juce::int64) r.getProperty (ids::fadeIn, 0), (juce::int64) r.getProperty (ids::fadeOut, 0),
+                        rp.fadeIn, rp.fadeOut);
             if (rp.length > 0)
                 tp.regions.push_back (std::move (rp));
         }
