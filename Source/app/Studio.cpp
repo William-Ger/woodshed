@@ -161,6 +161,49 @@ void Studio::changeListenerCallback (juce::ChangeBroadcaster*)
         flash ("Switched to " + wanted.outputDeviceName);
 }
 
+void Studio::checkAudioAlive()
+{
+    if (retryTicks > 0)
+    {
+        --retryTicks;
+        return;
+    }
+
+    const auto count = engineInstance->getCallbackCount();
+    auto* device = deviceManager.getCurrentAudioDevice();
+    const bool stalled = device == nullptr || count == lastCallbackCount;
+    lastCallbackCount = count;
+    silentTicks = stalled && ! switchingDevice ? silentTicks + 1 : 0;
+    if (silentTicks < 10)           // a second with no audio callbacks
+        return;
+
+    silentTicks = 0;
+    retryTicks = 20;                // then give it two seconds before trying again
+
+    // Go back to the chosen interface if it's there, else reopen whatever was open.
+    bool known = false;
+    auto setup = deviceManager.getAudioDeviceSetup();
+    const auto wanted = wantedSetup (known);
+    if (known && deviceAvailable (deviceManager, wanted.outputDeviceName, false)
+              && deviceAvailable (deviceManager, wanted.inputDeviceName, true))
+    {
+        setup.outputDeviceName = wanted.outputDeviceName;
+        setup.inputDeviceName = wanted.inputDeviceName;
+        setup.sampleRate = wanted.sampleRate;
+        setup.bufferSize = wanted.bufferSize;
+        setup.useDefaultInputChannels = setup.useDefaultOutputChannels = true;
+    }
+    else if (setup.outputDeviceName.isEmpty() || ! deviceAvailable (deviceManager, setup.outputDeviceName, false))
+    {
+        return;                     // nothing to reopen yet; the device-list listener takes it from here
+    }
+
+    const juce::ScopedValueSetter<bool> guard (switchingDevice, true);
+    deviceManager.closeAudioDevice();
+    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+    flash (error.isEmpty() ? "Reconnected to " + setup.outputDeviceName : "Audio interface: " + error);
+}
+
 void Studio::saveAudioSettings()
 {
     if (auto xml = deviceManager.createStateXml())
@@ -568,6 +611,8 @@ void Studio::flash (const juce::String& message)
 
 void Studio::timerCallback()
 {
+    checkAudioAlive();
+
     if (flashTicks > 0 && --flashTicks == 0)
     {
         flashText = {};

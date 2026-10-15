@@ -146,6 +146,8 @@ public:
     double getSampleRate() const                            { return sampleRate; }
     int getBlockSize() const                                { return blockSize; }
     int getRecordLatencySamples() const;
+    /** Audio callbacks so far: if this stops moving while a device is open, the device has died. */
+    juce::uint64 getCallbackCount() const                   { return callbackCount.load(); }
 
     // Bounce: renders [start, end) plus a tail with fresh copies of every rig, on a background
     // thread. `done` is called on the message thread.
