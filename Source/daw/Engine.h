@@ -29,6 +29,47 @@ private:
 using RigFactory = std::function<std::unique_ptr<juce::AudioProcessor>()>;
 
 //==============================================================================
+/** The waveform of a take while it records: one peak per `hop` samples, written by the audio
+    thread and read by the arrange view. Preallocated, so the audio thread never allocates. */
+struct LivePeaks
+{
+    static constexpr int hop = 256;
+
+    explicit LivePeaks (double sampleRate, double maxMinutes = 60.0)
+        : peaks ((size_t) juce::jmax (1.0, sampleRate * 60.0 * maxMinutes / hop), 0.0f) {}
+
+    /** Audio thread. */
+    void add (const float* data, int n) noexcept
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            pending = juce::jmax (pending, std::abs (data[i]));
+            if (++inHop == hop)
+            {
+                const auto c = count.load (std::memory_order_relaxed);
+                if (c < (int) peaks.size())
+                {
+                    peaks[(size_t) c] = pending;
+                    count.store (c + 1, std::memory_order_release);
+                }
+                pending = 0.0f;
+                inHop = 0;
+            }
+        }
+    }
+
+    /** Message thread: how many peaks are ready to read. */
+    int size() const noexcept                       { return count.load (std::memory_order_acquire); }
+    float operator[] (int i) const noexcept         { return peaks[(size_t) i]; }
+
+private:
+    std::vector<float> peaks;
+    std::atomic<int> count { 0 };
+    float pending = 0.0f;
+    int inHop = 0;
+};
+
+//==============================================================================
 /** Per-track state that lives as long as the track does, shared by successive snapshots. */
 struct TrackRuntime
 {
@@ -39,6 +80,7 @@ struct TrackRuntime
     std::atomic<float> peakLeft { 0.0f }, peakRight { 0.0f };          // audio thread accumulates
     float shownLeft = 0.0f, shownRight = 0.0f;                          // message thread: last 30 Hz frame
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> recorder { nullptr };
+    std::atomic<LivePeaks*> livePeaks { nullptr };                      // set together with recorder
 };
 
 struct RegionPlayback
@@ -124,6 +166,12 @@ public:
     /** Where the current (or last) recording starts on the timeline, and how much it has so far. */
     juce::int64 getRecordStart() const                      { return recordStart.load(); }
     juce::int64 getRecordedLength() const                   { return recordedSamples.load(); }
+    /** The waveform recorded so far on this track, while recording (else null). Message thread;
+        don't keep the pointer past the current call. Peak i covers the recording's samples
+        [i * hop, (i + 1) * hop), counted from getRecordStart(). */
+    const LivePeaks* getLivePeaks (int trackId) const;
+    /** Where the take being recorded will land once latency is taken out (see placeRecording). */
+    juce::int64 getLiveTakeOffset() const                   { return latencyAtRecord; }
     juce::int64 getPosition() const                         { return position.load(); }
     void setPosition (juce::int64);
 
@@ -217,7 +265,8 @@ private:
     std::atomic<juce::uint64> callbackCount { 0 };
 
     // Recording bookkeeping (message thread).
-    struct Take { int trackId; juce::File file; std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer; juce::int64 samples = 0; };
+    struct Take { int trackId; juce::File file; std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer;
+                  std::unique_ptr<LivePeaks> peaks; juce::int64 samples = 0; };
     std::vector<Take> takes;
     std::atomic<juce::int64> recordedSamples { 0 };
     juce::uint64 stopRequestedAt = 0;
