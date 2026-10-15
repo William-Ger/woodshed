@@ -474,6 +474,83 @@ void Studio::splitSelectedAtPlayhead()
         setSelectedRegions (rights);
 }
 
+void Studio::copySelectedRegions()
+{
+    if (! selectedRegions.isEmpty())
+        clipboard = currentProject->copyRegions (selectedRegions);
+}
+
+void Studio::cutSelectedRegions()
+{
+    if (selectedRegions.isEmpty())
+        return;
+    copySelectedRegions();
+    currentProject->undo.beginNewTransaction ("Cut");
+    for (int id : selectedRegions)
+        if (auto r = findRegion (id); r.isValid())
+            r.getParent().removeChild (r, &currentProject->undo);
+    setSelectedRegions ({});
+}
+
+void Studio::paste()
+{
+    auto& p = *currentProject;
+    if (! canPaste())
+        return;
+    if (p.numTracks() == 0)
+        addTrack();
+
+    const auto selected = getSelectedTrack();
+    const int firstTrack = selected.isValid() ? p.trackList().indexOf (selected) : 0;
+    p.undo.beginNewTransaction ("Paste");
+    setSelectedRegions (p.pasteRegions (clipboard, engineInstance->getPosition(), juce::jmax (0, firstTrack)));
+}
+
+void Studio::repeatSelectedRegions()
+{
+    if (selectedRegions.isEmpty())
+        return;
+    currentProject->undo.beginNewTransaction ("Repeat");
+    setSelectedRegions (currentProject->repeatRegions (selectedRegions));
+}
+
+void Studio::nudgeSelectedRegions (int direction)
+{
+    if (selectedRegions.isEmpty())
+        return;
+    const auto grid = currentProject->grid();
+    const auto step = (juce::int64) std::llround (grid.samplesPerBeat() * grid.beatUnit / 16.0);   // a 16th note in any meter
+    currentProject->undo.beginNewTransaction ("Nudge");
+    currentProject->nudgeRegions (selectedRegions, step * direction);
+}
+
+void Studio::toggleMuteSelectedRegions()
+{
+    juce::Array<juce::ValueTree> regions;
+    bool allMuted = true;
+    for (int id : selectedRegions)
+        if (auto r = findRegion (id); r.isValid())
+        {
+            regions.add (r);
+            allMuted = allMuted && (bool) r[daw::ids::mute];
+        }
+    if (regions.isEmpty())
+        return;
+
+    currentProject->undo.beginNewTransaction (allMuted ? "Unmute Regions" : "Mute Regions");
+    for (auto& r : regions)
+    {
+        if (allMuted) r.removeProperty (daw::ids::mute, &currentProject->undo);
+        else          r.setProperty (daw::ids::mute, true, &currentProject->undo);
+    }
+}
+
+void Studio::toggleSelectedTrack (const juce::Identifier& property)
+{
+    if (auto t = getSelectedTrack(); t.isValid())
+        t.setProperty (property, ! (bool) t[property], nullptr);
+}
+
 void Studio::setPane (Pane p)
 {
     if (pane == p)

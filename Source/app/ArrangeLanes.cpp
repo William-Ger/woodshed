@@ -179,7 +179,7 @@ void Lanes::paint (juce::Graphics& g)
             look.fadeIn = (juce::int64) r.getProperty (ids::fadeIn, 0);
             look.fadeOut = (juce::int64) r.getProperty (ids::fadeOut, 0);
             look.selected = selected.contains ((int) r[ids::id]);
-            look.muted = muted;
+            look.muted = muted || (bool) r[ids::mute];
 
             if (moving && look.selected)
             {
@@ -217,7 +217,7 @@ void Lanes::paint (juce::Graphics& g)
                     look.fadeIn = (juce::int64) r.getProperty (ids::fadeIn, 0);
                     look.fadeOut = (juce::int64) r.getProperty (ids::fadeOut, 0);
                     look.selected = true;
-                    look.muted = (bool) p.track (target)[ids::mute];
+                    look.muted = (bool) p.track (target)[ids::mute] || (bool) r[ids::mute];
                     drawRegion (g, r, target, look);
                 }
     }
@@ -608,7 +608,14 @@ void Lanes::mouseDown (const juce::MouseEvent& e)
     if (! hit.region.isValid())
     {
         if (e.mods.isPopupMenu())
+        {
+            studio.setSelectedRegions ({});
+            juce::PopupMenu m;
+            m.addItem ("Paste", studio.canPaste(), false, [&studio] { studio.paste(); });
+            m.addItem ("Create Marker", [&studio] { studio.commands.invokeDirectly (cmd::createMarker, false); });
+            m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
             return;
+        }
         gesture = Gesture::pendingEmpty;
         selectionAtDown = shiftAtDown ? studio.getSelectedRegions() : juce::Array<int>();
         if (! shiftAtDown)
@@ -901,7 +908,13 @@ void Lanes::showRegionMenu()
 {
     auto& studio = view.studio;
     juce::PopupMenu m;
+    m.addItem ("Cut", [&studio] { studio.cutSelectedRegions(); });
+    m.addItem ("Copy", [&studio] { studio.copySelectedRegions(); });
+    m.addItem ("Paste", studio.canPaste(), false, [&studio] { studio.paste(); });
+    m.addSeparator();
     m.addItem ("Split at Playhead", [&studio] { studio.splitSelectedAtPlayhead(); });
+    m.addItem ("Repeat", [&studio] { studio.repeatSelectedRegions(); });
+    m.addItem ("Mute / Unmute", [&studio] { studio.toggleMuteSelectedRegions(); });
     m.addItem ("Loop These Regions", [&studio] { studio.commands.invokeDirectly (cmd::loopToSelection, false); });
     m.addItem ("Remove Fades", [this] { removeFadesFromSelection(); });
     m.addSeparator();

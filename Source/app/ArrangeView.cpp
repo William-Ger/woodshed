@@ -188,6 +188,16 @@ void ArrangeView::paint (juce::Graphics& g)
     g.setColour (theme::bar);
     g.fillRect (corner);
 
+    // The marker row's name, level with the marker lane at the bottom of the ruler.
+    auto markerRow = corner.removeFromBottom (arrange::Ruler::markerHeight);
+    g.setColour (theme::panel);
+    g.fillRect (markerRow);
+    g.setColour (theme::separator.withAlpha (0.6f));
+    g.fillRect (markerRow.getX(), markerRow.getY(), markerRow.getWidth(), 1);
+    g.setColour (theme::dimText);
+    g.setFont (theme::font (11.0f, theme::Weight::medium));
+    g.drawText ("Marker", markerRow.withTrimmedLeft (14), juce::Justification::centredLeft);
+
     auto label = corner.withTrimmedLeft (14).withTrimmedRight (40);
     g.setColour (theme::text);
     g.setFont (theme::font (13.0f, theme::Weight::semibold));
@@ -221,7 +231,7 @@ void ArrangeView::resized()
 {
     auto r = getLocalBounds();
     auto left = r.removeFromLeft (headerWidth);
-    auto corner = left.removeFromTop (rulerHeight);
+    auto corner = left.removeFromTop (rulerHeight).withTrimmedBottom (arrange::Ruler::markerHeight);
     addButton.setBounds (corner.removeFromRight (36).withSizeKeepingCentre (24, 24).translated (2, 0));
     headerArea.setBounds (left.withTrimmedBottom (scrollBarSize).withTrimmedRight (1));
 

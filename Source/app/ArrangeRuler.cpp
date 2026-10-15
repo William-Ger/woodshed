@@ -6,9 +6,32 @@ namespace woodshed::app::arrange
 
 namespace ids = daw::ids;
 
+namespace
+{
+    /** Logic-like marker colours, in turn. */
+    juce::Colour markerColour (int index)
+    {
+        static const juce::uint32 colours[] { 0xff5e9cec, 0xffe8a33d, 0xff6cc17a, 0xffd96a8b, 0xff9a7be0, 0xff4fbfbf, 0xffd9d35b };
+        return juce::Colour (colours[(size_t) index % std::size (colours)]);
+    }
+}
+
 Ruler::Ruler (ArrangeView& v) : view (v)
 {
     setOpaque (true);
+
+    renameEditor.setFont (theme::font (11.0f, theme::Weight::semibold));
+    renameEditor.setColour (juce::TextEditor::backgroundColourId, theme::window);
+    renameEditor.setColour (juce::TextEditor::textColourId, theme::text);
+    renameEditor.setColour (juce::TextEditor::outlineColourId, theme::accent);
+    renameEditor.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent);
+    renameEditor.setColour (juce::TextEditor::highlightColourId, theme::accent.withAlpha (0.35f));
+    renameEditor.setColour (juce::CaretComponent::caretColourId, theme::accent);
+    renameEditor.setIndents (4, 1);
+    renameEditor.onReturnKey = [this] { finishRename (true); };
+    renameEditor.onEscapeKey = [this] { finishRename (false); };
+    renameEditor.onFocusLost = [this] { finishRename (true); };
+    addChildComponent (renameEditor);
 }
 
 void Ruler::paint (juce::Graphics& g)
@@ -20,7 +43,7 @@ void Ruler::paint (juce::Graphics& g)
     g.fillAll (theme::bar);
 
     // Loop strip: a touch darker than the numbers, with the range as a rounded band.
-    const auto strip = getLocalBounds().withTrimmedTop (numbersHeight).withTrimmedBottom (1).toFloat();
+    const auto strip = getLocalBounds().withTrimmedTop (numbersHeight).withTrimmedBottom (markerHeight + 1).toFloat();
     g.setColour (theme::panel);
     g.fillRect (strip);
 
@@ -88,8 +111,11 @@ void Ruler::paint (juce::Graphics& g)
         }
     }
 
+    drawMarkers (g, getLocalBounds().removeFromBottom (markerHeight).withTrimmedBottom (1).toFloat());
+
     g.setColour (theme::separator.withAlpha (0.6f));
     g.fillRect (0, numbersHeight, getWidth(), 1);
+    g.fillRect (0, getHeight() - markerHeight - 1, getWidth(), 1);
     g.setColour (theme::separator);
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 
@@ -106,6 +132,111 @@ void Ruler::paint (juce::Graphics& g)
     }
 }
 
+void Ruler::drawMarkers (juce::Graphics& g, juce::Rectangle<float> lane) const
+{
+    g.setColour (theme::window);
+    g.fillRect (lane);
+
+    // Each marker is a tag running to the next one (Logic's marker track), the last one sized to its name.
+    const auto markers = view.project().getMarkers();
+    const auto font = theme::font (11.0f, theme::Weight::semibold);
+    g.setFont (font);
+
+    for (size_t i = 0; i < markers.size(); ++i)
+    {
+        const auto& m = markers[i];
+        const float x = std::round (view.xForSample ((double) m.position));
+        const float nameWidth = juce::GlyphArrangement::getStringWidth (font, m.name) + 14.0f;
+        const float end = i + 1 < markers.size() ? std::round (view.xForSample ((double) markers[i + 1].position)) : x + nameWidth;
+        if (end < -2.0f || x > (float) getWidth() + 2.0f)
+            continue;
+
+        const auto colour = markerColour ((int) i);
+        const auto tag = juce::Rectangle<float> (x, lane.getY() + 2.0f, juce::jmax (2.0f, end - x - 1.0f), lane.getHeight() - 3.0f);
+        g.setColour (colour.withAlpha (m.id == grabbedMarker ? 0.55f : 0.32f));
+        g.fillRoundedRectangle (tag, 3.0f);
+        g.setColour (colour);
+        g.fillRect (tag.withWidth (2.0f));
+
+        if (m.id != renamingMarker && tag.getWidth() > 16.0f)
+        {
+            g.setColour (theme::text);
+            g.drawText (m.name, tag.withTrimmedLeft (6.0f).withTrimmedRight (3.0f), juce::Justification::centredLeft, true);
+        }
+    }
+}
+
+int Ruler::markerAt (juce::Point<int> p) const
+{
+    if (! inMarkerLane (p))
+        return 0;
+
+    const auto markers = view.project().getMarkers();
+    const auto font = theme::font (11.0f, theme::Weight::semibold);
+    for (size_t i = markers.size(); i-- > 0;)
+    {
+        const float x = view.xForSample ((double) markers[i].position);
+        const float end = i + 1 < markers.size() ? view.xForSample ((double) markers[i + 1].position)
+                                                 : x + juce::GlyphArrangement::getStringWidth (font, markers[i].name) + 14.0f;
+        if ((float) p.x >= x - 3.0f && (float) p.x < end)
+            return markers[i].id;
+    }
+    return 0;
+}
+
+void Ruler::showMarkerMenu (int markerId)
+{
+    auto& p = view.project();
+    juce::PopupMenu m;
+    m.addItem ("Rename", [this, markerId] { startRename (markerId); });
+    m.addItem ("Move Marker to Playhead", [this, markerId, &p]
+    {
+        p.undo.beginNewTransaction ("Move Marker");
+        p.moveMarker (markerId, view.studio.engine().getPosition());
+    });
+    m.addSeparator();
+    m.addItem ("Delete Marker", [markerId, &p]
+    {
+        p.undo.beginNewTransaction ("Delete Marker");
+        p.removeMarker (markerId);
+    });
+    m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+}
+
+void Ruler::startRename (int markerId)
+{
+    for (auto& m : view.project().getMarkers())
+        if (m.id == markerId)
+        {
+            renamingMarker = markerId;
+            const float x = view.xForSample ((double) m.position);
+            renameEditor.setBounds (juce::Rectangle<int> (juce::roundToInt (x), getHeight() - markerHeight, 150, markerHeight - 1));
+            renameEditor.setText (m.name, false);
+            renameEditor.setVisible (true);
+            renameEditor.grabKeyboardFocus();
+            renameEditor.selectAll();
+            repaint();
+            return;
+        }
+}
+
+void Ruler::finishRename (bool commit)
+{
+    if (renamingMarker == 0)
+        return;
+
+    const int id = std::exchange (renamingMarker, 0);
+    renameEditor.setVisible (false);
+    const auto name = renameEditor.getText().trim();
+    if (commit && name.isNotEmpty())
+    {
+        auto& p = view.project();
+        p.undo.beginNewTransaction ("Rename Marker");
+        p.renameMarker (id, name);
+    }
+    repaint();
+}
+
 void Ruler::playheadMoved (float oldX, float newX)
 {
     repaint (juce::Rectangle<int> ((int) oldX - 8, 0, 18, getHeight()));
@@ -117,6 +248,8 @@ Ruler::Mode Ruler::loopModeAt (juce::Point<int> p) const
 {
     if (p.y < numbersHeight)
         return Mode::scrub;
+    if (inMarkerLane (p))
+        return markerAt (p) != 0 ? Mode::markerDrag : Mode::markerEmpty;
 
     auto& state = view.project().state;
     const auto loopStart = (juce::int64) state[ids::loopStart];
@@ -138,10 +271,12 @@ void Ruler::mouseMove (const juce::MouseEvent& e)
     {
         case Mode::loopStart:
         case Mode::loopEnd:   setMouseCursor (juce::MouseCursor::LeftRightResizeCursor); break;
-        case Mode::loopMove:  setMouseCursor (juce::MouseCursor::PointingHandCursor); break;
+        case Mode::loopMove:
+        case Mode::markerDrag: setMouseCursor (juce::MouseCursor::PointingHandCursor); break;
         case Mode::none:
         case Mode::scrub:
         case Mode::loopCreate:
+        case Mode::markerEmpty:
         default:              setMouseCursor (juce::MouseCursor::NormalCursor); break;
     }
 }
@@ -177,6 +312,37 @@ void Ruler::mouseDown (const juce::MouseEvent& e)
 
     if (mode == Mode::scrub)
         scrubTo ((float) e.x);
+
+    if (mode == Mode::markerDrag)
+    {
+        grabbedMarker = markerAt (e.getPosition());
+        for (auto& m : view.project().getMarkers())
+            if (m.id == grabbedMarker)
+                grabbedMarkerPosition = m.position;
+
+        if (e.mods.isPopupMenu())
+        {
+            mode = Mode::none;
+            showMarkerMenu (std::exchange (grabbedMarker, 0));
+        }
+        repaint();
+    }
+}
+
+void Ruler::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    if (! inMarkerLane (e.getPosition()))
+        return;
+
+    if (const int id = markerAt (e.getPosition()); id != 0)
+    {
+        startRename (id);
+        return;
+    }
+
+    auto& p = view.project();
+    p.undo.beginNewTransaction ("Create Marker");
+    p.addMarker (view.snap (view.sampleAtX (e.x), ! e.mods.isCommandDown()));
 }
 
 void Ruler::mouseDrag (const juce::MouseEvent& e)
@@ -216,6 +382,23 @@ void Ruler::mouseDrag (const juce::MouseEvent& e)
             setLoop (originalStart, juce::jmax (at, originalStart + minLength), false);
             break;
 
+        case Mode::markerDrag:
+        {
+            if (! changed && std::abs (e.getDistanceFromDragStartX()) < 3)
+                break;
+            auto& p = view.project();
+            if (! changed)
+            {
+                p.undo.beginNewTransaction ("Move Marker");
+                changed = true;
+            }
+            // The marker itself lands on the grid (the grab offset is kept only with snapping off).
+            const auto unsnapped = (double) grabbedMarkerPosition + (view.sampleAtX (e.x) - view.sampleAtX (e.getMouseDownX()));
+            p.moveMarker (grabbedMarker, view.snap (unsnapped, snapOn));
+            break;
+        }
+
+        case Mode::markerEmpty:
         case Mode::none:
         default:
             break;
@@ -227,6 +410,12 @@ void Ruler::mouseUp (const juce::MouseEvent&)
     // A click on the range (no drag) switches looping on or off, like the C key.
     if (mode == Mode::loopMove && ! changed)
         view.studio.commands.invokeDirectly (cmd::toggleLoop, false);
+
+    // A click on a marker (no drag) takes the playhead there.
+    if (mode == Mode::markerDrag && ! changed && grabbedMarker != 0)
+        view.studio.engine().setPosition (grabbedMarkerPosition);
+    grabbedMarker = 0;
+    repaint();
 
     mode = Mode::none;
     changed = false;

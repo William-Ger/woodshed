@@ -540,7 +540,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
 
         for (auto r : t)
         {
-            if (! r.hasType (ids::REGION))
+            if (! r.hasType (ids::REGION) || (bool) r[ids::mute])
                 continue;
 
             RegionPlayback rp;
