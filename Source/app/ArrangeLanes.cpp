@@ -64,6 +64,27 @@ Lanes::Hit Lanes::regionAt (juce::Point<int> p) const
             continue;
 
         hit.region = r;
+
+        // Fade handles: in the name strip, at the end of each fade (the top corners when there's none).
+        if ((float) p.y < rect.getY() + nameBarHeight)
+        {
+            const auto length = (juce::int64) r[ids::length];
+            auto fadeIn = (juce::int64) r.getProperty (ids::fadeIn, 0), fadeOut = (juce::int64) r.getProperty (ids::fadeOut, 0);
+            fitFades (length, fadeIn, fadeOut);
+            const float pxPerSample = rect.getWidth() / (float) juce::jmax ((juce::int64) 1, length);
+            const float zone = juce::jmin (8.0f, rect.getWidth() / 4.0f);
+            const float inX = rect.getX() + (float) fadeIn * pxPerSample;
+            const float outX = rect.getRight() - (float) fadeOut * pxPerSample;
+
+            // The nearer handle wins, so a fade that reaches the far end can still be pulled back.
+            const float toIn = std::abs ((float) p.x - inX), toOut = std::abs ((float) p.x - outX);
+            if (juce::jmin (toIn, toOut) <= zone)
+            {
+                hit.part = toIn <= toOut ? Part::fadeIn : Part::fadeOut;
+                return hit;
+            }
+        }
+
         const float grab = juce::jmin (6.0f, rect.getWidth() / 4.0f);
         if ((float) p.x < rect.getX() + grab)            hit.part = Part::leftEdge;
         else if ((float) p.x > rect.getRight() - grab)   hit.part = Part::rightEdge;
@@ -71,6 +92,12 @@ Lanes::Hit Lanes::regionAt (juce::Point<int> p) const
         return hit;
     }
     return hit;
+}
+
+void Lanes::fitFades (juce::int64 length, juce::int64& fadeIn, juce::int64& fadeOut)
+{
+    fadeOut = juce::jlimit ((juce::int64) 0, juce::jmax ((juce::int64) 0, length), fadeOut);
+    fadeIn = juce::jlimit ((juce::int64) 0, juce::jmax ((juce::int64) 0, length - fadeOut), fadeIn);
 }
 
 juce::int64 Lanes::fileLengthOf (const juce::ValueTree& region)
@@ -133,6 +160,7 @@ void Lanes::paint (juce::Graphics& g)
     const auto& selected = view.studio.getSelectedRegions();
     const bool moving = gesture == Gesture::move;
     const bool trimming = gesture == Gesture::trimLeft || gesture == Gesture::trimRight;
+    const bool fading = gesture == Gesture::fadeIn || gesture == Gesture::fadeOut;
 
     for (int i = 0; i < numTracks; ++i)
     {
@@ -148,6 +176,8 @@ void Lanes::paint (juce::Graphics& g)
             look.start = (juce::int64) r[ids::start];
             look.offset = (juce::int64) r[ids::offset];
             look.length = (juce::int64) r[ids::length];
+            look.fadeIn = (juce::int64) r.getProperty (ids::fadeIn, 0);
+            look.fadeOut = (juce::int64) r.getProperty (ids::fadeOut, 0);
             look.selected = selected.contains ((int) r[ids::id]);
             look.muted = muted;
 
@@ -163,6 +193,10 @@ void Lanes::paint (juce::Graphics& g)
                 look.start = trimStart;
                 look.offset = trimOffset;
                 look.length = trimLength;
+            }
+            else if (fading && r == grabbed)
+            {
+                (gesture == Gesture::fadeIn ? look.fadeIn : look.fadeOut) = fadeLength;
             }
 
             drawRegion (g, r, i, look);
@@ -180,6 +214,8 @@ void Lanes::paint (juce::Graphics& g)
                     look.start = (juce::int64) r[ids::start] + moveDelta;
                     look.offset = (juce::int64) r[ids::offset];
                     look.length = (juce::int64) r[ids::length];
+                    look.fadeIn = (juce::int64) r.getProperty (ids::fadeIn, 0);
+                    look.fadeOut = (juce::int64) r.getProperty (ids::fadeOut, 0);
                     look.selected = true;
                     look.muted = (bool) p.track (target)[ids::mute];
                     drawRegion (g, r, target, look);
@@ -351,6 +387,8 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
                     juce::Justification::centredLeft, true);
     }
 
+    drawFades (g, rect, body.withTrimmedTop (nameBarHeight), look);
+
     // Border: crisp in the track colour; brighter when selected.
     if (look.selected)
     {
@@ -363,6 +401,59 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
     {
         g.setColour (colour.withAlpha (0.75f));
         g.drawRoundedRectangle (body.reduced (0.5f), regionRadius, 1.0f);
+    }
+}
+
+void Lanes::drawFades (juce::Graphics& g, juce::Rectangle<float> rect, juce::Rectangle<float> wave, const RegionLook& look) const
+{
+    auto fadeIn = look.fadeIn, fadeOut = look.fadeOut;
+    fitFades (look.length, fadeIn, fadeOut);
+    const float pxPerSample = rect.getWidth() / (float) juce::jmax ((juce::int64) 1, look.length);
+
+    // The faded part is shaded above the gain curve (equal-power, like the engine's).
+    const auto drawFade = [&] (float fromX, float width, bool rising)
+    {
+        if (width < 1.0f)
+            return;
+        const int steps = juce::jlimit (8, 64, juce::roundToInt (width / 3.0f));
+        juce::Path curve, shade;
+        for (int i = 0; i <= steps; ++i)
+        {
+            const float t = (float) i / (float) steps;
+            const float level = std::sin ((rising ? t : 1.0f - t) * juce::MathConstants<float>::halfPi);
+            const juce::Point<float> pt (fromX + width * t, wave.getBottom() - level * wave.getHeight());
+            if (i == 0) { curve.startNewSubPath (pt); shade.startNewSubPath (pt); }
+            else        { curve.lineTo (pt); shade.lineTo (pt); }
+        }
+        shade.lineTo (fromX + width, wave.getY());
+        shade.lineTo (fromX, wave.getY());
+        shade.closeSubPath();
+
+        g.setColour (juce::Colours::black.withAlpha (0.4f));
+        g.fillPath (shade);
+        g.setColour (juce::Colours::white.withAlpha (0.75f));
+        g.strokePath (curve, juce::PathStrokeType (1.2f));
+    };
+
+    {
+        juce::Graphics::ScopedSaveState s (g);
+        g.reduceClipRegion (wave.toNearestInt());
+        drawFade (rect.getX(), (float) fadeIn * pxPerSample, true);
+        drawFade (rect.getRight() - (float) fadeOut * pxPerSample, (float) fadeOut * pxPerSample, false);
+    }
+
+    // Handles on a selected region, in the name strip where they're grabbed.
+    if (look.selected && rect.getWidth() > 24.0f)
+    {
+        const float y = rect.getY() + nameBarHeight * 0.5f;
+        for (auto x : { rect.getX() + (float) fadeIn * pxPerSample, rect.getRight() - (float) fadeOut * pxPerSample })
+        {
+            const auto dot = juce::Rectangle<float> (7.0f, 7.0f).withCentre ({ juce::jlimit (rect.getX() + 4.0f, rect.getRight() - 4.0f, x), y });
+            g.setColour (juce::Colours::white);
+            g.fillEllipse (dot);
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            g.drawEllipse (dot, 1.0f);
+        }
     }
 }
 
@@ -493,6 +584,8 @@ void Lanes::mouseMove (const juce::MouseEvent& e)
     {
         case Part::leftEdge:  setMouseCursor (juce::MouseCursor::LeftEdgeResizeCursor); break;
         case Part::rightEdge: setMouseCursor (juce::MouseCursor::RightEdgeResizeCursor); break;
+        case Part::fadeIn:
+        case Part::fadeOut:   setMouseCursor (juce::MouseCursor::LeftRightResizeCursor); break;
         case Part::body:
         case Part::none:
         default:              setMouseCursor (juce::MouseCursor::NormalCursor); break;
@@ -585,6 +678,8 @@ void Lanes::mouseDrag (const juce::MouseEvent& e)
         }
         gesture = grabbedPart == Part::leftEdge  ? Gesture::trimLeft
                 : grabbedPart == Part::rightEdge ? Gesture::trimRight
+                : grabbedPart == Part::fadeIn    ? Gesture::fadeIn
+                : grabbedPart == Part::fadeOut   ? Gesture::fadeOut
                                                  : Gesture::move;
         view.setUserGesture (true);
         if (gesture == Gesture::move)
@@ -624,6 +719,18 @@ void Lanes::mouseDrag (const juce::MouseEvent& e)
     const auto grabEnd = grabStart + grabLength;
     const auto minLength = minimumLength();
 
+    if (gesture == Gesture::fadeIn || gesture == Gesture::fadeOut)
+    {
+        // Fades follow the mouse freely (no snapping) and stop where the other fade starts.
+        auto fadeIn = (juce::int64) grabbed.getProperty (ids::fadeIn, 0), fadeOut = (juce::int64) grabbed.getProperty (ids::fadeOut, 0);
+        fitFades (grabLength, fadeIn, fadeOut);
+        const bool in = gesture == Gesture::fadeIn;
+        const auto wanted = in ? (juce::int64) mouseSample - grabStart : grabEnd - (juce::int64) mouseSample;
+        fadeLength = juce::jlimit ((juce::int64) 0, grabLength - (in ? fadeOut : fadeIn), wanted);
+        repaint();
+        return;
+    }
+
     if (gesture == Gesture::trimLeft)
     {
         auto newStart = view.snap (mouseSample, snapOn);
@@ -655,6 +762,8 @@ void Lanes::mouseUp (const juce::MouseEvent& e)
         case Gesture::move:      commitMove (e.mods.isAltDown()); break;
         case Gesture::trimLeft:
         case Gesture::trimRight: commitTrim(); break;
+        case Gesture::fadeIn:
+        case Gesture::fadeOut:   commitFade(); break;
         case Gesture::pendingRegion:
             // A plain click on a region that was part of a bigger selection selects just it.
             if (! shiftAtDown && grabbed.isValid())
@@ -747,6 +856,32 @@ void Lanes::commitTrim()
     grabbed.setProperty (ids::length, trimLength, &p.undo);
 }
 
+void Lanes::commitFade()
+{
+    const auto& property = gesture == Gesture::fadeIn ? ids::fadeIn : ids::fadeOut;
+    if (! grabbed.isValid() || fadeLength == (juce::int64) grabbed.getProperty (property, 0))
+        return;
+
+    auto& p = view.project();
+    p.undo.beginNewTransaction (gesture == Gesture::fadeIn ? "Fade In" : "Fade Out");
+    if (fadeLength > 0) grabbed.setProperty (property, fadeLength, &p.undo);
+    else                grabbed.removeProperty (property, &p.undo);
+}
+
+void Lanes::removeFadesFromSelection()
+{
+    auto& p = view.project();
+    const auto& selected = view.studio.getSelectedRegions();
+    p.undo.beginNewTransaction ("Remove Fades");
+    for (int i = 0; i < p.numTracks(); ++i)
+        for (auto r : regionsOf (p.track (i)))
+            if (selected.contains ((int) r[ids::id]))
+            {
+                r.removeProperty (ids::fadeIn, &p.undo);
+                r.removeProperty (ids::fadeOut, &p.undo);
+            }
+}
+
 void Lanes::updateRubberBand (const juce::MouseEvent& e)
 {
     rubber = juce::Rectangle<int> (e.getMouseDownPosition(), e.getPosition());
@@ -768,6 +903,7 @@ void Lanes::showRegionMenu()
     juce::PopupMenu m;
     m.addItem ("Split at Playhead", [&studio] { studio.splitSelectedAtPlayhead(); });
     m.addItem ("Loop These Regions", [&studio] { studio.commands.invokeDirectly (cmd::loopToSelection, false); });
+    m.addItem ("Remove Fades", [this] { removeFadesFromSelection(); });
     m.addSeparator();
     m.addItem ("Delete", [&studio] { studio.deleteSelectedRegions(); });
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
