@@ -1416,7 +1416,6 @@ void WoodshedEditor::setEmbedded (bool shouldBeEmbedded)
         libraryButton.removeColour (juce::TextButton::buttonColourId);
         libraryButton.removeColour (juce::TextButton::textColourOffId);
         libraryButton.getProperties().set ("primary", true);
-        libraryButton.setButtonText ("Add Pedal");
         inputGain.removeColour (juce::Slider::rotarySliderOutlineColourId);
         inputGain.setTooltip ("Input gain (double-click for 0 dB)");
         inputMeter.setSlim (true);

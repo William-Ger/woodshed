@@ -333,7 +333,7 @@ void RigPanel::resized()
     if (w != nullptr)
     {
         auto c = w->getHostControls();
-        c.addPedal.setBounds (fit (header.removeFromRight (100)));
+        c.addPedal.setBounds (fit (header.removeFromRight (108)));
         header.removeFromRight (8);
         tunerButton.setBounds (fit (header.removeFromRight (h)));
         header.removeFromRight (12);
