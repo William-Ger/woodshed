@@ -151,8 +151,8 @@ int Project::nextId()
 
 juce::Colour Project::trackColour (int index)
 {
-    static const juce::uint32 colours[] { 0xffd9893b, 0xff4fa3c7, 0xff8bbf5a, 0xffc75b7a, 0xff9a7bd6,
-                                          0xffd6c04f, 0xff4fc7a6, 0xffd66b4f };
+    static const juce::uint32 colours[] { 0xffff9f0a, 0xff0a84ff, 0xff32d74b, 0xffff375f, 0xffbf5af2,
+                                          0xffffd60a, 0xff64d2ff, 0xffff6b3d };
     return juce::Colour (colours[(size_t) index % std::size (colours)]);
 }
 

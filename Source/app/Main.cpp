@@ -1,6 +1,8 @@
 // Woodshed: a multitrack recording studio built around the guitar rig.
 
 #include "MainComponent.h"
+#include "StudioLookAndFeel.h"
+#include "WindowStyle.h"
 
 namespace woodshed::app
 {
@@ -28,6 +30,8 @@ public:
         setResizeLimits (1100, 640, 8192, 8192);
         centreWithSize (1440, 900);
         setVisible (true);
+        useUnifiedTitleBar (*this);
+        content->resized();
         content->grabKeyboardFocus();
     }
 
@@ -67,6 +71,7 @@ public:
 
     void initialise (const juce::String&) override
     {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         studio = std::make_unique<Studio> (settings);
         window = std::make_unique<MainWindow> ("Woodshed", *studio);
     }
@@ -76,6 +81,7 @@ public:
         window = nullptr;
         studio = nullptr;      // saves the project and the audio setup
         settings.saveIfNeeded();
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }
 
     void systemRequestedQuit() override
@@ -88,6 +94,7 @@ public:
 
 private:
     juce::ApplicationProperties settings;
+    StudioLookAndFeel lookAndFeel;
     std::unique_ptr<Studio> studio;
     std::unique_ptr<MainWindow> window;
 };

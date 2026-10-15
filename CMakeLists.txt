@@ -83,9 +83,21 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/ChannelStrip.cpp
         Source/app/RigPanel.cpp
         Source/app/SettingsWindow.cpp
+        Source/app/Theme.cpp
+        Source/app/Icons.cpp
+        Source/app/StudioLookAndFeel.cpp
+        Source/app/WindowStyle_other.cpp
         ${WOODSHED_RIG_SOURCES}
         ${WOODSHED_ENGINE_SOURCES}
         ${WOODSHED_DAW_SOURCES})
+
+    if(APPLE)
+        target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
+    endif()
+
+    # The studio's typefaces: Inter and JetBrains Mono (both SIL Open Font License; see art/fonts).
+    file(GLOB WOODSHED_FONTS CONFIGURE_DEPENDS art/fonts/*.ttf)
+    juce_add_binary_data(WoodshedFonts HEADER_NAME FontData.h NAMESPACE FontData SOURCES ${WOODSHED_FONTS})
 
     target_compile_definitions(WoodshedStudio PRIVATE
         JUCE_WEB_BROWSER=0
@@ -102,6 +114,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         PRIVATE
             WoodshedArt
             WoodshedPresets
+            WoodshedFonts
             juce::juce_audio_utils
             juce::juce_dsp
         PUBLIC

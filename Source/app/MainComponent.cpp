@@ -40,7 +40,7 @@ void MainComponent::paint (juce::Graphics& g)
 void MainComponent::resized()
 {
     auto r = getLocalBounds();
-    controlBar.setBounds (r.removeFromTop (64));
+    controlBar.setBounds (r.removeFromTop (theme::toolbarHeight));
 
     if (shownPane == Studio::Pane::none)
     {
