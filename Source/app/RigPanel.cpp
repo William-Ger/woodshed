@@ -12,16 +12,35 @@ bool rigIsOn (const juce::ValueTree& track)
 {
     return (bool) track.getProperty (daw::ids::rigOn, true);
 }
+
+void makeQuiet (juce::Component& c)
+{
+    // Space must keep starting playback after a click in the header, not press the control again.
+    c.setWantsKeyboardFocus (false);
+    c.setMouseClickGrabsKeyboardFocus (false);
+}
 }
 
 RigPanel::RigPanel (Studio& s) : studio (s)
 {
-    rigSwitch.setColour (juce::ToggleButton::textColourId, theme::text);
-    rigSwitch.setColour (juce::ToggleButton::tickColourId, theme::accent);
-    rigSwitch.setColour (juce::ToggleButton::tickDisabledColourId, theme::dimText);
-    rigSwitch.setTooltip ("Run this track through its rig (off: the track plays dry)");
-    rigSwitch.onClick = [this] { setRigOn (rigSwitch.getToggleState()); };
-    addChildComponent (rigSwitch);
+    powerButton.setTooltip ("Rig on or off (off: the track plays and records dry)");
+    powerButton.onClick = [this] { setRigOn (! powerButton.lit); };
+    addChildComponent (powerButton);
+
+    tunerButton.setTooltip ("Chromatic tuner (T)");
+    tunerButton.onClick = [this]
+    {
+        if (auto* w = rigEditor())
+        {
+            w->toggleTuner();
+            tunerButton.setToggleState (w->isTunerShowing(), juce::dontSendNotification);
+        }
+        else
+        {
+            showTuner();
+        }
+    };
+    addChildComponent (tunerButton);
 
     inputChoice.setTooltip ("The interface input this track records and monitors");
     inputChoice.setWantsKeyboardFocus (false);
@@ -38,17 +57,13 @@ RigPanel::RigPanel (Studio& s) : studio (s)
     };
     addChildComponent (inputChoice);
 
-    turnOnButton.setColour (juce::TextButton::buttonColourId, theme::accent);
-    turnOnButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xff1a1410));
+    turnOnButton.getProperties().set ("primary", true);
     turnOnButton.onClick = [this] { setRigOn (true); };
     addChildComponent (turnOnButton);
 
-    // Space must keep starting playback after a click here, not press the button again.
-    for (juce::Component* c : { (juce::Component*) &rigSwitch, (juce::Component*) &turnOnButton })
-    {
-        c->setWantsKeyboardFocus (false);
-        c->setMouseClickGrabsKeyboardFocus (false);
-    }
+    for (juce::Component* c : { (juce::Component*) &powerButton, (juce::Component*) &tunerButton,
+                                (juce::Component*) &turnOnButton })
+        makeQuiet (*c);
 
     studio.addChangeListener (this);
     studio.engine().addChangeListener (this);
@@ -87,8 +102,8 @@ void RigPanel::sync()
     const bool on = track.isValid() && rigIsOn (track);
     auto* rig = on && ! waitingForProjectSwap() ? studio.engine().getRig (trackId) : nullptr;
 
-    const bool changed = trackId != shownTrackId || rig != shownRig || on != rigSwitch.getToggleState()
-                      || track.isValid() != rigSwitch.isVisible();
+    const bool changed = trackId != shownTrackId || rig != shownRig || on != powerButton.lit
+                      || track.isValid() != powerButton.isVisible();
     if (! changed)
         return;
 
@@ -110,16 +125,44 @@ void RigPanel::sync()
             }
 
             addAndMakeVisible (*editor);
+            adoptEditorControls();
             layOutEditor();
         }
     }
 
-    rigSwitch.setVisible (track.isValid());
-    rigSwitch.setToggleState (on, juce::dontSendNotification);
+    powerButton.setVisible (track.isValid());
+    powerButton.lit = on;
+    powerButton.repaint();
+    tunerButton.setVisible (editor != nullptr);
+    tunerButton.setToggleState (false, juce::dontSendNotification);
     refreshInputChoice();
     turnOnButton.setVisible (track.isValid() && ! on);
     resized();
     repaint();
+}
+
+WoodshedEditor* RigPanel::rigEditor() const
+{
+    return dynamic_cast<WoodshedEditor*> (editor.get());
+}
+
+void RigPanel::adoptEditorControls()
+{
+    // The editor's bar controls move into this header, outside the editor's scaling, and pick up
+    // the studio's look from here. They still belong to the editor and leave with it.
+    auto* w = rigEditor();
+    if (w == nullptr)
+        return;
+
+    auto c = w->getHostControls();
+    for (juce::Component* control : { (juce::Component*) &c.inputGain, (juce::Component*) &c.inputMeter,
+                                      (juce::Component*) &c.previousPreset, (juce::Component*) &c.presets,
+                                      (juce::Component*) &c.nextPreset, (juce::Component*) &c.savePreset,
+                                      (juce::Component*) &c.addPedal })
+    {
+        addAndMakeVisible (control);
+        makeQuiet (*control);
+    }
 }
 
 void RigPanel::dropEditor()
@@ -186,35 +229,67 @@ void RigPanel::showTuner()
 }
 
 //==============================================================================
+void RigPanel::IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    auto r = getLocalBounds().toFloat().reduced (0.5f);
+    const bool on = getToggleState();
+
+    if (on)
+    {
+        g.setColour (theme::accent.withAlpha (down ? 0.3f : highlighted ? 0.24f : 0.18f));
+        g.fillRoundedRectangle (r, theme::radiusControl);
+    }
+    else if ((highlighted || down) && isEnabled())
+    {
+        g.setColour (juce::Colours::white.withAlpha (down ? 0.12f : 0.07f));
+        g.fillRoundedRectangle (r, theme::radiusControl);
+    }
+
+    auto colour = on || lit ? theme::accent : highlighted ? theme::text : theme::dimText;
+    if (! isEnabled())
+        colour = theme::faintText.withAlpha (0.6f);
+
+    icons::draw (g, icon, r.withSizeKeepingCentre (16.0f, 16.0f), colour, 1.8f);
+}
+
+//==============================================================================
 void RigPanel::paint (juce::Graphics& g)
 {
     g.fillAll (theme::window);
 
-    // Header strip: the track's colour, its name and the rig switch.
+    // The pane header: one bar in the studio's chrome.
     auto header = getLocalBounds().removeFromTop (headerHeight);
     g.setColour (theme::bar);
     g.fillRect (header);
-    g.setColour (theme::outline);
+    g.setColour (theme::highlight);
+    g.fillRect (header.withHeight (1));
+    g.setColour (theme::separator);
     g.fillRect (header.removeFromBottom (1));
-    header.reduce (14, 0);
 
     if (shownTrack.isValid())
     {
+        auto name = nameArea;
         const auto colour = juce::Colour ((juce::uint32) (int) shownTrack.getProperty (daw::ids::colour, (int) 0xff8d857a));
         g.setColour (colour);
-        g.fillRoundedRectangle (header.removeFromLeft (12).withSizeKeepingCentre (12, 12).toFloat(), 3.0f);
-        header.removeFromLeft (10);
+        g.fillEllipse (name.removeFromLeft (10).withSizeKeepingCentre (10, 10).toFloat());
+        name.removeFromLeft (8);
 
-        g.setColour (theme::text);
-        g.setFont (theme::font (14.0f, true));
-        g.drawFittedText (shownTrack[daw::ids::name].toString(), header.withTrimmedRight (rigSwitch.getWidth() + 20),
-                          juce::Justification::centredLeft, 1, 0.8f);
+        g.setColour (rigIsOn (shownTrack) ? theme::text : theme::dimText);
+        g.setFont (theme::font (13.0f, theme::Weight::semibold));
+        g.drawFittedText (shownTrack[daw::ids::name].toString(), name, juce::Justification::centredLeft, 1, 0.85f);
+
+        if (! gainLabelArea.isEmpty())
+        {
+            g.setColour (theme::faintText);
+            g.setFont (theme::font (11.0f, theme::Weight::medium));
+            g.drawText ("Gain", gainLabelArea, juce::Justification::centredRight);
+        }
     }
     else
     {
         g.setColour (theme::dimText);
-        g.setFont (theme::font (13.0f, true));
-        g.drawText ("RIG", header, juce::Justification::centredLeft);
+        g.setFont (theme::font (13.0f, theme::Weight::semibold));
+        g.drawText ("Rig", header.reduced (16, 0), juce::Justification::centredLeft);
     }
 
     if (editor != nullptr)
@@ -240,13 +315,67 @@ void RigPanel::paint (juce::Graphics& g)
 
 void RigPanel::resized()
 {
-    auto header = getLocalBounds().removeFromTop (headerHeight).reduced (14, 0);
-    rigSwitch.setBounds (header.removeFromRight (84).withSizeKeepingCentre (84, 22));
-    header.removeFromRight (12);
-    inputChoice.setBounds (header.removeFromRight (110).withSizeKeepingCentre (110, 24));
+    auto header = getLocalBounds().removeFromTop (headerHeight).withTrimmedBottom (1).reduced (10, 0);
+    constexpr int h = 26;
+    const auto fit = [&] (juce::Rectangle<int> r) { return r.withSizeKeepingCentre (r.getWidth(), h); };
+
+    // Left: power, colour dot and name, the track's input, the rig's input gain and level.
+    powerButton.setBounds (fit (header.removeFromLeft (h)));
+    header.removeFromLeft (6);
+
+    const int nameWidth = shownTrack.isValid()
+        ? 18 + juce::GlyphArrangement::getStringWidthInt (theme::font (13.0f, theme::Weight::semibold), shownTrack[daw::ids::name].toString())
+        : 0;
+
+    // Right: Add Pedal (primary), tuner, Save, then the preset browser takes what's left.
+    auto* w = rigEditor();
+    juce::Rectangle<int> right;
+    if (w != nullptr)
+    {
+        auto c = w->getHostControls();
+        c.addPedal.setBounds (fit (header.removeFromRight (100)));
+        header.removeFromRight (8);
+        tunerButton.setBounds (fit (header.removeFromRight (h)));
+        header.removeFromRight (12);
+        c.savePreset.setBounds (fit (header.removeFromRight (52)));
+        header.removeFromRight (8);
+        c.nextPreset.setBounds (fit (header.removeFromRight (h)));
+        header.removeFromRight (4);
+        right = header;      // the preset box sizes itself once the left side is known
+    }
+    else
+    {
+        tunerButton.setBounds (fit (header.removeFromRight (h)));
+        header.removeFromRight (12);
+    }
+
+    const int leftFixed = 16 + 96 + 16 + (w != nullptr ? 30 + 4 + h + 8 + 60 + 16 : 0);
+    const int presetMin = w != nullptr ? 140 + 4 + h : 0;
+    nameArea = header.removeFromLeft (juce::jlimit (60, 220, juce::jmin (nameWidth, header.getWidth() - leftFixed - presetMin)));
+    header.removeFromLeft (16);
+    inputChoice.setBounds (fit (header.removeFromLeft (96)));
+    header.removeFromLeft (16);
+
+    gainLabelArea = {};
+    if (w != nullptr)
+    {
+        auto c = w->getHostControls();
+        gainLabelArea = header.removeFromLeft (30);
+        header.removeFromLeft (4);
+        c.inputGain.setBounds (fit (header.removeFromLeft (h)));
+        header.removeFromLeft (8);
+        c.inputMeter.setBounds (header.removeFromLeft (60).withSizeKeepingCentre (60, 8));
+        header.removeFromLeft (16);
+
+        const int presetWidth = juce::jlimit (140, 260, header.getWidth() - h - 4);
+        auto presets = right.removeFromRight (presetWidth);
+        c.presets.setBounds (fit (presets));
+        right.removeFromRight (4);
+        c.previousPreset.setBounds (fit (right.removeFromRight (h)));
+    }
 
     const auto body = getLocalBounds().withTrimmedTop (headerHeight);
-    turnOnButton.setBounds (body.getCentreX() - 80, body.getCentreY() + 20, 160, 30);
+    turnOnButton.setBounds (body.getCentreX() - 80, body.getCentreY() + 20, 160, 28);
 
     layOutEditor();
 }
@@ -279,6 +408,11 @@ void RigPanel::timerCallback()
 {
     // Catches what no message announces: a new track's rig appearing, a dialog closing.
     sync();
+
+    // The tuner also opens and closes from the keyboard and its own Done button.
+    const bool tunerOpen = rigEditor() != nullptr && rigEditor()->isTunerShowing();
+    if (tunerButton.getToggleState() != tunerOpen)
+        tunerButton.setToggleState (tunerOpen, juce::dontSendNotification);
 }
 
 void RigPanel::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Identifier& property)
@@ -298,6 +432,7 @@ void RigPanel::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Iden
     {
         if (auto* w = dynamic_cast<WoodshedEditor*> (editor.get()))
             w->setTrackName (tree[daw::ids::name].toString());
+        resized();
         repaint (getLocalBounds().removeFromTop (headerHeight));
     }
 }
