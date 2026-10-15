@@ -19,6 +19,9 @@ public:
 
     std::function<void()> onClose;
 
+    /** Studio mode: the studio's panel, type and controls instead of the stage look. */
+    void setEmbedded (bool);
+
 private:
     void timerCallback() override;
 
@@ -37,6 +40,7 @@ private:
     float shownCents = 0.0f, shownHz = 0.0f, strobePhase = 0.0f;
     int shownNote = -1;
     juce::Rectangle<int> panelBounds;
+    bool embedded = false;
 
     float referenceHz() const                       { return 430.0f + (float) reference.getSelectedId(); }
 

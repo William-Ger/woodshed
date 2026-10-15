@@ -41,10 +41,13 @@ class Meter final : public juce::Component
 public:
     void setLevel (float linearPeak);
     void paint (juce::Graphics&) override;
+    /** Studio mode: a thin continuous bar in the studio's meter colours instead of LED segments. */
+    void setSlim (bool shouldBeSlim)                         { slim = shouldBeSlim; repaint(); }
 
 private:
     float level = 0.0f, hold = 0.0f;
     int holdFrames = 0;
+    bool slim = false;
 };
 
 //==============================================================================
@@ -146,6 +149,8 @@ public:
     explicit LibraryPanel (std::function<void (const juce::String& type)> onPick);
 
     void showCategory (const juce::String& category);
+    /** Studio mode: the studio's panels, cards and controls instead of the stage look. */
+    void setEmbedded (bool);
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -167,6 +172,7 @@ private:
     juce::Component grid;
     juce::OwnedArray<Card> cards;
     juce::Rectangle<int> panelBounds;
+    bool embedded = false;
 };
 
 } // namespace woodshed
@@ -196,7 +202,23 @@ public:
     bool isTunerShowing() const                              { return tuner.isVisible(); }
 
     /** In studio mode the pane scales the editor down below this rather than crowding it. */
-    static constexpr int embeddedMinWidth = 1000, embeddedMinHeight = 420;
+    static constexpr int embeddedMinWidth = 1000, embeddedMinHeight = 368;
+
+    /** Studio mode: the top bar's controls, which the studio's pane header adopts (reparents)
+        so they stay full size while the stage below scales. They still belong to this editor
+        and go with it. */
+    struct HostControls
+    {
+        juce::Slider& inputGain;
+        woodshed::Meter& inputMeter;
+        juce::ComboBox& presets;
+        juce::Button& previousPreset;
+        juce::Button& nextPreset;
+        juce::Button& savePreset;
+        juce::Button& addPedal;
+    };
+    HostControls getHostControls()                           { return { inputGain, inputMeter, presetChoice, prevPresetButton,
+                                                                        nextPresetButton, savePresetButton, libraryButton }; }
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
@@ -209,8 +231,8 @@ private:
     void savePresetAs();
     void showLibrary (int targetSpot = -1, const juce::String& category = {});
     void keepControlsFromTakingFocus (juce::Component&);
-    void layOutEmbeddedBar (juce::Rectangle<int> bar);
-    int topBarHeight() const                                 { return embedded ? 52 : 72; }
+    void paintEmbeddedFooter (juce::Graphics&);
+    int topBarHeight() const                                 { return embedded ? 0 : 72; }
     void pickFromLibrary (const juce::String& type);
     void flash (const juce::String& message);
 

@@ -1,5 +1,8 @@
 #include "PluginEditor.h"
 #include "Art.h"
+// Colour constants only (header-only): the plug-in build has no studio fonts or drawing helpers,
+// so nothing here may call theme::font() and friends. Studio mode uses these to match the app.
+#include "app/Theme.h"
 
 #if JucePlugin_Build_Standalone
  #include <juce_audio_utils/juce_audio_utils.h>
@@ -183,6 +186,25 @@ void Meter::setLevel (float linearPeak)
 void Meter::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
+
+    if (slim)
+    {
+        const auto well = r.withSizeKeepingCentre (r.getWidth(), juce::jmin (4.0f, r.getHeight()));
+        const float radius = well.getHeight() * 0.5f;
+        g.setColour (juce::Colour (0xff111113));
+        g.fillRoundedRectangle (well, radius);
+
+        juce::ColourGradient ramp (theme::meterLow, well.getX(), 0.0f, theme::meterHigh, well.getRight(), 0.0f, false);
+        ramp.addColour (0.72, theme::meterLow);
+        ramp.addColour (0.86, theme::meterMid);
+        g.setGradientFill (ramp);
+        if (level > 0.01f)
+            g.fillRoundedRectangle (well.withWidth (juce::jmax (well.getHeight(), well.getWidth() * level)), radius);
+        if (hold > 0.02f)
+            g.fillRect (well.getX() + (well.getWidth() - 2.0f) * hold, well.getY(), 2.0f, well.getHeight());
+        return;
+    }
+
     g.setColour (juce::Colour (0xff0b0a09));
     g.fillRoundedRectangle (r, 3.0f);
 
@@ -764,13 +786,20 @@ void RigStack::paint (juce::Graphics& g)
 class LibraryPanel::Card final : public juce::Component
 {
 public:
-    Card (const PedalType& t, std::function<void (const juce::String&)> pick) : type (t), onPick (std::move (pick))
+    Card (const PedalType& t, std::function<void (const juce::String&)> pick, bool studioLook)
+        : type (t), onPick (std::move (pick)), embedded (studioLook)
     {
         setMouseCursor (juce::MouseCursor::PointingHandCursor);
     }
 
     void paint (juce::Graphics& g) override
     {
+        if (embedded)
+        {
+            paintStudio (g);
+            return;
+        }
+
         auto r = getLocalBounds().toFloat().reduced (4.0f);
         g.setColour (isMouseOver() ? juce::Colour (0xff2e2b27) : juce::Colour (0xff24221f));
         g.fillRoundedRectangle (r, 10.0f);
@@ -806,15 +835,58 @@ public:
 
     void mouseEnter (const juce::MouseEvent&) override   { repaint(); }
     void mouseExit (const juce::MouseEvent&) override    { repaint(); }
+    void mouseDown (const juce::MouseEvent&) override    { repaint(); }
     void mouseUp (const juce::MouseEvent& e) override
     {
+        repaint();
         if (e.mouseWasClicked())
             onPick (type.info.type);
     }
 
 private:
+    void paintStudio (juce::Graphics& g)
+    {
+        auto r = getLocalBounds().toFloat().reduced (4.0f);
+        const bool over = isMouseOver(), down = over && isMouseButtonDown();
+        g.setColour (down ? theme::controlDown : over ? theme::control : theme::panelLight);
+        g.fillRoundedRectangle (r, theme::radiusPanel);
+        g.setColour (theme::highlight);
+        g.fillRect (r.reduced (theme::radiusPanel, 0.0f).withHeight (1.0f));
+        g.setColour (over ? theme::accent.withAlpha (0.7f) : juce::Colours::white.withAlpha (0.05f));
+        g.drawRoundedRectangle (r.reduced (0.5f), theme::radiusPanel, 1.0f);
+
+        // Miniature enclosure: the pedal's own colours are the content here.
+        auto mini = r.removeFromLeft (52.0f).reduced (10.0f, 12.0f);
+        g.setColour (type.info.body);
+        g.fillRoundedRectangle (mini, 4.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.drawRoundedRectangle (mini.reduced (0.5f), 4.0f, 1.0f);
+        g.setColour (type.info.ink.withAlpha (0.8f));
+        for (int i = 0; i < juce::jmin (3, (int) type.info.knobs.size()); ++i)
+            g.fillEllipse (mini.getX() + 5.0f + (float) i * 9.5f, mini.getY() + 7.0f, 6.0f, 6.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.8f));
+        g.fillEllipse (juce::Rectangle<float> (10.0f, 10.0f).withCentre ({ mini.getCentreX(), mini.getBottom() - 10.0f }));
+
+        r.removeFromLeft (2.0f);
+        r.removeFromRight (10.0f);
+        auto top = r.removeFromTop (32.0f).withTrimmedTop (10.0f);
+        g.setColour (theme::text);
+        g.setFont (juce::FontOptions (14.0f, juce::Font::bold));
+        const auto name = type.info.name.substring (0, 1) + type.info.name.substring (1).toLowerCase();
+        g.drawText (name, top, juce::Justification::centredLeft);
+
+        g.setColour (theme::dimText);
+        g.setFont (juce::FontOptions (11.5f).withStyle ("Medium"));
+        g.drawText (type.info.subtitle, r.removeFromTop (16.0f), juce::Justification::centredLeft);
+        g.setColour (theme::faintText);
+        g.setFont (juce::FontOptions (11.0f));
+        g.drawFittedText (type.info.description, r.withTrimmedTop (2.0f).withTrimmedBottom (6.0f).toNearestInt(),
+                          juce::Justification::topLeft, 2, 0.95f);
+    }
+
     const PedalType& type;
     std::function<void (const juce::String&)> onPick;
+    const bool embedded;
 };
 
 LibraryPanel::LibraryPanel (std::function<void (const juce::String&)> pick) : onPick (std::move (pick))
@@ -878,14 +950,57 @@ void LibraryPanel::refresh()
         if (query.isNotEmpty() && ! haystack.contains (query))
             continue;
 
-        grid.addAndMakeVisible (cards.add (new Card (t, onPick)));
+        grid.addAndMakeVisible (cards.add (new Card (t, onPick, embedded)));
     }
 
     resized();
 }
 
+void LibraryPanel::setEmbedded (bool shouldBeEmbedded)
+{
+    if (embedded == shouldBeEmbedded)
+        return;
+
+    embedded = shouldBeEmbedded;
+
+    // The studio's default look (combo, field, segmented chips, overlay scroll bars).
+    setLookAndFeel (embedded ? &juce::LookAndFeel::getDefaultLookAndFeel() : nullptr);
+    search.setFont (juce::FontOptions (embedded ? 13.0f : 15.0f));
+    search.setIndents (embedded ? 10 : 4, embedded ? 7 : 4);
+    search.setTextToShowWhenEmpty (embedded ? "Search pedals" : "Search pedals...", embedded ? theme::faintText : palette::dimText);
+    viewport.setScrollBarThickness (embedded ? 10 : 8);
+    refresh();
+}
+
 void LibraryPanel::paint (juce::Graphics& g)
 {
+    if (embedded)
+    {
+        g.fillAll (juce::Colours::black.withAlpha (0.55f));
+        const auto p = panelBounds.toFloat();
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.fillRoundedRectangle (p.translated (0.0f, 6.0f).expanded (2.0f), theme::radiusPanel + 4.0f);
+        g.setColour (theme::panel);
+        g.fillRoundedRectangle (p, theme::radiusPanel + 4.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.08f));
+        g.drawRoundedRectangle (p.reduced (0.5f), theme::radiusPanel + 4.0f, 1.0f);
+
+        auto head = panelBounds.reduced (20, 16).removeFromTop (28);
+        g.setColour (theme::text);
+        g.setFont (juce::FontOptions (16.0f, juce::Font::bold));
+        g.drawText ("Pedal library", head, juce::Justification::centredLeft);
+        g.setColour (theme::faintText);
+        g.setFont (juce::FontOptions (12.0f));
+        g.drawText (juce::String ((int) Registry::get().all().size())
+                        + juce::String::fromUTF8 (" pedals  \u00b7  click one to add it  \u00b7  Esc to close"),
+                    head, juce::Justification::centredRight);
+
+        // Hairline under the search and category row.
+        g.setColour (theme::separator);
+        g.fillRect (viewport.getX(), viewport.getY() - 9, viewport.getWidth(), 1);
+        return;
+    }
+
     g.fillAll (juce::Colours::black.withAlpha (0.6f));
 
     g.setColour (palette::panel);
@@ -904,6 +1019,34 @@ void LibraryPanel::paint (juce::Graphics& g)
 
 void LibraryPanel::resized()
 {
+    if (embedded)
+    {
+        panelBounds = getLocalBounds().reduced (juce::jmax (24, getWidth() / 16), 12);
+        auto r = panelBounds.reduced (20, 16);
+        r.removeFromTop (28 + 12);
+
+        auto row = r.removeFromTop (28);
+        search.setBounds (row.removeFromLeft (juce::jlimit (180, 280, row.getWidth() / 4)));
+        row.removeFromLeft (12);
+        for (auto* b : categoryButtons)
+        {
+            const int w = juce::GlyphArrangement::getStringWidthInt (juce::FontOptions (13.0f).withStyle ("Medium"), b->getButtonText()) + 20;
+            b->setBounds (row.removeFromLeft (w));
+            row.removeFromLeft (4);
+        }
+
+        r.removeFromTop (18);
+        viewport.setBounds (r);
+
+        const int cardW = 240, cardH = 92;
+        const int cols = juce::jmax (1, r.getWidth() / cardW);
+        const int w = r.getWidth() / cols;
+        for (int i = 0; i < cards.size(); ++i)
+            cards[i]->setBounds ((i % cols) * w, (i / cols) * cardH, w, cardH);
+        grid.setSize (r.getWidth(), ((cards.size() + cols - 1) / cols) * cardH);
+        return;
+    }
+
     // Short hosts (the studio's rig pane) get slimmer margins so more of the library shows.
     panelBounds = getLocalBounds().reduced (juce::jmax (30, getWidth() / 14), getHeight() < 560 ? 14 : 36);
     auto r = panelBounds.reduced (24, 18);
@@ -1111,41 +1254,21 @@ void WoodshedEditor::paint (juce::Graphics& g)
 
     if (embedded)
     {
-        // "RIG", then the track whose rig this is (the studio's own bar carries the wordmark).
-        const juce::Font mark (juce::FontOptions (16.0f, juce::Font::bold).withKerningFactor (0.22f));
-        const int markW = juce::GlyphArrangement::getStringWidthInt (mark, "RIG") + 4;
-        g.setColour (palette::dimText);
-        g.setFont (mark);
-        g.drawText ("RIG", 20, 0, markW, barH, juce::Justification::centredLeft);
-
-        if (trackName.isNotEmpty())
-        {
-            const int x = 20 + markW + 12;
-            const int w = inputGain.getX() - 16 - x;
-            g.setColour (juce::Colour (0xff3a3631));
-            g.fillRect (x, barH / 2 - 9, 1, 18);
-            g.setColour (palette::accent);
-            g.setFont (juce::FontOptions (15.0f, juce::Font::bold));
-            g.drawFittedText (trackName, x + 12, 0, juce::jmax (0, w - 12), barH, juce::Justification::centredLeft, 1, 0.8f);
-        }
-
-        g.setColour (palette::dimText);
-        g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.15f));
-        g.drawText ("INPUT", inputMeter.getBounds().withY (inputMeter.getY() - 15).withHeight (12), juce::Justification::centredLeft);
+        // The studio's pane header carries the name and the bar's controls; only the footer here.
+        paintEmbeddedFooter (g);
+        return;
     }
-    else
-    {
-        g.setColour (palette::text);
-        g.setFont (juce::FontOptions (25.0f, juce::Font::bold).withKerningFactor (0.22f));
-        g.drawText ("WOODSHED", 24, 10, 220, 34, juce::Justification::centredLeft);
 
-        g.setColour (palette::dimText);
-        g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.15f));
-        g.drawText ("IN", inputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
-        g.drawText ("OUT", outputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
-        g.drawText ("INPUT", inputGain.getBounds().withY (56).withHeight (12), juce::Justification::centred);
-        g.drawText ("MASTER", master.getBounds().withY (56).withHeight (12), juce::Justification::centred);
-    }
+    g.setColour (palette::text);
+    g.setFont (juce::FontOptions (25.0f, juce::Font::bold).withKerningFactor (0.22f));
+    g.drawText ("WOODSHED", 24, 10, 220, 34, juce::Justification::centredLeft);
+
+    g.setColour (palette::dimText);
+    g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.15f));
+    g.drawText ("IN", inputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
+    g.drawText ("OUT", outputMeter.getBounds().withY (12).withHeight (12), juce::Justification::centredLeft);
+    g.drawText ("INPUT", inputGain.getBounds().withY (56).withHeight (12), juce::Justification::centred);
+    g.drawText ("MASTER", master.getBounds().withY (56).withHeight (12), juce::Justification::centred);
 
     auto footer = getLocalBounds().removeFromBottom (24);
     g.setColour (palette::topBar);
@@ -1158,13 +1281,43 @@ void WoodshedEditor::paint (juce::Graphics& g)
 
     footer.reduce (16, 0);
     const auto hints = juce::String (onBoard) + " / " + juce::String (WoodshedProcessor::boardSpots)
-                     + (embedded ? juce::String::fromUTF8 (" spots   \u00b7   1-0 stomp   \u00b7   \u2190 \u2192 presets   \u00b7   T tuner   \u00b7   A add pedal   \u00b7   drag to rearrange")
-                                 : juce::String::fromUTF8 (" spots   \u00b7   1-0 stomp   \u00b7   \u2190 \u2192 presets   \u00b7   T tuner   \u00b7   F full screen   \u00b7   A add pedal   \u00b7   drag to rearrange"));
+                     + juce::String::fromUTF8 (" spots   \u00b7   1-0 stomp   \u00b7   \u2190 \u2192 presets   \u00b7   T tuner   \u00b7   F full screen   \u00b7   A add pedal   \u00b7   drag to rearrange");
     g.drawText (hints, footer.removeFromLeft (juce::jmin (footer.getWidth() / 2, 560)), juce::Justification::centredLeft);
 
     if (presetCaption.isNotEmpty() && statusLabel.getText().isEmpty())
     {
         g.setColour (palette::text.withAlpha (0.8f));
+        g.drawFittedText (presetCaption, footer.withTrimmedLeft (16), juce::Justification::centredRight, 1, 0.85f);
+    }
+}
+
+void WoodshedEditor::paintEmbeddedFooter (juce::Graphics& g)
+{
+    namespace theme = woodshed::theme;
+
+    // A quiet status line in the studio's type: spots and shortcuts left, the preset right.
+    auto footer = getLocalBounds().removeFromBottom (24);
+    g.setColour (theme::bar);
+    g.fillRect (footer);
+    g.setColour (theme::separator);
+    g.fillRect (footer.removeFromTop (1));
+
+    int onBoard = 0;
+    for (auto spot : woodshedProcessor.getSpots())
+        onBoard += spot >= 0 ? 1 : 0;
+
+    footer.reduce (16, 0);
+    const auto dot = juce::String::fromUTF8 ("  \u00b7  ");
+    const auto hints = juce::String (onBoard) + " of " + juce::String (WoodshedProcessor::boardSpots) + " spots" + dot
+                     + "1-0 stomp" + dot + juce::String::fromUTF8 ("\u2190 \u2192 presets") + dot + "T tuner" + dot
+                     + "A add pedal" + dot + "drag to rearrange";
+    g.setFont (juce::FontOptions (11.0f));
+    g.setColour (theme::faintText);
+    g.drawText (hints, footer.removeFromLeft (juce::jmin (footer.getWidth() / 2, 520)), juce::Justification::centredLeft);
+
+    if (presetCaption.isNotEmpty() && statusLabel.getText().isEmpty())
+    {
+        g.setColour (theme::dimText);
         g.drawFittedText (presetCaption, footer.withTrimmedLeft (16), juce::Justification::centredRight, 1, 0.85f);
     }
 }
@@ -1177,11 +1330,7 @@ void WoodshedEditor::resized()
 
     auto bar = r.removeFromTop (topBarHeight()).reduced (16, 0);
 
-    if (embedded)
-    {
-        layOutEmbeddedBar (bar);
-    }
-    else
+    if (! embedded)
     {
         auto brand = bar.removeFromLeft (230);
         latencyLabel.setBounds (brand.withTrimmedTop (42).withHeight (18).withTrimmedLeft (8));
@@ -1246,33 +1395,6 @@ void WoodshedEditor::resized()
     board.setBounds (r);
 }
 
-void WoodshedEditor::layOutEmbeddedBar (juce::Rectangle<int> bar)
-{
-    // Wordmark and track name are painted on the left; the studio owns the interface, the
-    // master level and the meters on the output side.
-    bar.removeFromLeft (juce::jmin (380, bar.getWidth() / 3));
-    inputGain.setBounds (bar.removeFromLeft (40).withSizeKeepingCentre (40, 40));
-    bar.removeFromLeft (10);
-    inputMeter.setBounds (bar.removeFromLeft (90).withTrimmedTop (27).withHeight (14));
-
-    auto button = [&bar] (juce::Component& c, int w)
-    {
-        c.setBounds (bar.removeFromRight (w).withSizeKeepingCentre (w, 28));
-        bar.removeFromRight (8);
-    };
-
-    button (libraryButton, 116);
-    button (tunerButton, 64);
-    bar.removeFromRight (8);
-    button (savePresetButton, 56);
-    nextPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
-    bar.removeFromRight (4);
-    const int presetWidth = juce::jlimit (130, 300, bar.getWidth() - 28 - 4 - 16);
-    presetChoice.setBounds (bar.removeFromRight (presetWidth).withSizeKeepingCentre (presetWidth, 28));
-    bar.removeFromRight (4);
-    prevPresetButton.setBounds (bar.removeFromRight (28).withSizeKeepingCentre (28, 28));
-}
-
 void WoodshedEditor::setEmbedded (bool shouldBeEmbedded)
 {
     if (embedded == shouldBeEmbedded)
@@ -1287,7 +1409,21 @@ void WoodshedEditor::setEmbedded (bool shouldBeEmbedded)
     if (embedded)
     {
         audioSetupButton.setVisible (false);
+        tunerButton.setVisible (false);                  // the pane header has its own
         setResizable (false, false);
+
+        // The pane header adopts these; give them the studio's look and conventions.
+        libraryButton.removeColour (juce::TextButton::buttonColourId);
+        libraryButton.removeColour (juce::TextButton::textColourOffId);
+        libraryButton.getProperties().set ("primary", true);
+        inputGain.removeColour (juce::Slider::rotarySliderOutlineColourId);
+        inputGain.setTooltip ("Input gain (double-click for 0 dB)");
+        inputMeter.setSlim (true);
+        prevPresetButton.setButtonText (juce::String::fromUTF8 ("\u2039"));
+        nextPresetButton.setButtonText (juce::String::fromUTF8 ("\u203a"));
+        statusLabel.setFont (juce::FontOptions (11.0f).withStyle ("Medium"));
+        library.setEmbedded (true);
+        tuner.setEmbedded (true);
         keepControlsFromTakingFocus (*this);
     }
 
