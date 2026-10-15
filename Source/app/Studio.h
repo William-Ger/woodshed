@@ -15,6 +15,8 @@ namespace cmd
     {
         newProject = 0x2000, openProject, saveProject, saveProjectAs, bounce, audioSettings,
         undo, redo, deleteSelection, splitAtPlayhead, selectAll,
+        cut, copy, paste, repeatRegions, nudgeLeft, nudgeRight, muteRegions, muteTrack, soloTrack,
+        createMarker, nextMarker, previousMarker,
         newTrack, deleteTrack, duplicateTrack,
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner
@@ -85,6 +87,18 @@ public:
     void deleteSelectedRegions();
     void splitSelectedAtPlayhead();
 
+    // Clipboard and Logic's region commands. Paste goes to the playhead on the selected track.
+    void copySelectedRegions();
+    void cutSelectedRegions();
+    void paste();
+    bool canPaste() const                                   { return clipboard.getNumChildren() > 0; }
+    void repeatSelectedRegions();
+    /** Moves the selected regions by a 1/16 note (the nudge value), -1 earlier or +1 later. */
+    void nudgeSelectedRegions (int direction);
+    /** Mutes the selected regions, or unmutes them if they're all muted. */
+    void toggleMuteSelectedRegions();
+    void toggleSelectedTrack (const juce::Identifier& property);
+
     // Panes below the tracks.
     enum class Pane { none, rig, mixer };
     Pane getPane() const                                    { return pane; }
@@ -115,6 +129,7 @@ private:
 
     juce::ListenerList<ProjectSwapListener> swapListeners;
     juce::Array<int> selectedRegions;
+    juce::ValueTree clipboard;
     Pane pane = Pane::rig;
     bool dirty = false;
     juce::String flashText;

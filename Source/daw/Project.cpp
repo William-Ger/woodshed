@@ -222,6 +222,221 @@ juce::ValueTree Project::splitRegion (juce::ValueTree region, juce::int64 at)
     return right;
 }
 
+juce::ValueTree Project::regionById (int id) const
+{
+    for (auto t : state)
+        for (auto r : t)
+            if (r.hasType (ids::REGION) && (int) r[ids::id] == id)
+                return r;
+    return {};
+}
+
+juce::ValueTree Project::copyRegions (const juce::Array<int>& regionIds) const
+{
+    juce::ValueTree clip (ids::CLIPBOARD);
+    clip.setProperty (ids::file, folder.getFullPathName(), nullptr);
+    juce::int64 earliest = std::numeric_limits<juce::int64>::max();
+    int topTrack = std::numeric_limits<int>::max();
+
+    for (int i = 0; i < numTracks(); ++i)
+        for (auto r : track (i))
+            if (r.hasType (ids::REGION) && regionIds.contains ((int) r[ids::id]))
+            {
+                earliest = juce::jmin (earliest, (juce::int64) r[ids::start]);
+                topTrack = juce::jmin (topTrack, i);
+            }
+
+    for (int i = 0; i < numTracks(); ++i)
+        for (auto r : track (i))
+            if (r.hasType (ids::REGION) && regionIds.contains ((int) r[ids::id]))
+            {
+                auto c = r.createCopy();
+                c.setProperty (ids::start, (juce::int64) r[ids::start] - earliest, nullptr);
+                c.setProperty (ids::lane, i - topTrack, nullptr);
+                clip.addChild (c, -1, nullptr);
+            }
+    return clip;
+}
+
+juce::Array<int> Project::pasteRegions (const juce::ValueTree& clipboard, juce::int64 at, int firstTrack)
+{
+    juce::Array<int> added;
+    if (numTracks() == 0)
+        return added;
+
+    // From another project: copy each recording in once, under a name that's free here.
+    const juce::File source (clipboard[ids::file].toString());
+    const bool foreign = source != juce::File() && source != folder;
+    std::map<juce::String, juce::String> imported;
+
+    for (auto c : clipboard)
+    {
+        auto r = c.createCopy();
+        if (foreign)
+        {
+            const auto relative = r[ids::file].toString();
+            auto it = imported.find (relative);
+            if (it == imported.end())
+            {
+                const auto from = source.getChildFile (relative);
+                auto to = audioFolder().getNonexistentChildFile (from.getFileNameWithoutExtension(), from.getFileExtension(), false);
+                audioFolder().createDirectory();
+                const auto copied = from.copyFileTo (to) ? to.getRelativePathFrom (folder).replaceCharacter ('\\', '/') : relative;
+                it = imported.emplace (relative, copied).first;
+            }
+            r.setProperty (ids::file, it->second, nullptr);
+        }
+
+        const int target = juce::jlimit (0, numTracks() - 1, firstTrack + (int) r[ids::lane]);
+        r.removeProperty (ids::lane, nullptr);
+        r.setProperty (ids::id, nextId(), nullptr);
+        r.setProperty (ids::start, juce::jmax ((juce::int64) 0, at + (juce::int64) r[ids::start]), nullptr);
+        track (target).addChild (r, -1, &undo);
+        added.add ((int) r[ids::id]);
+    }
+    return added;
+}
+
+juce::Array<int> Project::repeatRegions (const juce::Array<int>& regionIds)
+{
+    juce::int64 from = std::numeric_limits<juce::int64>::max(), to = 0;
+    int topTrack = std::numeric_limits<int>::max();
+    for (int i = 0; i < numTracks(); ++i)
+        for (auto r : track (i))
+            if (r.hasType (ids::REGION) && regionIds.contains ((int) r[ids::id]))
+            {
+                from = juce::jmin (from, (juce::int64) r[ids::start]);
+                to = juce::jmax (to, (juce::int64) r[ids::start] + (juce::int64) r[ids::length]);
+                topTrack = juce::jmin (topTrack, i);
+            }
+
+    if (to <= from)
+        return {};
+    return pasteRegions (copyRegions (regionIds), to, topTrack);
+}
+
+void Project::nudgeRegions (const juce::Array<int>& regionIds, juce::int64 delta)
+{
+    juce::Array<juce::ValueTree> regions;
+    juce::int64 earliest = std::numeric_limits<juce::int64>::max();
+    for (int id : regionIds)
+        if (auto r = regionById (id); r.isValid())
+        {
+            regions.add (r);
+            earliest = juce::jmin (earliest, (juce::int64) r[ids::start]);
+        }
+
+    delta = juce::jmax (delta, -earliest);
+    if (regions.isEmpty() || delta == 0)
+        return;
+    for (auto& r : regions)
+        r.setProperty (ids::start, (juce::int64) r[ids::start] + delta, &undo);
+}
+
+std::vector<Marker> Project::getMarkers() const
+{
+    std::vector<Marker> list;
+    const auto parsed = juce::JSON::parse (state[ids::markers].toString());
+    if (auto* items = parsed.getArray())
+        for (auto& item : *items)
+            list.push_back ({ (int) item["id"], item["name"].toString(), (juce::int64) item["position"] });
+
+    std::stable_sort (list.begin(), list.end(), [] (auto& a, auto& b) { return a.position < b.position; });
+    return list;
+}
+
+void Project::setMarkers (const std::vector<Marker>& list)
+{
+    if (list.empty())
+    {
+        state.removeProperty (ids::markers, &undo);
+        return;
+    }
+
+    juce::Array<juce::var> items;
+    for (auto& m : list)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("id", m.id);
+        o->setProperty ("name", m.name);
+        o->setProperty ("position", m.position);
+        items.add (juce::var (o));
+    }
+    state.setProperty (ids::markers, juce::JSON::toString (juce::var (items), true), &undo);
+}
+
+int Project::addMarker (juce::int64 at)
+{
+    auto list = getMarkers();
+    for (auto& m : list)
+        if (m.position == at)
+            return m.id;
+
+    // Logic numbers new markers after the highest "Marker N" so far.
+    int highest = 0;
+    for (auto& m : list)
+        if (m.name.startsWith ("Marker "))
+            highest = juce::jmax (highest, m.name.fromFirstOccurrenceOf ("Marker ", false, false).getIntValue());
+
+    // Marker ids live in the JSON, which nextId() doesn't see, so stay above both.
+    int id = nextId();
+    for (auto& m : list)
+        id = juce::jmax (id, m.id + 1);
+    list.push_back ({ id, "Marker " + juce::String (highest + 1), juce::jmax ((juce::int64) 0, at) });
+    setMarkers (list);
+    return id;
+}
+
+void Project::moveMarker (int id, juce::int64 to)
+{
+    auto list = getMarkers();
+    for (auto& m : list)
+        if (m.id == id && m.position != to)
+        {
+            m.position = juce::jmax ((juce::int64) 0, to);
+            setMarkers (list);
+            return;
+        }
+}
+
+void Project::renameMarker (int id, const juce::String& name)
+{
+    auto list = getMarkers();
+    for (auto& m : list)
+        if (m.id == id && m.name != name)
+        {
+            m.name = name;
+            setMarkers (list);
+            return;
+        }
+}
+
+void Project::removeMarker (int id)
+{
+    auto list = getMarkers();
+    const auto before = list.size();
+    list.erase (std::remove_if (list.begin(), list.end(), [id] (auto& m) { return m.id == id; }), list.end());
+    if (list.size() != before)
+        setMarkers (list);
+}
+
+juce::int64 Project::nextMarkerAfter (juce::int64 from) const
+{
+    for (auto& m : getMarkers())
+        if (m.position > from)
+            return m.position;
+    return -1;
+}
+
+juce::int64 Project::previousMarkerBefore (juce::int64 from) const
+{
+    juce::int64 found = -1;
+    for (auto& m : getMarkers())
+        if (m.position < from)
+            found = m.position;
+    return found;
+}
+
 juce::int64 Project::contentEnd() const
 {
     juce::int64 end = 0;

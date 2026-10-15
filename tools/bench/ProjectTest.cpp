@@ -179,6 +179,106 @@ int runProjectTest()
         a.setProperty (ids::mute, false, nullptr);
     }
 
+    std::cout << "copy, paste, repeat, nudge, region mute\n";
+    {
+        auto b = project->addTrack ("B");
+        b.setProperty (ids::rigOn, false, nullptr);
+        auto c = project->addTrack ("C");
+        auto onA = a.getChild (0);                                  // 20000..26000 on track 0
+        auto onB = project->addRegion (b, "Audio/clicks.wav", 23000, 0, 2000, "b");
+        const juce::Array<int> both { (int) onA[ids::id], (int) onB[ids::id] };
+
+        auto clip = project->copyRegions (both);
+        check (clip.getNumChildren() == 2 && (juce::int64) clip.getChild (0)[ids::start] == 0
+                 && (juce::int64) clip.getChild (1)[ids::start] == 3000 && (int) clip.getChild (1)[ids::lane] == 1,
+               "copy keeps the regions' spacing and track layout");
+
+        project->undo.beginNewTransaction ("Paste");
+        auto pasted = project->pasteRegions (clip, 50000, 1);       // onto B and C
+        auto p0 = project->regionById (pasted[0]), p1 = project->regionById (pasted[1]);
+        check (pasted.size() == 2 && p0.getParent() == b && p1.getParent() == c
+                 && (juce::int64) p0[ids::start] == 50000 && (juce::int64) p1[ids::start] == 53000
+                 && ! p0.hasProperty (ids::lane) && ! both.contains (pasted[0]),
+               "paste lands at the playhead from the selected track down, with new ids");
+        project->undo.undo();
+        check (! project->regionById (pasted[0]).isValid(), "undo removes the pasted regions");
+
+        project->undo.beginNewTransaction ("Paste");
+        pasted = project->pasteRegions (clip, 0, 2);                // below the last track: clamped to C
+        check (project->regionById (pasted[1]).getParent() == c, "lanes past the last track stay on the last track");
+        project->undo.undo();
+
+        {
+            const auto otherFolder = folder.getSiblingFile ("woodshed-project-test-other");
+            otherFolder.deleteRecursively();
+            auto other = Project::createIn (otherFolder, rate);
+            other->addTrack ("X");
+            auto fromOther = other->pasteRegions (clip, 0, 0);
+            const auto file = other->regionById (fromOther[0])[ids::file].toString();
+            check (other->resolve (file).existsAsFile() && other->resolve (file).isAChildOf (other->audioFolder())
+                     && other->regionById (fromOther[0])[ids::file] == other->regionById (fromOther[1])[ids::file],
+                   "pasting into another project copies the audio in, once");
+            otherFolder.deleteRecursively();
+        }
+
+        project->undo.beginNewTransaction ("Repeat");
+        auto repeated = project->repeatRegions (both);
+        auto r0 = project->regionById (repeated[0]), r1 = project->regionById (repeated[1]);
+        check (r0.getParent() == a && r1.getParent() == b && (juce::int64) r0[ids::start] == 26000
+                 && (juce::int64) r1[ids::start] == 29000, "repeat places a copy straight after the block");
+        project->undo.undo();
+
+        project->undo.beginNewTransaction ("Nudge");
+        project->nudgeRegions (both, -30000);
+        check ((juce::int64) onA[ids::start] == 0 && (juce::int64) onB[ids::start] == 3000, "nudge stops at the song start, as a block");
+        project->undo.undo();
+        check ((juce::int64) onA[ids::start] == 20000, "undo nudge");
+
+        b.setProperty (ids::mute, true, nullptr);
+        onA.setProperty (ids::mute, true, nullptr);
+        auto r = offline (*project, pool, 40000);
+        check (clicks (r.left.data(), (int) r.left.size()).empty(), "a muted region is silent");
+        onA.removeProperty (ids::mute, nullptr);
+
+        project->removeTrack (c);
+        project->removeTrack (b);
+    }
+
+    std::cout << "markers\n";
+    {
+        const auto tracksBefore = project->numTracks();
+        project->undo.beginNewTransaction ("Create Marker");
+        const int verse = project->addMarker (96000);
+        project->undo.beginNewTransaction ("Create Marker");
+        const int intro = project->addMarker (0);
+        auto markers = project->getMarkers();
+        check (markers.size() == 2 && markers[0].id == intro && markers[1].id == verse && verse != intro
+                 && markers[0].name == "Marker 2" && markers[1].name == "Marker 1",
+               "markers come back in timeline order, numbered as they were made");
+        check (project->numTracks() == tracksBefore, "markers don't count as tracks");
+        check (project->addMarker (96000) == verse && project->getMarkers().size() == 2, "a second marker at the same place is the first one");
+
+        project->undo.beginNewTransaction ("Rename Marker");
+        project->renameMarker (verse, "Verse");
+        project->undo.beginNewTransaction ("Move Marker");
+        project->moveMarker (verse, 48000);
+        check (project->nextMarkerAfter (0) == 48000 && project->previousMarkerBefore (48000) == 0
+                 && project->nextMarkerAfter (48000) == -1, "next and previous marker");
+
+        project->save();
+        auto copy = Project::load (project->folder);
+        check (copy != nullptr && copy->getMarkers().size() == 2 && copy->getMarkers()[1].name == "Verse",
+               "markers survive save and load");
+
+        project->undo.undo();                                       // move
+        project->undo.undo();                                       // rename
+        check (project->getMarkers()[1].name == "Marker 1" && project->getMarkers()[1].position == 96000, "undo marker edits");
+        project->undo.beginNewTransaction ("Delete Marker");
+        project->removeMarker (intro);
+        project->removeMarker (verse);
+        check (project->getMarkers().empty() && ! project->state.hasProperty (ids::markers), "deleting every marker clears the property");
+    }
+
     std::cout << "pan, mute, solo\n";
     {
         a.setProperty (ids::pan, -1.0, nullptr);

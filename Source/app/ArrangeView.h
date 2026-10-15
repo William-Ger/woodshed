@@ -42,7 +42,7 @@ public:
     daw::Project& project() const                           { return studio.project(); }
     arrange::WaveformCache waveforms;
 
-    static constexpr int headerWidth = 200, rulerHeight = 40, trackHeight = 64, scrollBarSize = 10;
+    static constexpr int headerWidth = 200, rulerHeight = 58, trackHeight = 64, scrollBarSize = 10;
 
     float xForSample (double sample) const                  { return (float) ((sample - viewStart) / samplesPerPixel); }
     double sampleAtX (double x) const                       { return viewStart + x * samplesPerPixel; }

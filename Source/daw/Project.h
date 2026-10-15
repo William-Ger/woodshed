@@ -12,13 +12,14 @@ namespace woodshed::daw
     whole tree is the save file (project.woodshed in the project folder, recordings in Audio/).
 
     PROJECT  name, sampleRate, tempo, beatsPerBar, beatUnit, click (bool), countIn (bool),
-             loopOn (bool), loopStart, loopEnd (samples), masterVolume (dB), selectedTrack (id)
+             loopOn (bool), loopStart, loopEnd (samples), masterVolume (dB), selectedTrack (id),
+             markers (JSON array of { id, name, position }; a property, so the children stay tracks)
       TRACK  id (int, unique), name, colour (ARGB int), volume (dB), pan (-1..1),
              mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool)
         RIG     state (XML string of the track's rig: its board, amp, cab and knobs)
         REGION  id (int, unique), name, file (path relative to the project folder),
                 start (timeline sample), offset (sample in the file), length (samples), gain (dB),
-                fadeIn, fadeOut (samples; equal-power, so overlapping fades cross-fade)
+                fadeIn, fadeOut (samples; equal-power, so overlapping fades cross-fade), mute (bool)
 
     All positions and lengths are in samples at the project sample rate.
 */
@@ -32,7 +33,7 @@ namespace ids
     WOODSHED_ID (id) WOODSHED_ID (colour) WOODSHED_ID (volume) WOODSHED_ID (pan) WOODSHED_ID (mute) WOODSHED_ID (solo)
     WOODSHED_ID (arm) WOODSHED_ID (monitor) WOODSHED_ID (input) WOODSHED_ID (rigOn) WOODSHED_ID (state)
     WOODSHED_ID (file) WOODSHED_ID (start) WOODSHED_ID (offset) WOODSHED_ID (length) WOODSHED_ID (gain)
-    WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut)
+    WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
 #undef WOODSHED_ID
 }
 
@@ -51,6 +52,14 @@ struct TimeGrid
     juce::String toBarsBeats (juce::int64 samples) const;
     /** "m:ss.mmm". */
     juce::String toClock (juce::int64 samples) const;
+};
+
+/** A named point on the timeline (Logic's marker track). */
+struct Marker
+{
+    int id = 0;
+    juce::String name;
+    juce::int64 position = 0;
 };
 
 class Project
@@ -97,6 +106,33 @@ public:
     /** Splits at a timeline position; returns the new right-hand region (or invalid if outside). */
     juce::ValueTree splitRegion (juce::ValueTree region, juce::int64 at);
     static juce::ValueTree trackOf (const juce::ValueTree& region) { return region.getParent(); }
+    juce::ValueTree regionById (int id) const;
+
+    /** Copies of these regions for the clipboard: each one's start is relative to the earliest and
+        its `lane` is its track's index relative to the topmost track among them. The clipboard
+        remembers this project's folder so another project can paste it. */
+    juce::ValueTree copyRegions (const juce::Array<int>& regionIds) const;
+    /** Adds the clipboard's regions with their earliest start at `at`, the topmost on `firstTrack`
+        and the rest on the tracks below it (the last track if there are none). Regions copied
+        from another project bring their audio into this one's Audio folder. One undo step if
+        the caller began a transaction. Returns the new regions' ids. */
+    juce::Array<int> pasteRegions (const juce::ValueTree& clipboard, juce::int64 at, int firstTrack);
+    /** Logic's Repeat: a copy of the regions straight after them, as a block. Returns the copies' ids. */
+    juce::Array<int> repeatRegions (const juce::Array<int>& regionIds);
+    /** Moves the regions by `delta` samples, as a block that stops at the song start. */
+    void nudgeRegions (const juce::Array<int>& regionIds, juce::int64 delta);
+
+    // Markers -------------------------------------------------------------------
+    /** In timeline order. */
+    std::vector<Marker> getMarkers() const;
+    /** A new marker ("Marker N") at `at`, or the one already there. Returns its id. */
+    int addMarker (juce::int64 at);
+    void moveMarker (int id, juce::int64 to);
+    void renameMarker (int id, const juce::String& name);
+    void removeMarker (int id);
+    /** The first marker after / the last one before `from`, or -1. */
+    juce::int64 nextMarkerAfter (juce::int64 from) const;
+    juce::int64 previousMarkerBefore (juce::int64 from) const;
 
     /** End of the last region, in samples. */
     juce::int64 contentEnd() const;
@@ -106,6 +142,7 @@ public:
 private:
     static juce::ValueTree createState (double sampleRate);
     static juce::Colour trackColour (int index);
+    void setMarkers (const std::vector<Marker>&);
 };
 
 } // namespace woodshed::daw

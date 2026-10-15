@@ -73,6 +73,9 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
 {
     c.addArray ({ cmd::newProject, cmd::openProject, cmd::saveProject, cmd::saveProjectAs, cmd::bounce, cmd::audioSettings,
                   cmd::undo, cmd::redo, cmd::deleteSelection, cmd::splitAtPlayhead, cmd::selectAll,
+                  cmd::cut, cmd::copy, cmd::paste, cmd::repeatRegions, cmd::nudgeLeft, cmd::nudgeRight,
+                  cmd::muteRegions, cmd::muteTrack, cmd::soloTrack,
+                  cmd::createMarker, cmd::nextMarker, cmd::previousMarker,
                   cmd::newTrack, cmd::deleteTrack, cmd::duplicateTrack,
                   cmd::playStop, cmd::record, cmd::returnToStart, cmd::toggleLoop, cmd::toggleClick, cmd::toggleCountIn,
                   cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
@@ -105,6 +108,31 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
                                    info.addDefaultKeypress (KP::deleteKey, 0); info.setActive (! studio.getSelectedRegions().isEmpty()); break;
         case cmd::splitAtPlayhead: info.setInfo ("Split at Playhead", {}, "Edit", 0); info.addDefaultKeypress ('t', cmdKey); break;
         case cmd::selectAll:       info.setInfo ("Select All", {}, "Edit", 0); info.addDefaultKeypress ('a', cmdKey); break;
+        case cmd::cut:             info.setInfo ("Cut", {}, "Edit", 0); info.addDefaultKeypress ('x', cmdKey);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::copy:            info.setInfo ("Copy", {}, "Edit", 0); info.addDefaultKeypress ('c', cmdKey);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::paste:           info.setInfo ("Paste", {}, "Edit", 0); info.addDefaultKeypress ('v', cmdKey);
+                                   info.setActive (studio.canPaste()); break;
+        case cmd::repeatRegions:   info.setInfo ("Repeat", {}, "Edit", 0); info.addDefaultKeypress ('r', cmdKey);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::nudgeLeft:       info.setInfo ("Nudge Left", {}, "Edit", 0);
+                                   info.addDefaultKeypress (KP::leftKey, juce::ModifierKeys::altModifier);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::nudgeRight:      info.setInfo ("Nudge Right", {}, "Edit", 0);
+                                   info.addDefaultKeypress (KP::rightKey, juce::ModifierKeys::altModifier);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::muteRegions:     info.setInfo ("Mute Regions", {}, "Edit", 0);
+                                   info.addDefaultKeypress ('m', juce::ModifierKeys::ctrlModifier);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::createMarker:    info.setInfo ("Create Marker", {}, "Transport", 0);
+                                   info.addDefaultKeypress ('\'', juce::ModifierKeys::altModifier); break;
+        case cmd::nextMarker:      info.setInfo ("Go to Next Marker", {}, "Transport", 0);
+                                   info.addDefaultKeypress ('.', juce::ModifierKeys::altModifier); break;
+        case cmd::previousMarker:  info.setInfo ("Go to Previous Marker", {}, "Transport", 0);
+                                   info.addDefaultKeypress (',', juce::ModifierKeys::altModifier); break;
+        case cmd::muteTrack:       info.setInfo ("Mute Track", {}, "Track", 0); info.addDefaultKeypress ('m', 0); break;
+        case cmd::soloTrack:       info.setInfo ("Solo Track", {}, "Track", 0); info.addDefaultKeypress ('s', 0); break;
 
         case cmd::newTrack:        info.setInfo ("New Track", {}, "Track", 0); info.addDefaultKeypress ('n', cmdKey | juce::ModifierKeys::altModifier); break;
         case cmd::deleteTrack:     info.setInfo ("Delete Track", {}, "Track", 0); info.addDefaultKeypress (KP::backspaceKey, cmdKey);
@@ -160,6 +188,25 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::redo:            p.undo.redo(); break;
         case cmd::deleteSelection: studio.deleteSelectedRegions(); break;
         case cmd::splitAtPlayhead: studio.splitSelectedAtPlayhead(); break;
+        case cmd::cut:             studio.cutSelectedRegions(); break;
+        case cmd::copy:            studio.copySelectedRegions(); break;
+        case cmd::paste:           studio.paste(); break;
+        case cmd::repeatRegions:   studio.repeatSelectedRegions(); break;
+        case cmd::nudgeLeft:       studio.nudgeSelectedRegions (-1); break;
+        case cmd::nudgeRight:      studio.nudgeSelectedRegions (1); break;
+        case cmd::muteRegions:     studio.toggleMuteSelectedRegions(); break;
+        case cmd::createMarker:
+            p.undo.beginNewTransaction ("Create Marker");
+            p.addMarker (e.getPosition());
+            break;
+        case cmd::nextMarker:
+            if (const auto at = p.nextMarkerAfter (e.getPosition()); at >= 0) e.setPosition (at);
+            break;
+        case cmd::previousMarker:
+            if (const auto at = p.previousMarkerBefore (e.getPosition()); at >= 0) e.setPosition (at);
+            break;
+        case cmd::muteTrack:       studio.toggleSelectedTrack (daw::ids::mute); break;
+        case cmd::soloTrack:       studio.toggleSelectedTrack (daw::ids::solo); break;
         case cmd::selectAll:
         {
             juce::Array<int> all;
@@ -258,14 +305,25 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::undo);
             m.addCommandItem (cm, cmd::redo);
             m.addSeparator();
-            m.addCommandItem (cm, cmd::splitAtPlayhead);
+            m.addCommandItem (cm, cmd::cut);
+            m.addCommandItem (cm, cmd::copy);
+            m.addCommandItem (cm, cmd::paste);
             m.addCommandItem (cm, cmd::deleteSelection);
             m.addCommandItem (cm, cmd::selectAll);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::splitAtPlayhead);
+            m.addCommandItem (cm, cmd::repeatRegions);
+            m.addCommandItem (cm, cmd::muteRegions);
+            m.addCommandItem (cm, cmd::nudgeLeft);
+            m.addCommandItem (cm, cmd::nudgeRight);
             break;
         case 2:
             m.addCommandItem (cm, cmd::newTrack);
             m.addCommandItem (cm, cmd::duplicateTrack);
             m.addCommandItem (cm, cmd::deleteTrack);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::muteTrack);
+            m.addCommandItem (cm, cmd::soloTrack);
             break;
         case 3:
             m.addCommandItem (cm, cmd::playStop);
@@ -276,6 +334,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::loopToSelection);
             m.addCommandItem (cm, cmd::toggleClick);
             m.addCommandItem (cm, cmd::toggleCountIn);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::createMarker);
+            m.addCommandItem (cm, cmd::nextMarker);
+            m.addCommandItem (cm, cmd::previousMarker);
             break;
         case 4:
             m.addCommandItem (cm, cmd::showRig);
