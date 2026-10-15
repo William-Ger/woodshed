@@ -805,6 +805,77 @@
           }
         }
       ]
+    },
+    {
+      "name": "Paranoid",
+      "description": "The 1970 proto-metal gallop: a germanium treble booster slamming a cranked non-master British head into a closed 4x12. Thick mids, raw bite, little gate and almost no room, so palm-muted E-minor eighths stay tight and fast. Stomp 2 to drop the booster for the dirty-rhythm verse feel, 3 for a slapback under the solo.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.82,
+          "bass": 0.4,
+          "mid": 0.72,
+          "treble": 0.62,
+          "presence": 0.5,
+          "sag": 0.45
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.15,
+          "lowcut": 90,
+          "highcut": 7000,
+          "level": -4
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.gate",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "threshold": -64,
+            "release": 80
+          }
+        },
+        {
+          "type": "drive.treble",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "boost": 0.7,
+            "range": "Mid",
+            "level": 3
+          }
+        },
+        {
+          "type": "delay.tape",
+          "spot": 7,
+          "on": false,
+          "knobs": {
+            "time": 110,
+            "repeats": 0.1,
+            "mix": 0.18,
+            "wow": 0.15,
+            "heads": "Short+Long"
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.3,
+            "damp": 0.55,
+            "mix": 0.08
+          }
+        }
+      ]
     }
   ]
 }
