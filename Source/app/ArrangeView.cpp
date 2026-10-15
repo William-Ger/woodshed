@@ -2,6 +2,7 @@
 #include "ArrangeHeader.h"
 #include "ArrangeLanes.h"
 #include "ArrangeRuler.h"
+#include "Icons.h"
 
 namespace woodshed::app
 {
@@ -10,23 +11,7 @@ namespace ids = daw::ids;
 
 ArrangeView::ArrangeView (Studio& s) : studio (s)
 {
-    // Themed menus, scrollbars, buttons and the rename editor.
-    lnf.setColour (juce::PopupMenu::backgroundColourId, theme::panel);
-    lnf.setColour (juce::PopupMenu::textColourId, theme::text);
-    lnf.setColour (juce::PopupMenu::headerTextColourId, theme::dimText);
-    lnf.setColour (juce::PopupMenu::highlightedBackgroundColourId, theme::accent);
-    lnf.setColour (juce::PopupMenu::highlightedTextColourId, juce::Colour (0xff15130f));
-    lnf.setColour (juce::ScrollBar::thumbColourId, theme::panelLight.brighter (0.25f));
-    lnf.setColour (juce::ScrollBar::trackColourId, theme::bar);
-    lnf.setColour (juce::TextButton::buttonColourId, theme::panelLight);
-    lnf.setColour (juce::TextButton::textColourOffId, theme::text);
-    lnf.setColour (juce::ComboBox::outlineColourId, theme::outline);
-    lnf.setColour (juce::TextEditor::backgroundColourId, theme::window);
-    lnf.setColour (juce::TextEditor::textColourId, theme::text);
-    lnf.setColour (juce::TextEditor::highlightColourId, theme::accent.withAlpha (0.35f));
-    lnf.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent);
-    setLookAndFeel (&lnf);
-
+    // Menus, scroll bars and the rename editor come from the app's StudioLookAndFeel.
     ruler = std::make_unique<arrange::Ruler> (*this);
     lanes = std::make_unique<arrange::Lanes> (*this);
     addAndMakeVisible (*ruler);
@@ -60,7 +45,6 @@ ArrangeView::~ArrangeView()
     waveforms.removeChangeListener (this);
     attached.removeListener (this);
     headers.clear();
-    setLookAndFeel (nullptr);
 }
 
 //==============================================================================
@@ -194,23 +178,43 @@ void ArrangeView::paint (juce::Graphics& g)
 {
     g.fillAll (theme::window);
 
-    // Corner above the headers.
-    auto corner = getLocalBounds().removeFromLeft (headerWidth).removeFromTop (rulerHeight);
+    // The header column, continuing below the last track.
+    auto column = getLocalBounds().removeFromLeft (headerWidth);
+    g.setColour (theme::panel);
+    g.fillRect (column);
+
+    // Header bar above the track headers, level with the ruler.
+    auto corner = column.removeFromTop (rulerHeight);
     g.setColour (theme::bar);
     g.fillRect (corner);
-    g.setColour (theme::dimText);
-    g.setFont (theme::font (11.0f, true));
+
+    auto label = corner.withTrimmedLeft (14).withTrimmedRight (40);
+    g.setColour (theme::text);
+    g.setFont (theme::font (13.0f, theme::Weight::semibold));
+    const juce::String title ("Tracks");
+    g.drawText (title, label, juce::Justification::centredLeft);
+
     const int n = project().numTracks();
-    g.drawText (n == 1 ? "1 TRACK" : juce::String (n) + " TRACKS", corner.withTrimmedLeft (14).withTrimmedRight (40),
-                juce::Justification::centredLeft);
+    const int titleWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (13.0f, theme::Weight::semibold), title));
+    g.setColour (theme::faintText);
+    g.setFont (theme::font (12.0f, theme::Weight::medium));
+    g.drawText (juce::String (n), label.withTrimmedLeft (titleWidth + 6), juce::Justification::centredLeft);
 
-    g.setColour (theme::outline);
-    g.fillRect (corner.getX(), corner.getBottom() - 1, corner.getWidth(), 1);
+    // Hairlines: under the header bar and ruler, and between the headers and the lanes.
+    g.setColour (theme::separator);
+    g.fillRect (0, rulerHeight - 1, getWidth(), 1);
     g.fillRect (headerWidth - 1, 0, 1, getHeight());
+}
 
-    // Bottom-left, beside the horizontal scrollbar.
-    g.setColour (theme::bar);
-    g.fillRect (0, getHeight() - scrollBarSize, headerWidth, scrollBarSize);
+void ArrangeView::AddButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    const auto r = getLocalBounds().toFloat();
+    if (highlighted || down)
+    {
+        g.setColour (down ? theme::controlDown : theme::controlHover.withAlpha (0.7f));
+        g.fillRoundedRectangle (r, theme::radiusControl);
+    }
+    icons::draw (g, icons::plus(), r.withSizeKeepingCentre (14.0f, 14.0f), highlighted ? theme::text : theme::dimText, 1.8f);
 }
 
 void ArrangeView::resized()
@@ -218,7 +222,7 @@ void ArrangeView::resized()
     auto r = getLocalBounds();
     auto left = r.removeFromLeft (headerWidth);
     auto corner = left.removeFromTop (rulerHeight);
-    addButton.setBounds (corner.removeFromRight (36).withSizeKeepingCentre (24, 22));
+    addButton.setBounds (corner.removeFromRight (36).withSizeKeepingCentre (24, 24).translated (2, 0));
     headerArea.setBounds (left.withTrimmedBottom (scrollBarSize).withTrimmedRight (1));
 
     auto top = r.removeFromTop (rulerHeight);
@@ -558,7 +562,6 @@ void ArrangeView::showTrackMenu (juce::ValueTree track)
     }
 
     juce::PopupMenu m;
-    m.setLookAndFeel (&lnf);
     m.addSectionHeader (track[ids::name].toString());
     m.addItem ("Rename", withTrack ([] (ArrangeView& v, juce::ValueTree t)
     {

@@ -9,8 +9,14 @@ namespace ids = daw::ids;
 
 namespace
 {
-    constexpr float regionInset = 3.0f, nameBarHeight = 15.0f;
-    const juce::Colour darkInk { 0xff15130f };
+    constexpr float regionInset = 2.0f, nameBarHeight = 16.0f, regionRadius = 5.0f;
+    const juce::Colour darkInk { 0xff141416 };
+
+    /** White or near-black, whichever reads better on `fill`. */
+    juce::Colour inkFor (juce::Colour fill)
+    {
+        return fill.getPerceivedBrightness() > 0.62f ? darkInk : juce::Colours::white;
+    }
 
     bool isAudioFile (const juce::String& path)
     {
@@ -99,10 +105,10 @@ void Lanes::paint (juce::Graphics& g)
         g.fillRect (row);
         if ((int) t[ids::id] == selectedTrack)
         {
-            g.setColour (trackColour (t).withAlpha (0.05f));
+            g.setColour (juce::Colours::white.withAlpha (0.018f));
             g.fillRect (row);
         }
-        g.setColour (theme::window.withAlpha (0.6f));
+        g.setColour (theme::separator.withAlpha (0.55f));
         g.fillRect (row.getX(), row.getBottom() - 1, row.getWidth(), 1);
     }
 
@@ -113,9 +119,9 @@ void Lanes::paint (juce::Graphics& g)
         if (loopEnd > loopStart)
         {
             const float x1 = view.xForSample ((double) loopStart), x2 = view.xForSample ((double) loopEnd);
-            g.setColour (theme::loop.withAlpha (0.045f));
+            g.setColour (theme::loop.withAlpha (0.035f));
             g.fillRect (juce::Rectangle<float> (x1, 0.0f, x2 - x1, (float) getHeight()));
-            g.setColour (theme::loop.withAlpha (0.28f));
+            g.setColour (theme::loop.withAlpha (0.22f));
             g.fillRect (juce::Rectangle<float> (x1, 0.0f, 1.0f, (float) getHeight()));
             g.fillRect (juce::Rectangle<float> (x2 - 1.0f, 0.0f, 1.0f, (float) getHeight()));
         }
@@ -185,10 +191,10 @@ void Lanes::paint (juce::Graphics& g)
     // Rubber band.
     if (gesture == Gesture::rubber)
     {
-        g.setColour (theme::accent.withAlpha (0.1f));
-        g.fillRect (rubber);
+        g.setColour (theme::accentDim.withMultipliedAlpha (0.45f));
+        g.fillRoundedRectangle (rubber.toFloat(), 3.0f);
         g.setColour (theme::accent.withAlpha (0.7f));
-        g.drawRect (rubber, 1);
+        g.drawRoundedRectangle (rubber.toFloat().reduced (0.5f), 3.0f, 1.0f);
     }
 
     // Where a dropped file will land.
@@ -203,7 +209,7 @@ void Lanes::paint (juce::Graphics& g)
         const float x = view.xForSample ((double) dropAt);
         g.setColour (theme::accent);
         g.fillRect (juce::Rectangle<float> (x, (float) row.getY(), 2.0f, (float) row.getHeight()));
-        g.setFont (theme::font (12.0f, true));
+        g.setFont (theme::font (12.0f, theme::Weight::semibold));
         g.drawText (dropTrack >= 0 ? "Drop to add to " + p.track (dropTrack)[ids::name].toString() : "Drop to add a new track",
                     row.withTrimmedLeft (juce::roundToInt (x) + 8).withWidth (260), juce::Justification::centredLeft);
     }
@@ -216,8 +222,6 @@ void Lanes::paint (juce::Graphics& g)
     if (px > -4.0f && px < (float) getWidth() + 4.0f)
     {
         const auto colour = engine.isRecording() ? theme::record : theme::accent;
-        g.setColour (colour.withAlpha (0.15f));
-        g.fillRect (px - 1.0f, 0.0f, 3.0f, (float) getHeight());
         g.setColour (colour);
         g.fillRect (px, 0.0f, 1.0f, (float) getHeight());
     }
@@ -258,7 +262,7 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
 {
     const auto rect = regionRect (trackIndex, look.start, look.length);
     const auto clip = g.getClipBounds().toFloat();
-    if (rect.getRight() < clip.getX() - 2.0f || rect.getX() > clip.getRight() + 2.0f)
+    if (rect.getRight() < clip.getX() - 4.0f || rect.getX() > clip.getRight() + 4.0f)
         return;
 
     auto colour = trackColour (view.project().track (trackIndex));
@@ -267,44 +271,56 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
 
     if (look.ghost)
     {
-        g.setColour (colour.withAlpha (0.08f));
-        g.fillRoundedRectangle (rect, 4.0f);
-        g.setColour (colour.withAlpha (0.4f));
-        g.drawRoundedRectangle (rect.reduced (0.5f), 4.0f, 1.0f);
+        g.setColour (colour.withAlpha (0.07f));
+        g.fillRoundedRectangle (rect, regionRadius);
+        g.setColour (colour.withAlpha (0.35f));
+        g.drawRoundedRectangle (rect.reduced (0.5f), regionRadius, 1.0f);
         return;
     }
 
     // Keep enormous regions to the area being painted, with a margin so cut ends stay out of view.
-    const auto body = rect.getIntersection ({ clip.getX() - 8.0f, rect.getY(), clip.getWidth() + 16.0f, rect.getHeight() });
+    const auto body = rect.getIntersection ({ clip.getX() - 12.0f, rect.getY(), clip.getWidth() + 24.0f, rect.getHeight() });
 
-    g.setColour (colour.withMultipliedBrightness (look.selected ? 0.55f : 0.38f).withMultipliedSaturation (0.85f));
-    g.fillRoundedRectangle (body, 4.0f);
+    // Selected regions sit a little higher: a soft shadow under them.
+    if (look.selected)
+    {
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.fillRoundedRectangle (body.translated (0.0f, 1.5f).expanded (0.5f), regionRadius + 0.5f);
+    }
 
-    // Name bar.
-    auto bar = body.withHeight (nameBarHeight);
+    // Body: the track colour, dark and translucent over the lane.
+    g.setColour (theme::lane);
+    g.fillRoundedRectangle (body, regionRadius);
+    g.setColour (colour.withAlpha (look.selected ? 0.34f : 0.24f));
+    g.fillRoundedRectangle (body, regionRadius);
+
+    // Header strip.
+    const auto strip = body.withHeight (nameBarHeight);
+    const auto stripColour = colour.withMultipliedBrightness (look.selected ? 1.0f : 0.82f)
+                                   .withMultipliedSaturation (look.selected ? 1.0f : 0.9f);
     {
         juce::Graphics::ScopedSaveState s (g);
-        g.reduceClipRegion (bar.toNearestInt());
-        g.setColour (look.selected ? colour.brighter (0.25f) : colour.withMultipliedBrightness (0.85f));
-        g.fillRoundedRectangle (body, 4.0f);
+        g.reduceClipRegion (strip.toNearestInt());
+        g.setColour (stripColour);
+        g.fillRoundedRectangle (body, regionRadius);
     }
 
     // Name: stays in view when the region starts off the left edge.
     {
-        const float textX = juce::jmax (rect.getX(), 0.0f) + 5.0f;
-        const float textW = rect.getRight() - textX - 4.0f;
+        const float textX = juce::jmax (rect.getX(), 0.0f) + 6.0f;
+        const float textW = rect.getRight() - textX - 5.0f;
         if (textW > 14.0f)
         {
-            g.setColour (darkInk.withAlpha (0.9f));
-            g.setFont (theme::font (11.0f, true));
-            g.drawText (region[ids::name].toString(), juce::Rectangle<float> (textX, bar.getY(), textW, nameBarHeight),
+            g.setColour (inkFor (stripColour).withAlpha (0.92f));
+            g.setFont (theme::font (11.0f, theme::Weight::semibold));
+            g.drawText (region[ids::name].toString(), juce::Rectangle<float> (textX, strip.getY(), textW, nameBarHeight),
                         juce::Justification::centredLeft, true);
         }
     }
 
     // Waveform: only the slice the region plays, and only the part that's on screen.
     const auto file = view.project().resolve (region[ids::file].toString());
-    const auto wave = body.withTrimmedTop (nameBarHeight + 1.0f).reduced (0.0f, 2.0f);
+    const auto wave = body.withTrimmedTop (nameBarHeight).reduced (0.0f, 3.0f);
     const auto info = view.waveforms.info (file);
     auto* thumb = info.length > 0 ? view.waveforms.thumbnail (file) : nullptr;
 
@@ -321,11 +337,10 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
 
         juce::Graphics::ScopedSaveState s (g);
         g.reduceClipRegion (wave.toNearestInt());
-        // Centre line, then the wave.
-        g.setColour (colour.withAlpha (0.25f));
+        g.setColour (colour.withAlpha (0.3f));
         g.fillRect (wave.withHeight (1.0f).withCentre (wave.getCentre()));
-        g.setColour (look.selected ? colour.interpolatedWith (juce::Colours::white, 0.75f)
-                                   : colour.brighter (0.35f).withAlpha (0.9f));
+        g.setColour (colour.interpolatedWith (juce::Colours::white, look.selected ? 0.6f : 0.4f)
+                           .withAlpha (look.muted ? 0.6f : 0.95f));
         thumb->drawChannel (g, wave.toNearestInt(), fromSample / rate, toSample / rate, 0, gain);
     }
     else if (wave.getHeight() > 10.0f)
@@ -336,16 +351,18 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
                     juce::Justification::centredLeft, true);
     }
 
-    // Outline.
+    // Border: crisp in the track colour; brighter when selected.
     if (look.selected)
     {
-        g.setColour (theme::text.withAlpha (0.95f));
-        g.drawRoundedRectangle (body.reduced (0.75f), 4.0f, 1.5f);
+        g.setColour (colour.interpolatedWith (juce::Colours::white, 0.75f));
+        g.drawRoundedRectangle (body.reduced (0.5f), regionRadius, 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.25f));
+        g.drawRoundedRectangle (body.reduced (1.5f), regionRadius - 1.0f, 1.0f);
     }
     else
     {
-        g.setColour (darkInk.withAlpha (0.6f));
-        g.drawRoundedRectangle (body.reduced (0.5f), 4.0f, 1.0f);
+        g.setColour (colour.withAlpha (0.75f));
+        g.drawRoundedRectangle (body.reduced (0.5f), regionRadius, 1.0f);
     }
 }
 
@@ -365,21 +382,25 @@ void Lanes::drawTakes (juce::Graphics& g)
             continue;
 
         const auto rect = regionRect (i, start, length);
-        g.setColour (theme::record.withAlpha (0.28f));
-        g.fillRoundedRectangle (rect, 4.0f);
+        g.setColour (theme::lane);
+        g.fillRoundedRectangle (rect, regionRadius);
+        g.setColour (theme::record.withAlpha (0.22f));
+        g.fillRoundedRectangle (rect, regionRadius);
         {
             juce::Graphics::ScopedSaveState s (g);
             g.reduceClipRegion (rect.withHeight (nameBarHeight).toNearestInt());
-            g.setColour (theme::record.withAlpha (0.9f));
-            g.fillRoundedRectangle (rect, 4.0f);
+            g.setColour (theme::record.withMultipliedBrightness (0.9f));
+            g.fillRoundedRectangle (rect, regionRadius);
         }
-        g.setColour (theme::record);
-        g.drawRoundedRectangle (rect.reduced (0.5f), 4.0f, 1.0f);
-        if (rect.getWidth() > 50.0f)
+        g.setColour (theme::record.withAlpha (0.9f));
+        g.drawRoundedRectangle (rect.reduced (0.5f), regionRadius, 1.0f);
+        if (rect.getWidth() > 60.0f)
         {
+            const float textX = juce::jmax (rect.getX(), 0.0f) + 6.0f;
             g.setColour (juce::Colours::white);
-            g.setFont (theme::font (11.0f, true));
-            g.drawText ("Recording", rect.withHeight (nameBarHeight).withTrimmedLeft (5.0f), juce::Justification::centredLeft, true);
+            g.setFont (theme::font (11.0f, theme::Weight::semibold));
+            g.drawText ("Recording", juce::Rectangle<float> (textX, rect.getY(), rect.getRight() - textX - 5.0f, nameBarHeight),
+                        juce::Justification::centredLeft, true);
         }
     }
 }
@@ -391,29 +412,78 @@ void Lanes::drawHint (juce::Graphics& g, int contentBottom) const
         return;
 
 #if JUCE_MAC
-    const juce::String newTrackKeys = "Cmd+Option+N";
+    const juce::StringArray newTrackKeys { "Cmd", "Option", "N" };
 #else
-    const juce::String newTrackKeys = "Ctrl+Alt+N";
+    const juce::StringArray newTrackKeys { "Ctrl", "Alt", "N" };
 #endif
 
     auto area = getLocalBounds().withTrimmedTop (juce::jmax (0, contentBottom));
-    if (area.getHeight() < 70)
-        area = getLocalBounds().withTrimmedTop (juce::jmax (0, getHeight() - 90));
+    if (area.getHeight() < 76)
+        area = getLocalBounds().withTrimmedTop (juce::jmax (0, getHeight() - 84));
 
-    auto box = area.withSizeKeepingCentre (juce::jmin (area.getWidth() - 40, 460), 64);
-    g.setColour (theme::text.withAlpha (0.8f));
-    g.setFont (theme::font (16.0f, true));
-    g.drawText ("Press R to record, or " + newTrackKeys + " for a new track", box.removeFromTop (28),
+    // One line of key caps and labels, centred; a quieter line under it.
+    struct Piece { juce::String text; bool key; };
+    std::vector<Piece> pieces { { "Press", false }, { "R", true }, { "to record, or", false } };
+    for (auto& k : newTrackKeys)
+        pieces.push_back ({ k, true });
+    pieces.push_back ({ "for a new track", false });
+
+    const auto labelFont = theme::font (13.0f, theme::Weight::medium);
+    const auto keyFont = theme::font (11.0f, theme::Weight::semibold);
+    constexpr float gap = 6.0f, keyPad = 6.0f, keyHeight = 20.0f;
+
+    auto widthOf = [&] (const Piece& piece)
+    {
+        return piece.key ? juce::jmax (keyHeight, juce::GlyphArrangement::getStringWidth (keyFont, piece.text) + keyPad * 2.0f)
+                         : juce::GlyphArrangement::getStringWidth (labelFont, piece.text);
+    };
+
+    // Keys of one shortcut sit closer together.
+    auto gapAfter = [&] (size_t i)
+    {
+        return i + 1 < pieces.size() && pieces[i].key && pieces[i + 1].key ? 3.0f : gap;
+    };
+
+    float total = 0.0f;
+    for (size_t i = 0; i < pieces.size(); ++i)
+        total += widthOf (pieces[i]) + (i + 1 < pieces.size() ? gapAfter (i) : 0.0f);
+
+    const auto centre = area.toFloat().getCentre();
+    float x = centre.x - total * 0.5f;
+    const float y = centre.y - 16.0f;
+
+    for (size_t i = 0; i < pieces.size(); ++i)
+    {
+        const auto& piece = pieces[i];
+        const float w = widthOf (piece);
+        const juce::Rectangle<float> box (x, y, w, keyHeight);
+        if (piece.key)
+        {
+            theme::drawRaised (g, box, theme::radiusChip, theme::control);
+            g.setColour (theme::text);
+            g.setFont (keyFont);
+            g.drawText (piece.text, box, juce::Justification::centred);
+        }
+        else
+        {
+            g.setColour (theme::text.withAlpha (0.85f));
+            g.setFont (labelFont);
+            g.drawText (piece.text, box, juce::Justification::centred);
+        }
+        x += w + gapAfter (i);
+    }
+
+    g.setColour (theme::faintText);
+    g.setFont (theme::font (12.0f));
+    g.drawText ("You can also drop WAV, AIFF or FLAC files here",
+                juce::Rectangle<float> (area.toFloat().getX(), y + keyHeight + 8.0f, area.toFloat().getWidth(), 18.0f),
                 juce::Justification::centred, true);
-    g.setColour (theme::dimText);
-    g.setFont (theme::font (13.0f));
-    g.drawText ("You can also drop WAV, AIFF or FLAC files here", box.removeFromTop (22), juce::Justification::centred, true);
 }
 
 void Lanes::playheadMoved (float oldX, float newX)
 {
-    repaint (juce::Rectangle<int> ((int) oldX - 3, 0, 7, getHeight()));
-    repaint (juce::Rectangle<int> ((int) newX - 3, 0, 7, getHeight()));
+    repaint (juce::Rectangle<int> ((int) oldX - 2, 0, 5, getHeight()));
+    repaint (juce::Rectangle<int> ((int) newX - 2, 0, 5, getHeight()));
 }
 
 //==============================================================================
@@ -696,7 +766,6 @@ void Lanes::showRegionMenu()
 {
     auto& studio = view.studio;
     juce::PopupMenu m;
-    m.setLookAndFeel (&view.getLookAndFeelForMenus());
     m.addItem ("Split at Playhead", [&studio] { studio.splitSelectedAtPlayhead(); });
     m.addItem ("Loop These Regions", [&studio] { studio.commands.invokeDirectly (cmd::loopToSelection, false); });
     m.addSeparator();

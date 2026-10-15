@@ -19,9 +19,9 @@ void Ruler::paint (juce::Graphics& g)
 
     g.fillAll (theme::bar);
 
-    // Loop strip.
-    const auto strip = getLocalBounds().withTrimmedTop (numbersHeight).toFloat();
-    g.setColour (theme::window);
+    // Loop strip: a touch darker than the numbers, with the range as a rounded band.
+    const auto strip = getLocalBounds().withTrimmedTop (numbersHeight).withTrimmedBottom (1).toFloat();
+    g.setColour (theme::panel);
     g.fillRect (strip);
 
     const auto loopStart = (juce::int64) state[ids::loopStart];
@@ -30,19 +30,22 @@ void Ruler::paint (juce::Graphics& g)
     {
         const bool on = (bool) state[ids::loopOn];
         const float x1 = view.xForSample ((double) loopStart), x2 = view.xForSample ((double) loopEnd);
-        auto range = juce::Rectangle<float> (x1, strip.getY() + 3.0f, x2 - x1, strip.getHeight() - 6.0f);
+        const auto range = juce::Rectangle<float> (x1, strip.getY() + 3.0f, x2 - x1, strip.getHeight() - 6.0f);
         if (range.getRight() > -10.0f && range.getX() < width + 10.0f)
         {
-            g.setColour (on ? theme::loop.withAlpha (0.85f) : theme::loop.withAlpha (0.14f));
-            g.fillRoundedRectangle (range, 3.0f);
-            g.setColour (on ? theme::loop.brighter (0.3f) : theme::loop.withAlpha (0.45f));
-            g.drawRoundedRectangle (range.reduced (0.5f), 3.0f, 1.0f);
+            const float radius = juce::jmin (4.0f, range.getHeight() * 0.5f);
+            g.setColour (theme::loop.withAlpha (on ? 0.30f : 0.08f));
+            g.fillRoundedRectangle (range, radius);
+            g.setColour (theme::loop.withAlpha (on ? 0.85f : 0.30f));
+            g.drawRoundedRectangle (range.reduced (0.5f), radius, 1.0f);
 
-            // Grips at each end.
-            g.setColour (on ? juce::Colour (0xff15130f).withAlpha (0.45f) : theme::loop.withAlpha (0.5f));
-            for (float gx : { range.getX() + 4.0f, range.getRight() - 6.0f })
-                if (range.getWidth() > 20.0f)
-                    g.fillRect (juce::Rectangle<float> (gx, range.getCentreY() - 3.0f, 2.0f, 6.0f));
+            // Handles: solid pills just inside each end.
+            if (range.getWidth() > 18.0f)
+            {
+                g.setColour (on ? theme::loop : theme::loop.withAlpha (0.4f));
+                for (float hx : { range.getX() + 3.0f, range.getRight() - 5.0f })
+                    g.fillRoundedRectangle (juce::Rectangle<float> (hx, range.getY() + 2.5f, 2.0f, range.getHeight() - 5.0f), 1.0f);
+            }
         }
     }
 
@@ -52,18 +55,19 @@ void Ruler::paint (juce::Graphics& g)
     const double firstBeat = std::floor (view.sampleAtX (0.0) / spb / step) * step;
     const double lastBeat = view.sampleAtX (width) / spb;
     const int bpb = juce::jmax (1, grid.beatsPerBar);
+    const float base = (float) numbersHeight;
 
-    g.setFont (theme::font (11.5f));
+    g.setFont (theme::font (11.0f, theme::Weight::medium));
     for (double beat = juce::jmax (0.0, firstBeat); beat <= lastBeat + step; beat += step)
     {
         const float x = std::round (view.xForSample (beat * spb));
         const double inBar = std::fmod (beat, (double) bpb);
         const bool isBar = inBar < 1.0e-6 || bpb - inBar < 1.0e-6;
         const bool isBeat = std::abs (beat - std::round (beat)) < 1.0e-6;
-        const float tickTop = isBar ? 10.0f : (isBeat ? 17.0f : 20.0f);
+        const float tickTop = isBar ? 5.0f : (isBeat ? base - 5.0f : base - 3.0f);
 
-        g.setColour (isBar ? theme::dimText.withAlpha (0.7f) : theme::gridBar);
-        g.fillRect (x, tickTop, 1.0f, (float) numbersHeight - tickTop);
+        g.setColour (isBar ? theme::faintText : theme::faintText.withAlpha (isBeat ? 0.55f : 0.35f));
+        g.fillRect (x, tickTop, 1.0f, base - tickTop);
 
         const double labelPhase = std::fmod (beat, labelStep);
         if (labelPhase > 1.0e-6 && labelStep - labelPhase > 1.0e-6)
@@ -73,31 +77,32 @@ void Ruler::paint (juce::Graphics& g)
         const int beatInBar = (int) std::floor (inBar + 1.0e-6) + 1;
         if (isBar)
         {
-            g.setColour (theme::text.withAlpha (0.85f));
-            g.drawText (juce::String (bar), juce::Rectangle<float> (x + 4.0f, 1.0f, 40.0f, 16.0f), juce::Justification::centredLeft);
+            g.setColour (theme::dimText);
+            g.drawText (juce::String (bar), juce::Rectangle<float> (x + 4.0f, 3.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
         }
         else if (isBeat)
         {
-            g.setColour (theme::dimText);
+            g.setColour (theme::faintText);
             g.drawText (juce::String (bar) + "." + juce::String (beatInBar),
-                        juce::Rectangle<float> (x + 3.0f, 3.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
+                        juce::Rectangle<float> (x + 3.0f, 5.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
         }
     }
 
-    g.setColour (theme::outline);
-    g.fillRect (0, numbersHeight - 1, getWidth(), 1);
+    g.setColour (theme::separator.withAlpha (0.6f));
+    g.fillRect (0, numbersHeight, getWidth(), 1);
+    g.setColour (theme::separator);
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 
-    // Playhead: a marker in the numbers and a line down through the strip.
+    // Playhead: a small cap in the numbers and a hairline down through the strip.
     const float px = std::round (view.xForSample ((double) view.studio.engine().getPosition()));
     if (px > -8.0f && px < width + 8.0f)
     {
         const auto colour = view.studio.engine().isRecording() ? theme::record : theme::accent;
         g.setColour (colour);
-        g.fillRect (px, 0.0f, 1.0f, (float) getHeight());
-        juce::Path marker;
-        marker.addTriangle (px - 5.5f, 0.0f, px + 6.5f, 0.0f, px + 0.5f, 8.0f);
-        g.fillPath (marker);
+        g.fillRect (px, 6.0f, 1.0f, (float) getHeight() - 6.0f);
+        juce::Path cap;
+        cap.addTriangle (px - 5.0f, 1.0f, px + 6.0f, 1.0f, px + 0.5f, 8.0f);
+        g.fillPath (cap.createPathWithRoundedCorners (1.5f));
     }
 }
 

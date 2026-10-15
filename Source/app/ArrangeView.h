@@ -42,7 +42,7 @@ public:
     daw::Project& project() const                           { return studio.project(); }
     arrange::WaveformCache waveforms;
 
-    static constexpr int headerWidth = 220, rulerHeight = 40, trackHeight = 72, scrollBarSize = 10;
+    static constexpr int headerWidth = 200, rulerHeight = 40, trackHeight = 64, scrollBarSize = 10;
 
     float xForSample (double sample) const                  { return (float) ((sample - viewStart) / samplesPerPixel); }
     double sampleAtX (double x) const                       { return viewStart + x * samplesPerPixel; }
@@ -76,8 +76,6 @@ public:
     void showTrackMenu (juce::ValueTree track);
     void addTrackAfterSelection();
 
-    juce::LookAndFeel_V4& getLookAndFeelForMenus()          { return lnf; }
-
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void scrollBarMoved (juce::ScrollBar*, double newRangeStart) override;
@@ -100,7 +98,6 @@ private:
     int lanesWidth() const;
     int lanesHeight() const;
 
-    juce::LookAndFeel_V4 lnf;
     juce::ValueTree attached;
     daw::Project* attachedProject = nullptr;
 
@@ -114,7 +111,15 @@ private:
     std::unique_ptr<arrange::Lanes> lanes;
     juce::Component headerArea;
     std::vector<std::unique_ptr<arrange::TrackHeader>> headers;
-    juce::TextButton addButton { "+" };
+    /** The + in the header bar: a borderless icon button. */
+    class AddButton final : public juce::Button
+    {
+    public:
+        AddButton() : juce::Button ("New track") {}
+        void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    };
+
+    AddButton addButton;
     juce::ScrollBar hScroll { false }, vScroll { true };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ArrangeView)
