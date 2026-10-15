@@ -5,18 +5,18 @@ namespace woodshed::app
 
 namespace ids = daw::ids;
 
+namespace { constexpr int gutter = 4; }    // between the track strips and the master's bay
+
 MixerView::MixerView (Studio& s) : studio (s)
 {
     viewport.setViewedComponent (&content, false);
     viewport.setScrollBarsShown (false, true, false, true);
-    viewport.setScrollBarThickness (9);
-    viewport.getHorizontalScrollBar().setColour (juce::ScrollBar::thumbColourId, theme::panelLight.brighter (0.25f));
-    viewport.getHorizontalScrollBar().setColour (juce::ScrollBar::trackColourId, theme::bar);
+    viewport.setScrollBarThickness (10);
     addAndMakeVisible (viewport);
 
     studio.addChangeListener (this);
     attach();
-    startTimerHz (30);
+    startTimerHz (60);
 }
 
 MixerView::~MixerView()
@@ -95,7 +95,7 @@ void MixerView::updateSolo()
 //==============================================================================
 void MixerView::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::bar);
+    g.fillAll (theme::window);
 
     if (strips.isEmpty())
     {
@@ -104,20 +104,14 @@ void MixerView::paint (juce::Graphics& g)
         g.drawText ("No tracks yet. Add one from the Track menu.", viewport.getBounds(), juce::Justification::centred, false);
     }
 
-    // The master sits in its own bay, with a shadow falling onto the track strips.
+    // The master sits in its own bay: a hairline and a narrow gap of window colour.
     if (master != nullptr)
     {
-        const auto x = (float) master->getX();
-        g.setGradientFill (juce::ColourGradient (juce::Colours::transparentBlack, x - 14.0f, 0.0f,
-                                                 juce::Colours::black.withAlpha (0.45f), x - 4.0f, 0.0f, false));
-        g.fillRect (x - 14.0f, 0.0f, 10.0f, (float) getHeight());
-        g.setColour (juce::Colours::black);
-        g.fillRect (x - 4.0f, 0.0f, 4.0f, (float) getHeight());
-        g.setColour (theme::outline);
-        g.fillRect (x - 3.0f, 0.0f, 1.0f, (float) getHeight());
+        g.setColour (theme::separator);
+        g.fillRect (master->getX() - gutter, 0, 1, getHeight());
     }
 
-    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.setColour (theme::separator);
     g.fillRect (0, 0, getWidth(), 1);
 }
 
@@ -127,7 +121,7 @@ void MixerView::resized()
     r.removeFromTop (1);
     if (master != nullptr)
         master->setBounds (r.removeFromRight (ChannelStrip::masterWidth));
-    r.removeFromRight (4);
+    r.removeFromRight (gutter);
     viewport.setBounds (r);
     layoutStrips();
 }
