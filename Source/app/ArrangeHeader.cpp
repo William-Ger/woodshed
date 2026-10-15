@@ -1,5 +1,6 @@
 #include "ArrangeHeader.h"
 #include "ArrangeView.h"
+#include "Icons.h"
 
 namespace woodshed::app::arrange
 {
@@ -31,28 +32,53 @@ TrackHeader::Toggle::Toggle (TrackHeader& o, const juce::Identifier& p, juce::St
 void TrackHeader::Toggle::paint (juce::Graphics& g)
 {
     const bool on = (bool) owner.track[property];
+    const bool over = isMouseOver(), down = isMouseButtonDown();
     const auto r = getLocalBounds().toFloat().reduced (0.5f);
+    constexpr float radius = 5.0f;
 
-    g.setColour (on ? onColour : (isMouseOver() ? theme::panelLight.brighter (0.08f) : theme::panelLight));
-    g.fillRoundedRectangle (r, 3.0f);
-    g.setColour (on ? onColour.darker (0.4f) : theme::outline);
-    g.drawRoundedRectangle (r, 3.0f, 1.0f);
-
-    if (glyph == Glyph::dot)
+    if (on)
     {
-        const auto d = r.withSizeKeepingCentre (8.0f, 8.0f);
-        g.setColour (on ? juce::Colours::white : theme::record.withAlpha (0.75f));
-        g.fillEllipse (d);
-        return;
+        g.setColour (down ? onColour.darker (0.2f) : (over ? onColour.brighter (0.08f) : onColour));
+        g.fillRoundedRectangle (r, radius);
+    }
+    else
+    {
+        g.setColour (down ? theme::controlDown : (over ? theme::controlHover : theme::control.withAlpha (0.7f)));
+        g.fillRoundedRectangle (r, radius);
+        // Top light, as on the other raised controls.
+        juce::Graphics::ScopedSaveState s (g);
+        g.reduceClipRegion (r.withHeight (radius).toNearestInt());
+        g.setColour (theme::highlight);
+        g.drawRoundedRectangle (r.reduced (0.5f), radius - 0.5f, 1.0f);
     }
 
-    g.setColour (on ? juce::Colour (0xff15130f) : theme::dimText);
-    g.setFont (theme::font (11.0f, true));
-    g.drawText (label, getLocalBounds(), juce::Justification::centred);
+    // Ink on the lit fill: dark on the light colours, white on record red.
+    const auto ink = on ? (onColour.getPerceivedBrightness() > 0.6f ? juce::Colour (0xff141416) : juce::Colours::white)
+                        : (over ? theme::text : theme::dimText);
+
+    switch (glyph)
+    {
+        case Glyph::dot:
+            g.setColour (on ? juce::Colours::white : theme::record.withAlpha (over ? 0.95f : 0.75f));
+            g.fillEllipse (r.withSizeKeepingCentre (8.0f, 8.0f));
+            break;
+
+        case Glyph::headphones:
+            icons::draw (g, icons::headphones(), r.withSizeKeepingCentre (13.0f, 13.0f), ink);
+            break;
+
+        case Glyph::text:
+        default:
+            g.setColour (ink);
+            g.setFont (theme::font (11.0f, theme::Weight::semibold));
+            g.drawText (label, getLocalBounds().translated (0, 0), juce::Justification::centred);
+            break;
+    }
 }
 
 void TrackHeader::Toggle::mouseDown (const juce::MouseEvent&)
 {
+    repaint();
     auto& p = owner.view.project();
     p.undo.beginNewTransaction (undoName);
     owner.track.setProperty (property, ! (bool) owner.track[property], &p.undo);
@@ -65,7 +91,7 @@ TrackHeader::TrackHeader (ArrangeView& v, juce::ValueTree t)
       mute (*this, ids::mute, "M", Toggle::Glyph::text, theme::mute, "Mute Track"),
       solo (*this, ids::solo, "S", Toggle::Glyph::text, theme::solo, "Solo Track"),
       arm (*this, ids::arm, "R", Toggle::Glyph::dot, theme::record, "Arm Track"),
-      monitor (*this, ids::monitor, "IN", Toggle::Glyph::text, theme::accent, "Monitor Input")
+      monitor (*this, ids::monitor, "IN", Toggle::Glyph::headphones, theme::monitor, "Monitor Input")
 {
     mute.setTooltip ("Mute");
     solo.setTooltip ("Solo");
@@ -75,15 +101,15 @@ TrackHeader::TrackHeader (ArrangeView& v, juce::ValueTree t)
         addAndMakeVisible (*c);
 
     name.setText (track[ids::name].toString(), juce::dontSendNotification);
-    name.setFont (theme::font (14.0f, true));
+    name.setFont (theme::font (13.0f, theme::Weight::medium));
     name.setColour (juce::Label::textColourId, theme::text);
     name.setColour (juce::Label::textWhenEditingColourId, theme::text);
     name.setColour (juce::Label::backgroundWhenEditingColourId, theme::window);
     name.setColour (juce::Label::outlineWhenEditingColourId, theme::accent);
     name.setColour (juce::TextEditor::highlightColourId, theme::accent.withAlpha (0.35f));
     name.setColour (juce::CaretComponent::caretColourId, theme::accent);
-    name.setMinimumHorizontalScale (0.8f);
-    name.setBorderSize ({ 1, 3, 1, 3 });
+    name.setMinimumHorizontalScale (0.85f);
+    name.setBorderSize ({ 0, 2, 0, 2 });
     // Clicks on the name select and drag the track; only the editor (a child) takes the mouse.
     name.setInterceptsMouseClicks (false, true);
     name.onTextChange = [this]
@@ -100,6 +126,7 @@ TrackHeader::TrackHeader (ArrangeView& v, juce::ValueTree t)
     };
     addAndMakeVisible (name);
 
+    setRepaintsOnMouseActivity (true);
     track.addListener (this);
 }
 
@@ -122,54 +149,67 @@ void TrackHeader::valueTreePropertyChanged (juce::ValueTree& tree, const juce::I
     repaint();
 }
 
+void TrackHeader::updateNameStyle (bool selected)
+{
+    const bool muted = (bool) track[ids::mute];
+    if (styled && selected == styledSelected && muted == styledMuted)
+        return;
+
+    styled = true;
+    styledSelected = selected;
+    styledMuted = muted;
+    name.setFont (theme::font (13.0f, selected ? theme::Weight::semibold : theme::Weight::medium));
+    name.setColour (juce::Label::textColourId, muted ? theme::dimText : theme::text);
+}
+
 void TrackHeader::paint (juce::Graphics& g)
 {
     const bool selected = view.studio.getSelectedTrackId() == (int) track[ids::id];
     const auto colour = trackColour (track);
-    auto r = getLocalBounds();
+    const auto r = getLocalBounds();
+    updateNameStyle (selected);
 
-    g.setColour (selected ? theme::panelLight : theme::panel);
-    g.fillRect (r);
+    // Selected: a raised fill with a line of light along the top. Hover: a whisper of it.
     if (selected)
     {
-        g.setColour (colour.withAlpha (0.07f));
+        g.setColour (theme::panelLight);
+        g.fillRect (r);
+        g.setColour (theme::highlight);
+        g.fillRect (r.getX(), r.getY(), r.getWidth(), 1);
+    }
+    else if (isMouseOver (true))
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.02f));
         g.fillRect (r);
     }
 
-    // Colour strip: wider and brighter on the selected track.
-    g.setColour (selected ? colour : colour.withMultipliedSaturation (0.8f).withMultipliedBrightness (0.8f));
-    g.fillRect (r.removeFromLeft (selected ? 6 : 4));
+    // Slim colour bar on the left edge.
+    const auto muted = (bool) track[ids::mute];
+    g.setColour (muted ? colour.withSaturation (0.15f).withMultipliedBrightness (0.7f) : colour);
+    g.fillRect (juce::Rectangle<int> (0, 0, 3, getHeight() - 1));
 
-    // Track number, top right.
+    // Track number, faint, beside the name.
     const int index = view.project().state.indexOf (track);
-    g.setColour (theme::dimText.withAlpha (0.7f));
-    g.setFont (theme::font (11.0f));
-    g.drawText (juce::String (index + 1), getLocalBounds().removeFromTop (28).removeFromRight (30).withTrimmedRight (10),
-                juce::Justification::centredRight);
+    g.setColour (selected ? theme::dimText : theme::faintText);
+    g.setFont (theme::font (11.0f, theme::Weight::medium));
+    g.drawText (juce::String (index + 1), juce::Rectangle<int> (8, name.getY(), 18, name.getHeight()),
+                juce::Justification::centred);
 
-    g.setColour (theme::outline);
+    g.setColour (theme::separator);
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
-    g.fillRect (getWidth() - 1, 0, 1, getHeight());
-
-    if ((bool) track[ids::mute])
-    {
-        g.setColour (theme::window.withAlpha (0.25f));
-        g.fillRect (getLocalBounds().withTrimmedLeft (6));
-    }
 }
 
 void TrackHeader::resized()
 {
-    name.setBounds (12, 9, getWidth() - 12 - 38, 22);
+    constexpr int left = 28;
+    name.setBounds (left - 2, 11, getWidth() - left - 10, 20);
 
-    auto row = juce::Rectangle<int> (15, 40, getWidth() - 30, 20);
-    mute.setBounds (row.removeFromLeft (26));
-    row.removeFromLeft (4);
-    solo.setBounds (row.removeFromLeft (26));
-    row.removeFromLeft (4);
-    arm.setBounds (row.removeFromLeft (26));
-    row.removeFromLeft (4);
-    monitor.setBounds (row.removeFromLeft (30));
+    auto row = juce::Rectangle<int> (left, getHeight() - 9 - 20 - 1, getWidth() - left - 10, 20);
+    for (auto* t : { &mute, &solo, &arm, &monitor })
+    {
+        t->setBounds (row.removeFromLeft (20));
+        row.removeFromLeft (4);
+    }
 }
 
 void TrackHeader::mouseDown (const juce::MouseEvent& e)

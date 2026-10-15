@@ -41,7 +41,7 @@ private:
     class Toggle final : public juce::Component, public juce::SettableTooltipClient
     {
     public:
-        enum class Glyph { text, dot };
+        enum class Glyph { text, dot, headphones };
         Toggle (TrackHeader&, const juce::Identifier&, juce::String label, Glyph, juce::Colour on, juce::String undoName);
         void paint (juce::Graphics&) override;
         void mouseDown (const juce::MouseEvent&) override;
@@ -57,12 +57,14 @@ private:
     };
 
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
+    /** Name weight and colour follow selection and mute. */
+    void updateNameStyle (bool selected);
 
     ArrangeView& view;
     juce::ValueTree track;
     juce::Label name;
     Toggle mute, solo, arm, monitor;
-    bool dragging = false;
+    bool dragging = false, styledSelected = false, styledMuted = false, styled = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TrackHeader)
 };

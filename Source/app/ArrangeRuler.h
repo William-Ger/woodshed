@@ -21,7 +21,7 @@ class Ruler final : public juce::Component
 public:
     explicit Ruler (ArrangeView&);
 
-    static constexpr int numbersHeight = 24;
+    static constexpr int numbersHeight = 22;
 
     void paint (juce::Graphics&) override;
     void mouseMove (const juce::MouseEvent&) override;
