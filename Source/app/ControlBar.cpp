@@ -131,7 +131,7 @@ ControlBar::Readout::Readout (ControlBar& o) : owner (o)
 {
     for (auto* b : { &click, &countIn })
     {
-        b->setLitFill (0.12f);
+        b->setLitFill (0.0f);     // in the readout an amber glyph alone means "on"
         addAndMakeVisible (b);
     }
 }
@@ -858,7 +858,7 @@ void ControlBar::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Id
 void ControlBar::timerCallback()
 {
     ++tick;
-    if (tick % 15 == 0 && leftInset() != layoutInset)
+    if ((tick < 90 || tick % 15 == 0) && leftInset() != layoutInset)
         resized();     // the window gained (or lost, in full screen) its unified title bar
     refreshTransport();
     readout.poll();
