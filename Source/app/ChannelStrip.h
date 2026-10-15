@@ -46,7 +46,7 @@ namespace mixer
         void beginWheelGesture();
     };
 
-    /** The volume fader: grooved slot, cap, dB scale. Drag (Shift for fine), wheel, double-click = 0 dB. */
+    /** The volume fader: thin groove, flat cap, dB scale. Drag (Shift for fine), wheel, double-click = 0 dB. */
     class Fader final : public Bound
     {
     public:
@@ -57,12 +57,15 @@ namespace mixer
         void mouseDrag (const juce::MouseEvent&) override;
         void mouseDoubleClick (const juce::MouseEvent&) override;
         void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+        void mouseUp (const juce::MouseEvent&) override     { repaint(); }
+        void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override   { repaint(); }
 
         void setTint (juce::Colour c)                       { tint = c; repaint(); }
         /** Vertical span the cap's centre travels; the meter beside it lines up with this. */
         juce::Range<float> travel() const;
 
-        static constexpr int scaleWidth = 20, slotWidth = 30;
+        static constexpr int scaleWidth = 22, slotWidth = 22;
 
     private:
         double value() const;
@@ -86,6 +89,9 @@ namespace mixer
         void mouseDrag (const juce::MouseEvent&) override;
         void mouseDoubleClick (const juce::MouseEvent&) override;
         void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+        void mouseUp (const juce::MouseEvent&) override     { repaint(); }
+        void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override   { repaint(); }
 
     private:
         float value() const;
@@ -93,7 +99,7 @@ namespace mixer
         float dragStart = 0.0f;
     };
 
-    /** A latching square button for a bool property. */
+    /** A small latching rounded button for a bool property. */
     class Toggle final : public Bound
     {
     public:
@@ -103,6 +109,7 @@ namespace mixer
                 const juce::String& label, juce::Colour onColour, Glyph);
 
         void paint (juce::Graphics&) override;
+        void mouseDown (const juce::MouseEvent&) override   { repaint(); }
         void mouseUp (const juce::MouseEvent&) override;
         void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
         void mouseExit (const juce::MouseEvent&) override   { repaint(); }
@@ -123,6 +130,8 @@ namespace mixer
         InputSelector (Studio&, juce::ValueTree);
         void paint (juce::Graphics&) override;
         void mouseDown (const juce::MouseEvent&) override;
+        void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override   { repaint(); }
 
     private:
         int numInputs() const;
@@ -137,6 +146,7 @@ namespace mixer
         explicit IconButton (Icon i) : icon (i) {}
 
         void paint (juce::Graphics&) override;
+        void mouseDown (const juce::MouseEvent&) override   { repaint(); }
         void mouseUp (const juce::MouseEvent&) override;
         void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
         void mouseExit (const juce::MouseEvent&) override   { repaint(); }
@@ -181,7 +191,7 @@ public:
     ChannelStrip (Studio&, juce::ValueTree track, bool isMaster);
     ~ChannelStrip() override;
 
-    static constexpr int trackWidth = 96, masterWidth = 104;
+    static constexpr int trackWidth = 88, masterWidth = 100;
 
     const juce::ValueTree& getTree() const                  { return tree; }
     int getTrackId() const                                  { return master ? -1 : (int) tree[daw::ids::id]; }
