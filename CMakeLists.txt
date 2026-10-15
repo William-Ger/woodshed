@@ -65,6 +65,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         BUNDLE_ID com.gerstungworks.woodshed
         PRODUCT_NAME "Woodshed"
         VERSION 0.2.0
+        ICON_BIG art/icon/woodshed-icon.png
         MICROPHONE_PERMISSION_ENABLED TRUE
         MICROPHONE_PERMISSION_TEXT "Woodshed needs audio input to hear and record your guitar through your interface.")
 
