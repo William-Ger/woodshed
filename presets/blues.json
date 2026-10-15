@@ -2,6 +2,159 @@
   "genre": "Blues",
   "presets": [
     {
+      "name": "Lone Star Shuffle",
+      "description": "Big-strung Texas blues: a mid-hump overdrive pushing a loud clean amp into a vintage 1x15, with springs behind it. Dig in for growl, back off for sparkle. Stomp 2 for a throbbing vibe, 3 for a cocked wah.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "American Clean",
+          "gain": 0.5,
+          "bass": 0.55,
+          "mid": 0.55,
+          "treble": 0.6,
+          "presence": 0.5,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "1x15 Vintage",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.2,
+          "lowcut": 70,
+          "highcut": 9000,
+          "level": -3.0
+        }
+      },
+      "board": [
+        {
+          "type": "drive.overdrive",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "drive": 0.3,
+            "tone": 0.5,
+            "level": 6
+          }
+        },
+        {
+          "type": "mod.throb",
+          "spot": 1,
+          "on": false,
+          "knobs": {
+            "speed": 2.2,
+            "intensity": 0.6,
+            "mode": "Chorus"
+          }
+        },
+        {
+          "type": "filter.wah",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "position": 0.5,
+            "voice": "Vintage",
+            "resonance": 0.5
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1800,
+            "mix": 0.16,
+            "drip": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Slow Burn Ballad",
+      "description": "Warm, glassy clean on the edge of breakup for slow, singing blues-pop: a light squeeze and a transparent drive into a smooth boutique amp, with a soft echo and springs. Neck or middle pickup. Stomp 3 for a hotter solo push.",
+      "amp": {
+        "type": "amp.limousine",
+        "knobs": {
+          "voicing": "Pre",
+          "volume": 0.55,
+          "drive": 0.25,
+          "od": 0.35,
+          "bass": 0.5,
+          "mid": 0.6,
+          "treble": 0.5,
+          "master": 0.55
+        }
+      },
+      "cab": {
+        "type": "cab.sidecar",
+        "knobs": {
+          "cabinet": "2x12 Open",
+          "mica": "Dynamic",
+          "micb": "Ribbon",
+          "blend": 0.45,
+          "lowcut": 80,
+          "highcut": 9000,
+          "level": 1.5
+        }
+      },
+      "board": [
+        {
+          "type": "dyn.compressor",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "sustain": 0.35,
+            "attack": 15,
+            "blend": 0.6,
+            "level": 2
+          }
+        },
+        {
+          "type": "drive.blend",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "gain": 0.25,
+            "treble": 0.5,
+            "blend": 0.6,
+            "level": 0
+          }
+        },
+        {
+          "type": "drive.overdrive",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "drive": 0.35,
+            "tone": 0.55,
+            "level": 5.5
+          }
+        },
+        {
+          "type": "delay.analog",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 420,
+            "repeats": 0.22,
+            "mix": 0.12
+          }
+        },
+        {
+          "type": "reverb.spring",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "decay": 1600,
+            "mix": 0.14,
+            "drip": 0.35
+          }
+        }
+      ]
+    },
+    {
       "name": "Delta Porch",
       "description": "Small combo right on the edge of breakup: clean when you play soft, hairy when you dig in. Stomp the boost for a solo lift.",
       "amp": {
