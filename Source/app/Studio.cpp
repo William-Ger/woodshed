@@ -62,7 +62,7 @@ Studio::~Studio()
     stopTimer();
     settingsWindow = nullptr;
     saveProject();
-    saveAudioSettings();
+    deviceManager.removeChangeListener (this);
     engineInstance->setProject (nullptr);
     currentProject->state.removeListener (this);
     engineInstance.reset();
@@ -70,18 +70,95 @@ Studio::~Studio()
 }
 
 //==============================================================================
+namespace
+{
+bool deviceAvailable (juce::AudioDeviceManager& dm, const juce::String& name, bool input)
+{
+    if (name.isEmpty())
+        return true;
+    for (auto* type : dm.getAvailableDeviceTypes())
+    {
+        type->scanForDevices();
+        if (type->getDeviceNames (input).contains (name))
+            return true;
+    }
+    return false;
+}
+}
+
+juce::AudioDeviceManager::AudioDeviceSetup Studio::wantedSetup (bool& known)
+{
+    // What the player chose in Settings (saved), else a Scarlett/Focusrite at 64 samples, 48 kHz.
+    juce::AudioDeviceManager::AudioDeviceSetup setup;
+    known = false;
+
+    if (auto saved = appSettings.getUserSettings()->getXmlValue ("audioDevice"))
+    {
+        setup.outputDeviceName = saved->getStringAttribute ("audioOutputDeviceName");
+        setup.inputDeviceName = saved->getStringAttribute ("audioInputDeviceName");
+        setup.sampleRate = saved->getDoubleAttribute ("audioDeviceRate", preferredSampleRate);
+        setup.bufferSize = saved->getIntAttribute ("audioDeviceBufferSize", preferredBufferSize);
+        known = setup.outputDeviceName.isNotEmpty() || setup.inputDeviceName.isNotEmpty();
+    }
+
+    if (! known)
+    {
+        const auto interfaceName = findInterface (deviceManager);
+        setup.inputDeviceName = setup.outputDeviceName = interfaceName;
+        setup.sampleRate = preferredSampleRate;
+        setup.bufferSize = preferredBufferSize;
+        known = interfaceName.isNotEmpty();
+    }
+
+    return setup;
+}
+
 void Studio::initialiseAudio()
 {
-    auto saved = appSettings.getUserSettings()->getXmlValue ("audioDevice");
-    const auto interfaceName = findInterface (deviceManager);
+    deviceManager.initialise (2, 2, nullptr, false);
 
-    juce::AudioDeviceManager::AudioDeviceSetup preferred;
-    preferred.inputDeviceName  = interfaceName;
-    preferred.outputDeviceName = interfaceName;
-    preferred.bufferSize       = preferredBufferSize;
-    preferred.sampleRate       = preferredSampleRate;
+    bool known = false;
+    const auto wanted = wantedSetup (known);
+    if (known && deviceAvailable (deviceManager, wanted.outputDeviceName, false)
+              && deviceAvailable (deviceManager, wanted.inputDeviceName, true))
+    {
+        auto setup = deviceManager.getAudioDeviceSetup();
+        setup.outputDeviceName = wanted.outputDeviceName;
+        setup.inputDeviceName = wanted.inputDeviceName;
+        setup.sampleRate = wanted.sampleRate;
+        setup.bufferSize = wanted.bufferSize;
+        setup.useDefaultInputChannels = setup.useDefaultOutputChannels = true;
+        deviceManager.setAudioDeviceSetup (setup, true);
+    }
 
-    deviceManager.initialise (2, 2, saved.get(), true, interfaceName, interfaceName.isNotEmpty() ? &preferred : nullptr);
+    // When the chosen interface is plugged back in, go back to it. (Whatever the Mac falls back to
+    // while it's unplugged is never saved as the choice: only the Settings window saves.)
+    deviceManager.addChangeListener (this);
+}
+
+void Studio::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    bool known = false;
+    const auto wanted = wantedSetup (known);
+    if (! known || switchingDevice)
+        return;
+
+    const auto current = deviceManager.getAudioDeviceSetup();
+    if (current.outputDeviceName == wanted.outputDeviceName && current.inputDeviceName == wanted.inputDeviceName)
+        return;
+
+    if (! deviceAvailable (deviceManager, wanted.outputDeviceName, false) || ! deviceAvailable (deviceManager, wanted.inputDeviceName, true))
+        return;
+
+    const juce::ScopedValueSetter<bool> guard (switchingDevice, true);
+    auto setup = current;
+    setup.outputDeviceName = wanted.outputDeviceName;
+    setup.inputDeviceName = wanted.inputDeviceName;
+    setup.sampleRate = wanted.sampleRate;
+    setup.bufferSize = wanted.bufferSize;
+    setup.useDefaultInputChannels = setup.useDefaultOutputChannels = true;
+    if (deviceManager.setAudioDeviceSetup (setup, true).isEmpty())
+        flash ("Switched to " + wanted.outputDeviceName);
 }
 
 void Studio::saveAudioSettings()

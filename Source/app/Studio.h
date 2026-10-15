@@ -27,6 +27,7 @@ namespace cmd
     or the selection or visible panes change. Project content changes come from the ValueTree.
 */
 class Studio final : public juce::ChangeBroadcaster,
+                     private juce::ChangeListener,
                      private juce::ValueTree::Listener,
                      private juce::Timer
 {
@@ -98,6 +99,10 @@ private:
     void valueTreeChildAdded (juce::ValueTree&, juce::ValueTree&) override             { dirty = true; }
     void valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree&, int) override      { dirty = true; }
     void timerCallback() override;
+
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;
+    juce::AudioDeviceManager::AudioDeviceSetup wantedSetup (bool& known);
+    bool switchingDevice = false;
 
     void adopt (std::unique_ptr<daw::Project>);
     void rememberProject (const juce::File&);
