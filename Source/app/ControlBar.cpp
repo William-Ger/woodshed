@@ -1,4 +1,5 @@
 #include "ControlBar.h"
+#include "WindowStyle.h"
 
 namespace woodshed::app
 {
@@ -9,8 +10,6 @@ namespace
 
     constexpr double minTempo = 20.0, maxTempo = 300.0;
     constexpr double minMasterDb = -60.0, maxMasterDb = 6.0;
-
-    const juce::Colour inset { 0xff0b0a09 };
 
     juce::String formatTempo (double bpm)
     {
@@ -23,7 +22,7 @@ namespace
         auto k = juce::String (sampleRate / 1000.0, 1);
         if (k.endsWith (".0"))
             k = k.dropLastCharacters (2);
-        return k + "k";
+        return k + " kHz";
     }
 
     juce::String formatDb (double db)
@@ -42,8 +41,8 @@ namespace
 }
 
 //==============================================================================
-ControlBar::IconButton::IconButton (Glyph g, juce::Colour lc, const juce::String& tip)
-    : juce::Button (tip), glyph (g), litColour (lc)
+ControlBar::IconButton::IconButton (icons::Icon i, juce::Colour lc, const juce::String& tip, float size)
+    : juce::Button (tip), icon (std::move (i)), litColour (lc), iconSize (size)
 {
     setTooltip (tip);
     noFocus (*this);
@@ -60,204 +59,147 @@ void ControlBar::IconButton::setLit (bool shouldBeLit)
 
 void ControlBar::IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 {
-    auto b = getLocalBounds().toFloat().reduced (1.0f);
+    const auto b = getLocalBounds().toFloat();
+    const float radius = juce::jmin (theme::radiusControl, b.getHeight() * 0.5f);
 
     if (lit)
     {
-        g.setColour (litColour.withAlpha (down ? 0.28f : 0.18f));
-        g.fillRoundedRectangle (b, 4.0f);
-        g.setColour (litColour.withAlpha (0.55f));
-        g.drawRoundedRectangle (b.reduced (0.5f), 4.0f, 1.0f);
+        g.setColour (litColour.withAlpha (litFill + (down ? 0.12f : highlighted ? 0.06f : 0.0f)));
+        g.fillRoundedRectangle (b, radius);
     }
     else if (highlighted || down)
     {
-        g.setColour (down ? theme::panel : theme::panelLight);
-        g.fillRoundedRectangle (b, 4.0f);
+        g.setColour (juce::Colours::white.withAlpha (down ? 0.12f : 0.07f));
+        g.fillRoundedRectangle (b, radius);
     }
 
+    const bool isRecord = litColour == theme::record;
     juce::Colour ink = lit ? litColour
-                           : (glyph == Glyph::record ? theme::record.withAlpha (highlighted ? 0.95f : 0.72f)
-                                                     : theme::text.withAlpha (highlighted ? 1.0f : 0.72f));
-    g.setColour (ink);
+                           : isRecord ? theme::record.withAlpha (highlighted ? 1.0f : 0.8f)
+                                      : theme::text.withAlpha (highlighted ? 0.95f : 0.72f);
+    if (down && ! lit)
+        ink = ink.withMultipliedAlpha (0.8f);
 
-    const auto c = b.getCentre();
-    juce::Path p;
-
-    auto triangle = [&p] (float x, float cy, float w, float h, bool right)
-    {
-        if (right)
-            p.addTriangle (x, cy - h * 0.5f, x, cy + h * 0.5f, x + w, cy);
-        else
-            p.addTriangle (x + w, cy - h * 0.5f, x + w, cy + h * 0.5f, x, cy);
-    };
-
-    switch (glyph)
-    {
-        case Glyph::play:       triangle (c.x - 5.0f, c.y, 12.0f, 13.0f, true); break;
-        case Glyph::stop:       p.addRoundedRectangle (c.x - 5.5f, c.y - 5.5f, 11.0f, 11.0f, 1.5f); break;
-        case Glyph::record:     p.addEllipse (c.x - 6.5f, c.y - 6.5f, 13.0f, 13.0f); break;
-        case Glyph::toStart:
-            p.addRectangle (c.x - 6.5f, c.y - 6.0f, 2.2f, 12.0f);
-            triangle (c.x - 3.5f, c.y, 10.0f, 12.0f, false);
-            break;
-        case Glyph::barBack:
-            triangle (c.x - 8.0f, c.y, 8.0f, 11.0f, false);
-            triangle (c.x, c.y, 8.0f, 11.0f, false);
-            break;
-        case Glyph::barForward:
-            triangle (c.x - 8.0f, c.y, 8.0f, 11.0f, true);
-            triangle (c.x, c.y, 8.0f, 11.0f, true);
-            break;
-        case Glyph::loop:
-        {
-            juce::Path ring;
-            ring.addRoundedRectangle (c.x - 8.0f, c.y - 5.0f, 16.0f, 10.0f, 4.0f);
-            g.strokePath (ring, juce::PathStrokeType (1.8f));
-            // Arrowheads riding the ring: right along the top, left along the bottom.
-            triangle (c.x - 1.0f, c.y - 5.0f, 5.0f, 6.5f, true);
-            triangle (c.x - 4.0f, c.y + 5.0f, 5.0f, 6.5f, false);
-            break;
-        }
-    }
-
-    if (lit && glyph == Glyph::record)
-    {
-        g.setColour (litColour.withAlpha (0.35f));
-        g.fillEllipse (c.x - 9.0f, c.y - 9.0f, 18.0f, 18.0f);
-        g.setColour (ink);
-    }
-
-    g.fillPath (p);
+    // Stroke icons keep a ~1.5 px line whatever size they're drawn at.
+    const auto box = b.withSizeKeepingCentre (iconSize, iconSize);
+    icons::draw (g, icon, box, ink, 1.5f * 24.0f / iconSize);
 }
 
 //==============================================================================
-ControlBar::PillButton::PillButton (const juce::String& text, bool withLed, const juce::String& tip)
-    : juce::Button (text), led (withLed)
+ControlBar::Segment::Segment (const juce::String& text, icons::Icon i, const juce::String& tip)
+    : juce::Button (text), icon (std::move (i))
 {
     setTooltip (tip);
     noFocus (*this);
 }
 
-void ControlBar::PillButton::setLit (bool shouldBeLit)
+void ControlBar::Segment::setSelected (bool shouldBeSelected)
 {
-    if (lit != shouldBeLit)
+    if (selected != shouldBeSelected)
     {
-        lit = shouldBeLit;
+        selected = shouldBeSelected;
         repaint();
     }
 }
 
-void ControlBar::PillButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+void ControlBar::Segment::paintButton (juce::Graphics& g, bool highlighted, bool down)
 {
-    auto b = getLocalBounds().toFloat();
-
-    if (led)
+    const auto b = getLocalBounds().toFloat().reduced (2.0f);
+    if (selected)
+        theme::drawRaised (g, b, theme::radiusControl - 1.5f, down ? theme::control : theme::controlHover);
+    else if (highlighted || down)
     {
-        // A switch printed on the readout: an LED and a label, no box.
-        const float d = 6.0f;
-        const juce::Rectangle<float> dot (b.getX() + 2.0f, b.getCentreY() - d * 0.5f, d, d);
-        if (lit)
-        {
-            g.setColour (theme::accent.withAlpha (0.3f));
-            g.fillEllipse (dot.expanded (2.5f));
-            g.setColour (theme::accent);
-        }
-        else
-        {
-            g.setColour (theme::outline.brighter (highlighted ? 0.4f : 0.15f));
-        }
-        g.fillEllipse (dot);
-
-        g.setColour (lit ? theme::text : theme::dimText.withAlpha (highlighted ? 1.0f : 0.8f));
-        g.setFont (theme::readout (10.0f));
-        g.drawText (getButtonText(), b.withTrimmedLeft (d + 8.0f), juce::Justification::centredLeft, false);
-        return;
+        g.setColour (juce::Colours::white.withAlpha (down ? 0.08f : 0.045f));
+        g.fillRoundedRectangle (b, theme::radiusControl - 1.5f);
     }
 
-    b = b.reduced (0.5f);
-    if (lit)
-    {
-        g.setColour (theme::accent.withAlpha (down ? 0.3f : 0.18f));
-        g.fillRoundedRectangle (b, 4.0f);
-        g.setColour (theme::accent.withAlpha (0.7f));
-    }
-    else
-    {
-        g.setColour (down ? theme::panel : (highlighted ? theme::panelLight : theme::panel));
-        g.fillRoundedRectangle (b, 4.0f);
-        g.setColour (theme::outline.brighter (highlighted ? 0.3f : 0.0f));
-    }
-    g.drawRoundedRectangle (b, 4.0f, 1.0f);
+    const auto font = theme::font (12.5f, theme::Weight::medium);
+    const float textW = juce::GlyphArrangement::getStringWidth (font, getButtonText());
+    const float iconW = 15.0f, gap = 6.0f;
+    const float x = b.getCentreX() - (iconW + gap + textW) * 0.5f;
 
-    g.setColour (lit ? theme::accent : theme::text.withAlpha (highlighted ? 1.0f : 0.82f));
-    g.setFont (theme::font (12.5f, true));
-    g.drawText (getButtonText(), getLocalBounds(), juce::Justification::centred, false);
+    const auto ink = selected ? theme::text : theme::dimText.withAlpha (highlighted ? 1.0f : 0.9f);
+    icons::draw (g, icon, { x, b.getCentreY() - iconW * 0.5f, iconW, iconW }, selected ? theme::accent : ink);
+    g.setColour (ink);
+    g.setFont (font);
+    g.drawText (getButtonText(), juce::Rectangle<float> (x + iconW + gap, b.getY(), textW + 2.0f, b.getHeight()),
+                juce::Justification::centredLeft, false);
 }
 
 //==============================================================================
 ControlBar::Readout::Readout (ControlBar& o) : owner (o)
 {
-    addAndMakeVisible (click);
-    addAndMakeVisible (countIn);
+    for (auto* b : { &click, &countIn })
+    {
+        b->setLitFill (0.0f);     // in the readout an amber glyph alone means "on"
+        addAndMakeVisible (b);
+    }
 }
 
 void ControlBar::Readout::resized()
 {
-    auto r = getLocalBounds().reduced (10, 0);
+    auto r = getLocalBounds();
     const int h = getHeight();
 
-    auto toggles = r.removeFromRight (juce::jmin (92, r.getWidth() / 4));
-    click.setBounds (toggles.getX(), h / 2 - 19, toggles.getWidth(), 17);
-    countIn.setBounds (toggles.getX(), h / 2 + 2, toggles.getWidth(), 17);
-    r.removeFromRight (10);
+    r.removeFromLeft (12);
+    r.removeFromRight (6);
 
-    signatureArea = r.removeFromRight (56);
-    r.removeFromRight (10);
-    tempoArea = r.removeFromRight (78);
-    r.removeFromRight (10);
+    // Click and count-in sit at the right end, as two small icon toggles.
+    constexpr int toggle = 26;
+    countIn.setBounds (r.removeFromRight (toggle).withSizeKeepingCentre (toggle, toggle));
+    r.removeFromRight (2);
+    click.setBounds (r.removeFromRight (toggle).withSizeKeepingCentre (toggle, toggle));
+    r.removeFromRight (8);
 
-    positionArea = r.withHeight (30).withY (4);
-    clockArea = r.withHeight (14).withY (32);
+    signatureArea = r.removeFromRight (48).withSizeKeepingCentre (48, h - 8);
+    r.removeFromRight (4);
+    tempoArea = r.removeFromRight (60).withSizeKeepingCentre (60, h - 8);
+    r.removeFromRight (8);
+
+    positionArea = r.withY (h / 2 - 15).withHeight (20);
+    clockArea = r.withY (h / 2 + 4).withHeight (12);
 }
 
 void ControlBar::Readout::paint (juce::Graphics& g)
 {
     const auto b = getLocalBounds().toFloat();
+    theme::drawInset (g, b, theme::radiusPanel);
 
-    // A dark inset: shadow along the top edge, a faint lip along the bottom.
-    g.setColour (inset);
-    g.fillRoundedRectangle (b, 5.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.55f));
-    g.drawRoundedRectangle (b.reduced (0.5f), 5.0f, 1.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.045f));
-    g.drawHorizontalLine (getHeight() - 1, 6.0f, b.getRight() - 6.0f);
+    // Hover wells for the fields you can drag or click.
+    if (hover != Hover::none || draggingTempo)
+    {
+        const auto area = (draggingTempo || hover == Hover::tempo) ? tempoArea : signatureArea;
+        g.setColour (juce::Colours::white.withAlpha (draggingTempo ? 0.08f : 0.05f));
+        g.fillRoundedRectangle (area.toFloat(), theme::radiusChip);
+    }
 
-    // Dividers between the fields.
-    g.setColour (theme::outline);
-    for (auto x : { tempoArea.getX() - 5, signatureArea.getX() - 5, click.getX() - 5 })
-        g.fillRect (x, 9, 1, getHeight() - 18);
+    // Hairline dividers between the fields.
+    g.setColour (juce::Colours::white.withAlpha (0.07f));
+    for (auto x : { tempoArea.getX() - 4, click.getX() - 4 })
+        g.fillRect (x, 10, 1, getHeight() - 20);
 
     g.setColour (countingIn ? theme::record : theme::text);
-    g.setFont (theme::readout (25.0f));
+    g.setFont (theme::readout (17.0f));
     g.drawText (positionText, positionArea, juce::Justification::centredLeft, false);
 
-    g.setColour (countingIn ? theme::record.withAlpha (0.8f) : theme::dimText);
-    g.setFont (theme::readout (11.0f));
-    g.drawText (clockText, clockArea, juce::Justification::centredLeft, false);
+    g.setColour (countingIn ? theme::record.withAlpha (0.8f) : theme::faintText.brighter (0.25f));
+    g.setFont (theme::readout (10.5f, theme::Weight::medium));
+    g.drawText (clockText, clockArea.withRight (tempoArea.getX() - 6), juce::Justification::centredLeft, false);
 
-    auto field = [&g] (juce::Rectangle<int> area, const juce::String& value, const juce::String& label, bool hot)
+    auto field = [&g, this] (juce::Rectangle<int> area, const juce::String& value, const juce::String& label, bool hot)
     {
+        const int h = getHeight();
         g.setColour (hot ? theme::accent : theme::text);
-        g.setFont (theme::readout (19.0f));
-        g.drawText (value, area.withHeight (26).withY (5), juce::Justification::centred, false);
-        g.setColour (theme::dimText);
-        g.setFont (theme::readout (9.5f));
-        g.drawText (label, area.withHeight (13).withY (32), juce::Justification::centred, false);
+        g.setFont (theme::readout (14.0f));
+        g.drawText (value, area.withY (h / 2 - 14).withHeight (18), juce::Justification::centred, false);
+        g.setColour (theme::faintText.brighter (0.25f));
+        g.setFont (theme::font (10.5f, theme::Weight::medium));
+        g.drawText (label, area.withY (h / 2 + 4).withHeight (12), juce::Justification::centred, false);
     };
 
     if (tempoEditor == nullptr)
-        field (tempoArea, tempoText, "BPM", draggingTempo);
-    field (signatureArea, signatureText, "TIME", false);
+        field (tempoArea, tempoText, "bpm", draggingTempo);
+    field (signatureArea, signatureText, "time", false);
 }
 
 void ControlBar::Readout::projectChanged()
@@ -288,8 +230,8 @@ void ControlBar::Readout::poll()
         // Before the take starts: the beats left to wait, and where recording will begin.
         const auto from = e.getRecordStart();
         const int beatsLeft = juce::jmax (1, (int) std::ceil ((double) (from - pos) / grid.samplesPerBeat()));
-        p = "COUNT " + juce::String (beatsLeft);
-        c = "REC FROM " + grid.toBarsBeats (from);
+        p = "Count " + juce::String (beatsLeft);
+        c = "Rec at " + grid.toBarsBeats (from);
     }
     else
     {
@@ -308,12 +250,25 @@ void ControlBar::Readout::poll()
 
 void ControlBar::Readout::mouseMove (const juce::MouseEvent& e)
 {
-    if (tempoArea.contains (e.getPosition()))
-        setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
-    else if (signatureArea.contains (e.getPosition()))
-        setMouseCursor (juce::MouseCursor::PointingHandCursor);
-    else
-        setMouseCursor (juce::MouseCursor::NormalCursor);
+    const auto p = e.getPosition();
+    const auto h = tempoArea.contains (p) ? Hover::tempo : signatureArea.contains (p) ? Hover::signature : Hover::none;
+    setMouseCursor (h == Hover::tempo ? juce::MouseCursor::UpDownResizeCursor
+                                      : h == Hover::signature ? juce::MouseCursor::PointingHandCursor
+                                                              : juce::MouseCursor::NormalCursor);
+    if (h != hover)
+    {
+        hover = h;
+        repaint();
+    }
+}
+
+void ControlBar::Readout::mouseExit (const juce::MouseEvent&)
+{
+    if (hover != Hover::none)
+    {
+        hover = Hover::none;
+        repaint();
+    }
 }
 
 void ControlBar::Readout::mouseDown (const juce::MouseEvent& e)
@@ -374,17 +329,18 @@ void ControlBar::Readout::editTempo()
 {
     tempoEditor = std::make_unique<juce::TextEditor>();
     auto& ed = *tempoEditor;
-    ed.setFont (theme::readout (19.0f));
+    ed.setFont (theme::readout (14.0f));
     ed.setJustification (juce::Justification::centred);
     ed.setInputRestrictions (6, "0123456789.");
-    ed.setColour (juce::TextEditor::backgroundColourId, theme::panel);
+    ed.setIndents (2, 1);
+    ed.setColour (juce::TextEditor::backgroundColourId, theme::control);
     ed.setColour (juce::TextEditor::textColourId, theme::text);
     ed.setColour (juce::TextEditor::highlightColourId, theme::accent.withAlpha (0.35f));
     ed.setColour (juce::TextEditor::outlineColourId, theme::accent);
     ed.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent);
     ed.setColour (juce::CaretComponent::caretColourId, theme::accent);
     ed.setText (tempoText, false);
-    ed.setBounds (tempoArea.withHeight (26).withY (5));
+    ed.setBounds (tempoArea.reduced (2, 4));
     addAndMakeVisible (ed);
     ed.selectAll();
     ed.grabKeyboardFocus();
@@ -491,75 +447,60 @@ void ControlBar::Meter::setLevels (float left, float right)
 
 void ControlBar::Meter::paint (juce::Graphics& g)
 {
+    // Two slim bars, left over right, scaled -60..+6 dB; tinted yellow above -12 dB and red above 0.
     const auto b = getLocalBounds().toFloat();
-    g.setColour (inset);
-    g.fillRoundedRectangle (b, 3.0f);
+    const float barH = (b.getHeight() - 1.0f) * 0.5f;
+    const float zeroX = b.getX() + b.getWidth() * 60.0f / 66.0f;
 
-    auto toY = [] (float gain, juce::Rectangle<float> bar)
+    auto toX = [&b] (float gain)
     {
         const float db = juce::Decibels::gainToDecibels (gain, -60.0f);
-        const float norm = juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f);
-        return bar.getBottom() - norm * bar.getHeight();
+        return b.getX() + juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f) * b.getWidth();
     };
 
-    const auto inner = b.reduced (3.0f);
-    const float w = (inner.getWidth() - 2.0f) * 0.5f;
+    juce::ColourGradient grad (theme::meterLow, b.getX(), 0.0f, theme::meterHigh, b.getRight(), 0.0f, false);
+    grad.addColour (42.0 / 66.0, theme::meterLow);
+    grad.addColour (48.0 / 66.0, theme::meterMid);
+    grad.addColour (59.0 / 66.0, theme::meterMid);
+    grad.addColour (60.0 / 66.0, theme::meterHigh);
 
     for (int ch = 0; ch < 2; ++ch)
     {
-        const juce::Rectangle<float> bar (inner.getX() + (float) ch * (w + 2.0f), inner.getY(), w, inner.getHeight());
-        g.setColour (theme::outline.withAlpha (0.6f));
-        g.fillRect (bar);
+        const juce::Rectangle<float> bar (b.getX(), b.getY() + (float) ch * (barH + 1.0f), b.getWidth(), barH);
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (bar, barH * 0.5f);
 
-        // Green, then yellow above -12 dB, red above 0 dB.
-        juce::ColourGradient grad (theme::meterHigh, 0.0f, bar.getY(), theme::meterLow, 0.0f, bar.getBottom(), false);
-        grad.addColour (6.0 / 66.0, theme::meterHigh);
-        grad.addColour (7.0 / 66.0, theme::meterMid);
-        grad.addColour (18.0 / 66.0, theme::meterMid);
-        grad.addColour (24.0 / 66.0, theme::meterLow);
         g.setGradientFill (grad);
-
-        const float top = toY (levels[ch], bar);
-        g.fillRect (bar.withTop (top));
-
+        if (levels[ch] > 0.0f)
+            g.fillRoundedRectangle (bar.withRight (juce::jmax (bar.getX() + barH, toX (levels[ch]))), barH * 0.5f);
         if (holds[ch] > 0.0f)
-            g.fillRect (bar.withTop (toY (holds[ch], bar)).withHeight (1.5f));
+            g.fillRect (bar.withX (toX (holds[ch]) - 1.5f).withWidth (1.5f));
     }
 
     // 0 dB tick.
-    g.setColour (theme::dimText.withAlpha (0.5f));
-    g.fillRect (b.getX(), inner.getBottom() - 60.0f / 66.0f * inner.getHeight(), 2.0f, 1.0f);
+    g.setColour (theme::dimText.withAlpha (0.35f));
+    g.fillRect (zeroX, b.getY(), 1.0f, b.getHeight());
 }
 
 //==============================================================================
-void ControlBar::KnobLook::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos,
-                                             float startAngle, float endAngle, juce::Slider& slider)
+int ControlBar::MasterLook::getSliderThumbRadius (juce::Slider&)    { return 6; }
+
+void ControlBar::MasterLook::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float, float,
+                                               juce::Slider::SliderStyle, juce::Slider& s)
 {
-    const auto bounds = juce::Rectangle<int> (x, y, w, h).toFloat().reduced (2.0f);
-    const float radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f;
-    const auto centre = bounds.getCentre();
-    const float angle = startAngle + pos * (endAngle - startAngle);
+    // A slim groove with a small round thumb, sized to sit above the meter.
+    const auto bounds = juce::Rectangle<int> (x, y, w, h).toFloat();
+    const auto groove = bounds.withSizeKeepingCentre (bounds.getWidth(), 3.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillRoundedRectangle (groove, 1.5f);
+    g.setColour (theme::text.withAlpha (s.isMouseOverOrDragging() ? 0.7f : 0.5f));
+    g.fillRoundedRectangle (groove.withRight (pos), 1.5f);
 
-    juce::Path track;
-    track.addCentredArc (centre.x, centre.y, radius - 1.5f, radius - 1.5f, 0.0f, startAngle, endAngle, true);
-    g.setColour (theme::outline);
-    g.strokePath (track, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-    juce::Path value;
-    value.addCentredArc (centre.x, centre.y, radius - 1.5f, radius - 1.5f, 0.0f, startAngle, angle, true);
-    g.setColour (theme::accent);
-    g.strokePath (value, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-    const float body = radius - 5.5f;
-    juce::ColourGradient grad (theme::panelLight.brighter (0.25f), centre.x, centre.y - body,
-                               theme::panel.darker (0.3f), centre.x, centre.y + body, false);
-    g.setGradientFill (grad);
-    g.fillEllipse (juce::Rectangle<float> (body * 2.0f, body * 2.0f).withCentre (centre));
-    g.setColour (juce::Colours::black.withAlpha (0.6f));
-    g.drawEllipse (juce::Rectangle<float> (body * 2.0f, body * 2.0f).withCentre (centre), 1.0f);
-
-    g.setColour (slider.isMouseOverOrDragging() ? theme::accent : theme::text);
-    g.drawLine ({ centre.getPointOnCircumference (body * 0.25f, angle), centre.getPointOnCircumference (body * 0.9f, angle) }, 2.0f);
+    const auto thumb = juce::Rectangle<float> (11.0f, 11.0f).withCentre ({ pos, bounds.getCentreY() });
+    g.setColour (juce::Colours::black.withAlpha (0.4f));
+    g.fillEllipse (thumb.translated (0.0f, 0.75f).expanded (0.5f));
+    g.setColour (s.isMouseButtonDown() ? juce::Colour (0xffd0d0d6) : juce::Colour (0xfff2f2f5));
+    g.fillEllipse (thumb);
 }
 
 //==============================================================================
@@ -567,9 +508,11 @@ ControlBar::ControlBar (Studio& s) : studio (s)
 {
     for (auto* b : { &toStart, &barBack, &barForward, &play, &stop, &record, &loop })
         addAndMakeVisible (b);
-    for (auto* b : { &audio, &rigPane, &mixerPane, &tuner })
-        addAndMakeVisible (b);
     addAndMakeVisible (readout);
+    for (auto* b : { &rigPane, &mixerPane })
+        addAndMakeVisible (b);
+    for (auto* b : { &tuner, &settings })
+        addAndMakeVisible (b);
     addAndMakeVisible (meter);
 
     toStart.onClick    = [this] { invoke (cmd::returnToStart); };
@@ -590,16 +533,18 @@ ControlBar::ControlBar (Studio& s) : studio (s)
     readout.click.onClick   = [this] { invoke (cmd::toggleClick); };
     readout.countIn.onClick = [this] { invoke (cmd::toggleCountIn); };
 
-    audio.onClick     = [this] { invoke (cmd::audioSettings); };
     rigPane.onClick   = [this] { invoke (cmd::showRig); };
     mixerPane.onClick = [this] { invoke (cmd::showMixer); };
     tuner.onClick     = [this] { invoke (cmd::showTuner); };
+    settings.onClick  = [this] { invoke (cmd::audioSettings); };
 
-    master.setLookAndFeel (&knobLook);
+    master.setLookAndFeel (&masterLook);
     master.setRange (minMasterDb, maxMasterDb, 0.1);
     master.setSkewFactorFromMidPoint (-12.0);
     master.setDoubleClickReturnValue (true, 0.0);
-    master.setTooltip ("Master volume (double-click: 0 dB)");
+    master.setColour (juce::Slider::trackColourId, theme::text.withAlpha (0.55f));
+    master.setSliderSnapsToMousePosition (false);
+    master.setMouseCursor (juce::MouseCursor::PointingHandCursor);
     noFocus (master);
     master.onDragStart = [this]
     {
@@ -613,6 +558,7 @@ ControlBar::ControlBar (Studio& s) : studio (s)
         if (! knobDragging)
             project.undo.beginNewTransaction ("Master Volume");
         project.state.setProperty (daw::ids::masterVolume, master.getValue(), &project.undo);
+        master.setTooltip ("Master volume: " + formatDb (master.getValue()) + " (double-click: 0 dB)");
     };
     addAndMakeVisible (master);
 
@@ -643,97 +589,145 @@ juce::String ControlBar::projectTitle() const
     return name.isNotEmpty() ? name : studio.project().folder.getFileName();
 }
 
-juce::Rectangle<int> ControlBar::titleArea() const
+int ControlBar::leftInset() const
 {
-    return { 16, 0, juce::jmax (0, toStart.getX() - 26), getHeight() };
+    // Under a unified title bar the window buttons float over our top-left corner (but not in full screen).
+    if (auto* top = getTopLevelComponent(); top != nullptr && top != this)
+        if (auto* peer = top->getPeer())
+            if (hasUnifiedTitleBar (*top) && ! peer->isFullScreen())
+                return theme::trafficLightInset;
+    return 16;
+}
+
+void ControlBar::parentHierarchyChanged()
+{
+    resized();
+}
+
+void ControlBar::mouseDown (const juce::MouseEvent& e)
+{
+    // Empty toolbar space is title bar: drag the window, double-click to zoom.
+    startWindowDrag (*this, e);
+}
+
+juce::String ControlBar::getTooltip()
+{
+    const auto pos = getMouseXYRelative();
+    if (titleBounds.contains (pos) && pos.y >= getHeight() / 2)
+        return deviceDetail;
+    return {};
 }
 
 void ControlBar::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::bar);
-    g.setColour (theme::outline);
+    g.setGradientFill (juce::ColourGradient::vertical (theme::barTop, 0.0f, theme::bar, (float) getHeight()));
+    g.fillAll();
+    g.setColour (theme::separator);
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 
-    // Wordmark, as on the rig's top bar, with the project (or the latest message) underneath.
-    const auto title = titleArea();
-    g.setColour (theme::text);
-    g.setFont (juce::FontOptions (22.0f, juce::Font::bold).withKerningFactor (0.22f));
-    g.drawText ("WOODSHED", title.withY (9).withHeight (26), juce::Justification::centredLeft, false);
-
-    const bool flashing = shownFlash.isNotEmpty();
-    g.setColour (flashing ? theme::accent : theme::dimText);
-    g.setFont (theme::font (12.0f, flashing));
-    g.drawFittedText (flashing ? shownFlash : shownTitle, title.withY (37).withHeight (16),
-                      juce::Justification::centredLeft, 1, 0.9f);
-
-    // The transport sits in a slightly raised tray.
-    const auto tray = toStart.getBounds().getUnion (loop.getBounds()).expanded (4).toFloat();
-    g.setColour (theme::panel);
-    g.fillRoundedRectangle (tray, 6.0f);
-    g.setColour (theme::outline);
-    g.drawRoundedRectangle (tray.reduced (0.5f), 6.0f, 1.0f);
-    g.fillRect ((float) loop.getX() - 5.0f, tray.getY() + 7.0f, 1.0f, tray.getHeight() - 14.0f);
-
-    if (! statusArea.isEmpty())
+    // The project leads; the audio status (or the latest message) sits underneath.
+    if (! titleBounds.isEmpty())
     {
-        g.setColour (theme::dimText);
-        g.setFont (theme::font (12.0f));
-        g.drawFittedText (statusText, statusArea, juce::Justification::centredRight, 1, 0.85f);
+        const int midY = getHeight() / 2;
+        g.setColour (theme::text);
+        g.setFont (theme::font (13.0f, theme::Weight::semibold));
+        g.drawText (shownTitle, titleBounds.withY (midY - 17).withHeight (17), juce::Justification::centredLeft, true);
+
+        const bool flashing = shownFlash.isNotEmpty();
+        g.setColour (flashing ? theme::accent : theme::dimText);
+        g.setFont (theme::font (11.0f, flashing ? theme::Weight::medium : theme::Weight::regular));
+        g.drawText (flashing ? shownFlash : statusText, titleBounds.withY (midY + 1).withHeight (14),
+                    juce::Justification::centredLeft, true);
     }
 
-    g.setColour (theme::dimText);
-    g.setFont (theme::readout (9.5f));
-    g.drawText (formatDb (master.getValue()), masterLabelArea, juce::Justification::centred, false);
+    // The Rig / Mixer switch's track.
+    if (! segmentTrack.isEmpty())
+    {
+        const auto t = segmentTrack.toFloat();
+        g.setColour (juce::Colours::black.withAlpha (0.28f));
+        g.fillRoundedRectangle (t, theme::radiusControl + 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.05f));
+        g.drawRoundedRectangle (t.reduced (0.5f), theme::radiusControl + 1.0f, 1.0f);
+    }
+
+    if (! speakerArea.isEmpty())
+        icons::draw (g, icons::speaker(), speakerArea.toFloat(), theme::dimText);
 }
 
 void ControlBar::resized()
 {
-    auto r = getLocalBounds();
-    const int midY = getHeight() / 2;
+    layoutInset = leftInset();
+    const int w = getWidth(), h = getHeight(), midY = h / 2;
+    constexpr int ctl = 28, margin = 12;
 
-    // Left: title, then the transport.
-    r.removeFromLeft (16);
-    r.removeFromLeft (190);
-    r.removeFromLeft (10);
+    auto place = [midY] (juce::Component& c, int x, int width, int height = ctl)
+    {
+        c.setBounds (x, midY - height / 2, width, height);
+    };
 
-    constexpr int bw = 34, bh = 32, gap = 3;
-    int x = r.getX();
+    // Right, from the edge inwards: master level and meter, settings, tuner, the pane switch.
+    int right = w - margin - 4;
+    const bool roomy = w >= 1180;
+    const int masterW = roomy ? 92 : 72;
+    master.setBounds (right - masterW, midY - 11, masterW, 14);
+    meter.setBounds (master.getX() + 6, midY + 5, masterW - 12, 5);
+    right = master.getX() - 4;
+    speakerArea = { right - 16, midY - 10, 16, 16 };
+    right = speakerArea.getX() - 14;
+
+    place (settings, right - ctl, ctl);
+    right = settings.getX() - 2;
+    place (tuner, right - ctl, ctl);
+    right = tuner.getX() - 12;
+
+    const auto segFont = theme::font (12.5f, theme::Weight::medium);
+    auto segWidth = [&segFont] (const juce::Button& b)
+    {
+        return juce::roundToInt (juce::GlyphArrangement::getStringWidth (segFont, b.getButtonText())) + 15 + 6 + 24;
+    };
+    const int mixW = segWidth (mixerPane), rigW = segWidth (rigPane);
+    place (mixerPane, right - mixW, mixW);
+    place (rigPane, mixerPane.getX() - rigW, rigW);
+    segmentTrack = rigPane.getBounds().getUnion (mixerPane.getBounds());
+    right = segmentTrack.getX() - 16;
+
+    // Centre: transport then readout, centred on the window when there's room.
+    const int left = layoutInset;
+    constexpr int bw = ctl, gap = 2, minTitle = 110;
+    int available = right - (left + minTitle + 16);
+
+    bool showBarButtons = true;
+    int transportW = 7 * bw + 5 * gap + 9;
+    int readoutW = Readout::preferredWidth;
+    if (transportW + 12 + readoutW > available)
+        readoutW = juce::jmax (Readout::minimumWidth, available - transportW - 12);
+    if (transportW + 12 + readoutW > available)
+    {
+        showBarButtons = false;
+        transportW -= 2 * (bw + gap);
+    }
+
+    const int groupW = transportW + 12 + readoutW;
+    int x = (w - groupW) / 2;
+    x = juce::jmin (x, right - groupW);
+    x = juce::jmax (x, left + minTitle + 16);
+
+    barBack.setVisible (showBarButtons);
+    barForward.setVisible (showBarButtons);
     for (auto* b : { &toStart, &barBack, &barForward, &play, &stop, &record })
     {
-        b->setBounds (x, midY - bh / 2, bw, bh);
+        if (! b->isVisible())
+            continue;
+        place (*b, x, bw);
         x += bw + gap;
     }
-    x += 8;
-    loop.setBounds (x, midY - bh / 2, bw, bh);
-    r.setLeft (loop.getRight() + 16);
+    x += 7;
+    place (loop, x, bw);
+    x = loop.getRight() + 12;
+    readout.setBounds (x, midY - 20, readoutW, 40);
 
-    // Right, from the edge inwards: meter, master knob, panes, audio, status.
-    r.removeFromRight (14);
-    meter.setBounds (r.removeFromRight (18).withSizeKeepingCentre (18, 46));
-    r.removeFromRight (6);
-    auto knob = r.removeFromRight (46);
-    master.setBounds (knob.getX() + 3, 3, 40, 40);
-    masterLabelArea = { knob.getX() - 6, 44, knob.getWidth() + 12, 14 };
-    r.removeFromRight (12);
-
-    auto pill = [&] (PillButton& b, int w)
-    {
-        b.setBounds (r.removeFromRight (w).withSizeKeepingCentre (w, 26));
-    };
-    pill (tuner, 54);
-    r.removeFromRight (10);
-    pill (mixerPane, 58);
-    r.removeFromRight (4);
-    pill (rigPane, 44);
-    r.removeFromRight (10);
-    pill (audio, 56);
-    r.removeFromRight (10);
-
-    // Centre: the readout takes what it needs; the status line gets the rest, if there's room.
-    const int readoutWidth = juce::jmin (440, r.getWidth());
-    const int spare = r.getWidth() - readoutWidth;
-    statusArea = spare >= 90 ? r.removeFromRight (juce::jmin (150, spare - 12)) : juce::Rectangle<int>();
-    readout.setBounds (r.withSizeKeepingCentre (juce::jmin (readoutWidth, r.getWidth()), 50));
+    titleBounds = { left, 0, juce::jmax (0, toStart.getX() - 16 - left), h };
+    repaint();
 }
 
 //==============================================================================
@@ -782,7 +776,7 @@ void ControlBar::refreshFromProject()
     const auto& s = studio.project().state;
     loop.setLit ((bool) s.getProperty (daw::ids::loopOn, false));
     master.setValue ((double) s.getProperty (daw::ids::masterVolume, 0.0), juce::dontSendNotification);
-    repaint (masterLabelArea);
+    master.setTooltip ("Master volume: " + formatDb (master.getValue()) + " (double-click: 0 dB)");
     readout.projectChanged();
 
     const auto t = projectTitle();
@@ -800,26 +794,29 @@ void ControlBar::refreshTransport()
     // Lit while recording; blinking while it counts in.
     record.setLit (e.isRecording() && (! e.isCountingIn() || (tick / 6) % 2 == 0));
 
-    rigPane.setLit (studio.getPane() == Studio::Pane::rig);
-    mixerPane.setLit (studio.getPane() == Studio::Pane::mixer);
+    rigPane.setSelected (studio.getPane() == Studio::Pane::rig);
+    mixerPane.setSelected (studio.getPane() == Studio::Pane::mixer);
 }
 
 void ControlBar::refreshStatus()
 {
-    juce::String text = "No audio device";
+    juce::String text = "No audio device", detail = "Choose an audio interface in Settings";
     if (auto* device = studio.deviceManager.getCurrentAudioDevice())
     {
         const double rate = device->getCurrentSampleRate();
         const int latency = device->getInputLatencyInSamples() + device->getOutputLatencyInSamples();
         const double ms = rate > 0.0 ? latency * 1000.0 / rate : 0.0;
-        text = juce::String (ms, 1) + " ms" + juce::String::fromUTF8 (" \xc2\xb7 ")
-             + juce::String (device->getCurrentBufferSizeSamples()) + " @ " + formatRate (rate);
+        const auto dot = juce::String::fromUTF8 (" \xc2\xb7 ");
+        text = formatRate (rate) + dot + juce::String (ms, 1) + " ms";
+        detail = device->getName() + dot + juce::String (device->getCurrentBufferSizeSamples()) + " samples at "
+               + formatRate (rate) + dot + juce::String (ms, 1) + " ms round trip";
     }
 
+    deviceDetail = detail;
     if (text != statusText)
     {
         statusText = text;
-        repaint (statusArea);
+        repaint (titleArea());
     }
 }
 
@@ -861,6 +858,8 @@ void ControlBar::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Id
 void ControlBar::timerCallback()
 {
     ++tick;
+    if ((tick < 90 || tick % 15 == 0) && leftInset() != layoutInset)
+        resized();     // the window gained (or lost, in full screen) its unified title bar
     refreshTransport();
     readout.poll();
 
