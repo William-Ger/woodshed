@@ -52,7 +52,7 @@ public:
         {
             if (starting.pending)
             {
-                if (starting.fading && p.legato && amp.isActive()) beginLegato();
+                if (starting.fading && p.legato && amp.isActive() && amp.stage != Adsr::Stage::release) beginLegato();
                 else if (starting.tick()) begin (p);
             }
             if (! amp.isActive() && ! starting.pending) break;
@@ -813,7 +813,8 @@ void registerSynthInstruments (InstrumentRegistry& r)
                                                         { "fenv", 0.25f }, { "fdecay", 400.0f }, { "sustain", 1.0f }, { "release", 200.0f },
                                                         { "vibrato", 0.35f }, { "lforate", 5.5f }, { "glide", 60.0f }, { "chorus", 0.2f } } },
                             P { "Pluck", "Plucks", { { "wave2", 1 }, { "cutoff", 300.0f }, { "reso", 0.35f }, { "fenv", 0.55f }, { "fdecay", 260.0f },
-                                                      { "fsustain", 0.0f }, { "decay", 700.0f }, { "sustain", 0.0f }, { "release", 300.0f }, { "chorus", 0.4f } } },
+                                                      { "fsustain", 0.0f }, { "decay", 700.0f }, { "sustain", 0.0f }, { "release", 300.0f }, { "chorus", 0.4f },
+                                                      { "level", 4.0f } } },
                             P { "Brass Stab", "Brass", { { "detune", 0.3f }, { "cutoff", 500.0f }, { "reso", 0.1f }, { "fenv", 0.45f }, { "fattack", 60.0f },
                                                           { "fdecay", 500.0f }, { "fsustain", 0.4f }, { "attack", 25.0f }, { "sustain", 0.85f },
                                                           { "release", 180.0f }, { "chorus", 0.25f } } },
@@ -858,7 +859,8 @@ void registerSynthInstruments (InstrumentRegistry& r)
                                                 { "keyscale", 0.5f }, { "chorus", 0.4f } } },
                         P { "FM Bass", "Basses", { { "algorithm", 0 }, { "level2", 0.7f }, { "level3", 0.0f }, { "level4", 0.0f },
                                                     { "feedback", 0.35f }, { "mdecay", 300.0f }, { "msustain", 0.2f }, { "decay", 1500.0f },
-                                                    { "sustain", 0.5f }, { "release", 120.0f }, { "keyscale", 0.0f }, { "chorus", 0.0f } } },
+                                                    { "sustain", 0.5f }, { "release", 120.0f }, { "keyscale", 0.0f }, { "chorus", 0.0f },
+                                                    { "level", -2.0f } } },
                         P { "FM Brass", "Brass", { { "algorithm", 2 }, { "ratio2", 1.0f }, { "ratio3", 1.0f }, { "ratio4", 1.0f }, { "level2", 0.55f },
                                                     { "level3", 0.3f }, { "level4", 0.25f }, { "feedback", 0.45f }, { "mattack", 90.0f },
                                                     { "mdecay", 600.0f }, { "msustain", 0.7f }, { "attack", 40.0f }, { "sustain", 0.85f },

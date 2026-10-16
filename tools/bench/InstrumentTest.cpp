@@ -296,6 +296,9 @@ PatchResult testPatch (const InstrumentType& t, const InstrumentInfo::Patch& pat
         if (! finite (out)) fail ("NaN/inf in phrase");
         peak = juce::jmax (peak, peakOf (out, 0, (size_t) secs (end)));
         res.tailDb = toDb (peakOf (out, (size_t) secs (end + 10.0)));
+        // The held, bent note at the end of the phrase must sound (catches voices that never restart).
+        if (! s.isDrums() && rmsOf (out, (size_t) secs (end - 2.2), (size_t) secs (end - 1.9)) < 0.00316f)
+            fail ("silent held note in phrase");
         if (res.tailDb > -90.0f) fail ("still sounding 10 s after all-notes-off (" + juce::String (res.tailDb, 0) + " dBFS)");
 
         if (s.isDrums())
