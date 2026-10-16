@@ -907,6 +907,21 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
                 addAndMakeVisible (c);
     }
 
+    if (master)
+    {
+        // The Stereo Out's own effects: mastering EQ, compression, a limiter.
+        fxSlot = std::make_unique<mixer::SlotButton>();
+        fxSlot->setTooltip ("Master effects: on the whole mix, before the master fader. Click to edit.");
+        fxSlot->text = [this]
+        {
+            const auto n = daw::Project::inserts (tree.getChildWithName (ids::MASTER)).size();
+            return n == 0 ? juce::String ("Master FX") : juce::String (n) + (n == 1 ? " effect" : " effects");
+        };
+        fxSlot->lit = [this] { return ! daw::Project::inserts (tree.getChildWithName (ids::MASTER)).isEmpty(); };
+        fxSlot->onClick = [this] { showInserts(); };
+        addAndMakeVisible (*fxSlot);
+    }
+
     // Any click on the strip selects its track.
     addMouseListener (this, true);
 }
@@ -924,6 +939,14 @@ juce::Colour ChannelStrip::trackColour() const
 void ChannelStrip::showInserts()
 {
     select();
+    if (master)
+    {
+        auto editor = std::make_unique<InsertsEditor> (studio);
+        editor->setTrack (studio.project().master());
+        editor->setSize (320, 380);
+        juce::CallOutBox::launchAsynchronously (std::move (editor), fxSlot->getScreenBounds(), nullptr);
+        return;
+    }
     if (instrumentTrack || auxTrack)
     {
         studio.setPane (Studio::Pane::rig);     // the instrument panel has the effects beside it
@@ -1075,6 +1098,9 @@ void ChannelStrip::resized()
 
     topArea = r.removeFromTop (m.controlsHeight());
     r.removeFromTop (m.gap);
+
+    if (master)
+        fxSlot->setBounds (topArea.withTrimmedTop (24).withHeight (m.chipH));
 
     if (! master)
     {

@@ -160,6 +160,7 @@ struct TrackPlayback
 struct Snapshot
 {
     std::vector<TrackPlayback> tracks;
+    std::vector<InsertPlayback> masterInserts;      // on the summed mix, before the master fader
     TimeGrid grid;
     float masterGain = 1.0f;
     bool click = true, loopOn = false;
@@ -293,7 +294,8 @@ public:
 
     /** Builds a snapshot of `project` using the given runtimes (by track id); used by tests too. */
     static std::unique_ptr<Snapshot> buildSnapshot (const Project&, AudioPool&,
-                                                    const std::map<int, std::shared_ptr<TrackRuntime>>&);
+                                                    const std::map<int, std::shared_ptr<TrackRuntime>>&,
+                                                    const TrackRuntime* master = nullptr);
 
     /** Where a recording that started at `recordStart` belongs once latency is taken out. */
     static void placeRecording (juce::int64 recordStart, int latency, juce::int64& start, juce::int64& offset);
@@ -335,6 +337,7 @@ private:
     AudioPool pool;
 
     std::map<int, std::shared_ptr<TrackRuntime>> runtimes;      // message thread
+    std::shared_ptr<TrackRuntime> masterRuntime;                // the master's inserts
 
     // Snapshot hand-off, like the rig's chain: publish to `pending`, the audio thread swaps it
     // into `current` and hands the old one back through `retired` for deletion here.

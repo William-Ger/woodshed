@@ -311,6 +311,23 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         rt.peakLeft.store (juce::jmax (rt.peakLeft.load (std::memory_order_relaxed), peakL), std::memory_order_relaxed);
         rt.peakRight.store (juce::jmax (rt.peakRight.load (std::memory_order_relaxed), peakR), std::memory_order_relaxed);
     }
+
+    // The Stereo Out's effects, on the whole mix.
+    for (auto& fx : snap.masterInserts)
+    {
+        if (! fx.on || fx.pedal == nullptr)
+            continue;
+        for (int k = 0; k < Pedal::maxKnobs; ++k)
+            fx.pedal->setKnob (k, fx.knobs[(size_t) k]);
+        fx.pedal->update();
+        if (fx.pedal->producesStereo())
+            fx.pedal->processStereo (b.left, b.right, n);
+        else
+        {
+            fx.pedal->processChannel (0, b.left, n);
+            fx.pedal->processChannel (1, b.right, n);
+        }
+    }
 }
 
 void Mixer::addClick (const Snapshot& snap, const Block& b, float level)
@@ -385,6 +402,7 @@ void Engine::setProject (Project* p)
 
     // Every runtime belongs to the old project; snapshots still holding them free them later.
     runtimes.clear();
+    masterRuntime.reset();
     pool.clear();
 
     if (project != nullptr)
@@ -851,10 +869,46 @@ void Engine::syncRuntimes()
 
     // Removed tracks' runtimes live on in the current snapshot until the audio thread lets it go.
     runtimes = std::move (next);
+
+    if (project != nullptr)
+    {
+        if (masterRuntime == nullptr)
+        {
+            masterRuntime = std::make_shared<TrackRuntime>();
+            masterRuntime->id = -1;
+        }
+        syncTrackDevices (*masterRuntime, project->state.getChildWithName (ids::MASTER), sampleRate, blockSize);
+    }
+    else
+        masterRuntime.reset();
+}
+
+namespace
+{
+std::vector<InsertPlayback> insertsFor (const juce::ValueTree& owner, const TrackRuntime& rt)
+{
+    std::vector<InsertPlayback> list;
+    for (auto node : Project::inserts (owner))
+        for (auto& fx : rt.inserts)
+            if (fx.id == (int) node[ids::id])
+            {
+                InsertPlayback ip;
+                ip.id = fx.id;
+                ip.pedal = fx.pedal;
+                ip.on = (bool) node.getProperty (ids::on, true);
+                const auto values = Project::decodeValues (node[ids::knobs].toString());
+                if (auto* pt = Registry::get().find (fx.type))
+                    for (size_t k = 0; k < pt->info.knobs.size() && k < ip.knobs.size(); ++k)
+                        ip.knobs[k] = k < values.size() ? values[k] : pt->info.knobs[k].def;
+                list.push_back (std::move (ip));
+            }
+    return list;
+}
 }
 
 std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPool& pool,
-                                                 const std::map<int, std::shared_ptr<TrackRuntime>>& runtimes)
+                                                 const std::map<int, std::shared_ptr<TrackRuntime>>& runtimes,
+                                                 const TrackRuntime* master)
 {
     auto snap = std::make_unique<Snapshot>();
     const auto& s = project.state;
@@ -1038,6 +1092,9 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
     // then each send finds its aux. A send to an aux that plays earlier (aux to aux, upwards) is
     // dropped, so there are never loops.
     std::stable_partition (snap->tracks.begin(), snap->tracks.end(), [] (const TrackPlayback& t) { return ! t.aux; });
+
+    if (master != nullptr)
+        snap->masterInserts = insertsFor (s.getChildWithName (ids::MASTER), *master);
     std::map<int, int> indexOfTrack;
     for (size_t i = 0; i < snap->tracks.size(); ++i)
         indexOfTrack[snap->tracks[i].runtime->id] = (int) i;
@@ -1069,7 +1126,7 @@ void Engine::handleAsyncUpdate()
 
 void Engine::publish()
 {
-    auto snap = project != nullptr ? buildSnapshot (*project, pool, runtimes) : std::make_unique<Snapshot>();
+    auto snap = project != nullptr ? buildSnapshot (*project, pool, runtimes, masterRuntime.get()) : std::make_unique<Snapshot>();
     // An unclaimed older snapshot was never seen by the audio thread, so it can go right away.
     delete pending.exchange (snap.release());
     freeRetired();
@@ -1118,6 +1175,8 @@ void Engine::prepare (double newSampleRate, int newBlockSize)
     // No callbacks run until this returns, so the rigs can be re-prepared for the new settings.
     for (auto& [id, rt] : runtimes)
         prepareRig (*rt);
+    if (masterRuntime != nullptr)
+        prepareRig (*masterRuntime);
     if (current != nullptr)
         for (auto& t : current->tracks)
             prepareRig (*t.runtime);
@@ -1398,7 +1457,9 @@ void Engine::startBounce (const juce::File& wav, juce::int64 start, juce::int64 
         fresh[rt->id] = rt;
     }
 
-    auto snap = buildSnapshot (*project, pool, fresh);
+    TrackRuntime freshMaster;
+    syncTrackDevices (freshMaster, project->state.getChildWithName (ids::MASTER), sampleRate, bounceBlock);
+    auto snap = buildSnapshot (*project, pool, fresh, &freshMaster);
     for (auto& t : snap->tracks)
     {
         t.armed = t.monitor = false;      // a bounce plays the song, never the live input

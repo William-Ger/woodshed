@@ -180,8 +180,22 @@ juce::ValueTree Project::addTrack (const juce::String& name, int insertIndex)
     t.setProperty (ids::monitor, false, nullptr);
     t.setProperty (ids::input, 0, nullptr);     // interface input 1, where William's guitar is plugged in
     t.setProperty (ids::rigOn, true, nullptr);
+    // Tracks stay ahead of the MASTER node.
+    if (insertIndex < 0 || insertIndex > numTracks())
+        insertIndex = numTracks();
     state.addChild (t, insertIndex, &undo);
     return t;
+}
+
+juce::ValueTree Project::master()
+{
+    auto m = state.getChildWithName (ids::MASTER);
+    if (! m.isValid())
+    {
+        m = juce::ValueTree (ids::MASTER);
+        state.addChild (m, -1, nullptr);
+    }
+    return m;
 }
 
 juce::ValueTree Project::addInstrumentTrack (const juce::String& name, const juce::String& instrumentType,

@@ -623,6 +623,37 @@ int runProjectTest()
             runtimes.erase (busRt->id);
         }
 
+        // The master: its node stays after the tracks, and its effects process the mix.
+        {
+            const int before = project->numTracks();
+            auto m = project->master();
+            auto added = project->addTrack ("After Master");
+            check (project->numTracks() == before + 1 && project->state.getChild (project->state.getNumChildren() - 1).hasType (ids::MASTER)
+                   && project->track (before) == added, "new tracks go before the MASTER node, which isn't a track");
+            project->state.removeChild (added, nullptr);
+
+            auto fx = project->addInsert (m, "dyn.boost", { 20.0f, 0.0f, 0.0f });
+            TrackRuntime masterRt;
+            masterRt.inserts.push_back ({ (int) fx[ids::id], "dyn.boost", woodshed::Registry::get().find ("dyn.boost")->create() });
+            masterRt.inserts.back().pedal->prepare (rate, 64);
+            auto snap = Engine::buildSnapshot (*project, pool, runtimes, &masterRt);
+            check (snap->masterInserts.size() == 1, "the master's effects are in the snapshot");
+            std::vector<float> L (64), R (64);
+            Mixer::Block b;
+            b.numSamples = 64;
+            b.playing = true;
+            b.left = L.data();
+            b.right = R.data();
+            rt->expectedPosition = -1;
+            for (juce::int64 pos = 48000 - 10 - 64 * 40; pos <= 48000 - 10; pos += 64)     // let its gain settle
+            {
+                b.position = pos;
+                Mixer::render (*snap, b);
+            }
+            check (L[10] > 2.0f, "a master effect processes the mix (" + juce::String (L[10], 2) + ")");
+            project->state.removeChild (m, nullptr);
+        }
+
         check (Project::decodeValues (Project::encodeValues ({ 1.0f, -0.5f, 2000.0f, 0.125f })) == std::vector<float> { 1.0f, -0.5f, 2000.0f, 0.125f },
                "knob values survive encoding");
 

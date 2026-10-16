@@ -11,7 +11,8 @@ namespace woodshed::daw
     The song, as a ValueTree. Every edit goes through `undo` so it can be undone, and the
     whole tree is the save file (project.woodshed in the project folder, recordings in Audio/).
 
-    PROJECT  name, sampleRate, tempo, beatsPerBar, beatUnit, click (bool), countIn (bool),
+    PROJECT  (children: the TRACKs in order, then at most one MASTER, always last)
+             name, sampleRate, tempo, beatsPerBar, beatUnit, click (bool), countIn (bool),
              loopOn (bool), loopStart, loopEnd (samples), masterVolume (dB), selectedTrack (id),
              markers (JSON array of { id, name, position }; a property, so the children stay tracks)
       TRACK  id (int, unique), name, colour (ARGB int), volume (dB), pan (-1..1),
@@ -40,6 +41,8 @@ namespace woodshed::daw
                   inside [start, start + length) plays, so trims, splits and copies treat both
                   kinds of region alike.
 
+      MASTER  the Stereo Out's insert effects: FX children as on a track (mastering EQ, a limiter...)
+
     All positions and lengths are in samples at the project sample rate, except notes (ticks).
 */
 namespace ids
@@ -55,7 +58,7 @@ namespace ids
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
     WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
-    WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
+    WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
 #undef WOODSHED_ID
 }
@@ -144,7 +147,13 @@ public:
     TimeGrid grid() const;
 
     // Tracks -------------------------------------------------------------------
-    int numTracks() const                                   { return trackList().getNumChildren(); }
+    int numTracks() const
+    {
+        const int n = state.getNumChildren();
+        return n > 0 && state.getChild (n - 1).hasType (ids::MASTER) ? n - 1 : n;
+    }
+    /** The Stereo Out's node (its insert effects), made on first use. */
+    juce::ValueTree master();
     juce::ValueTree track (int index) const                 { return trackList().getChild (index); }
     juce::ValueTree trackById (int id) const;
     juce::ValueTree addTrack (const juce::String& name, int insertIndex = -1);
