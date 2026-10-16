@@ -858,7 +858,13 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         if (Project::isInstrumentTrack (t))
         {
             tp.instrument = rt.instrument;
-            const auto values = Project::decodeValues (t.getChildWithName (ids::INSTRUMENT)[ids::knobs].toString());
+            // Stored values, with the instrument's defaults for any knob the project doesn't have
+            // (a project saved before the instrument grew that knob).
+            const auto inst = t.getChildWithName (ids::INSTRUMENT);
+            const auto values = Project::decodeValues (inst[ids::knobs].toString());
+            if (auto* type = InstrumentRegistry::get().find (inst[ids::type].toString()))
+                for (size_t k = 0; k < type->info.knobs.size() && k < tp.instrumentKnobs.size(); ++k)
+                    tp.instrumentKnobs[k] = type->info.knobs[k].def;
             for (size_t k = 0; k < values.size() && k < tp.instrumentKnobs.size(); ++k)
                 tp.instrumentKnobs[k] = values[k];
 

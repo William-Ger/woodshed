@@ -3,6 +3,7 @@
 // the live callback, and every click must land on exactly the sample the timeline says.
 
 #include "../../Source/daw/Engine.h"
+#include "../../Source/instruments/Instrument.h"
 #include <iostream>
 
 using namespace woodshed::daw;
@@ -658,4 +659,81 @@ int writeDemoProject (const juce::File& folder, const juce::File& di)
     const bool ok = project->save();
     std::cout << (ok ? "wrote " : "couldn't write ") << project->projectFile().getFullPathName() << "\n";
     return ok ? 0 : 1;
+}
+
+/** woodshed-bench demo-midi <folder>: a short song on software instruments, for screenshots and UI work. */
+int writeMidiDemoProject (const juce::File& folder);
+int writeMidiDemoProject (const juce::File& folder)
+{
+    juce::ScopedJuceInitialiser_GUI init;
+    folder.deleteRecursively();
+    auto project = Project::createIn (folder, rate);
+    project->state.setProperty (ids::name, "Instrument Demo", nullptr);
+    project->state.setProperty (ids::tempo, 100.0, nullptr);
+    const auto grid = project->grid();
+    const auto bar = (juce::int64) std::llround (grid.samplesPerBar());
+    constexpr int q = ticksPerQuarter;
+
+    auto addInstrument = [&] (const juce::String& name, const juce::String& type, const juce::String& patchName)
+    {
+        auto* t = woodshed::InstrumentRegistry::get().find (type);
+        const woodshed::InstrumentInfo::Patch* patch = nullptr;
+        if (t != nullptr)
+            for (auto& p : t->info.patches)
+                if (p.name == patchName)
+                    patch = &p;
+        return project->addInstrumentTrack (name, type, patch != nullptr ? patch->name : juce::String(),
+                                            t != nullptr ? woodshed::patchValues (t->info, patch) : std::vector<float>());
+    };
+
+    // C - Am - F - G, twice.
+    const int roots[] { 48, 45, 41, 43 };
+    const std::vector<std::vector<int>> chords { { 60, 64, 67 }, { 57, 60, 64 }, { 53, 57, 60 }, { 55, 59, 62 } };
+
+    auto keys = addInstrument ("Keys", "synth.analog", "Classic Poly");
+    auto keysRegion = project->addMidiRegion (keys, 0, bar * 8, "Chords");
+    for (int b = 0; b < 8; ++b)
+        for (int beat = 0; beat < 4; beat += 2)
+            for (int pitch : chords[(size_t) (b % 4)])
+                project->addNote (keysRegion, { pitch, beat == 0 ? 96 : 76, (juce::int64) (b * 4 + beat) * q, (juce::int64) q * 2 - 40 });
+
+    auto bass = addInstrument ("Bass", "synth.analog", "Sub Bass");
+    auto bassRegion = project->addMidiRegion (bass, 0, bar * 8, "Bass");
+    for (int b = 0; b < 8; ++b)
+        for (int eighth = 0; eighth < 8; ++eighth)
+            project->addNote (bassRegion, { roots[b % 4] - 12 + (eighth == 6 ? 12 : 0), eighth % 2 == 0 ? 110 : 80,
+                                            (juce::int64) (b * 8 + eighth) * q / 2, (juce::int64) q / 2 - 60 });
+
+    auto lead = addInstrument ("Lead", "synth.analog", "Saw Lead");
+    auto leadRegion = project->addMidiRegion (lead, bar * 4, bar * 4, "Melody");
+    const int melody[] { 72, 74, 76, 79, 76, 74, 72, 69, 72, 76, 77, 76, 74, 71, 74, 79 };
+    for (int i = 0; i < 16; ++i)
+        project->addNote (leadRegion, { melody[i], 100, (juce::int64) i * q, (juce::int64) q - 60 });
+    if (auto* reverb = woodshed::Registry::get().find ("reverb.hall"))
+    {
+        std::vector<float> defaults;
+        for (auto& k : reverb->info.knobs)
+            defaults.push_back (k.def);
+        project->addInsert (lead, "reverb.hall", defaults);
+    }
+
+    if (woodshed::InstrumentRegistry::get().find ("drums.kit") != nullptr)
+    {
+        auto drums = addInstrument ("Drums", "drums.kit", {});
+        auto beat = project->addMidiRegion (drums, 0, bar * 8, "Beat");
+        for (int b = 0; b < 8; ++b)
+            for (int s = 0; s < 16; ++s)
+            {
+                const auto at = (juce::int64) (b * 16 + s) * q / 4;
+                if (s == 0 || s == 8 || s == 10) project->addNote (beat, { 36, 115, at, q / 4 });
+                if (s == 4 || s == 12)           project->addNote (beat, { 38, 110, at, q / 4 });
+                if (s % 2 == 0)                  project->addNote (beat, { 42, s % 4 == 0 ? 90 : 65, at, q / 4 });
+            }
+    }
+
+    project->state.setProperty (ids::selectedTrack, keys[ids::id], nullptr);
+    if (! project->save())
+        return 1;
+    std::cout << "wrote " << project->projectFile().getFullPathName() << "\n";
+    return 0;
 }

@@ -137,6 +137,23 @@ namespace mixer
         int numInputs() const;
     };
 
+    /** A chip showing a line of text from a callback (the instrument, the effects); click for an action. */
+    class SlotButton final : public juce::Component,
+                             public juce::SettableTooltipClient
+    {
+    public:
+        SlotButton() = default;
+        void paint (juce::Graphics&) override;
+        void mouseDown (const juce::MouseEvent&) override   { repaint(); }
+        void mouseUp (const juce::MouseEvent&) override;
+        void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override   { repaint(); }
+
+        std::function<juce::String()> text;
+        std::function<bool()> lit;              // shown in the accent colour
+        std::function<void()> onClick;
+    };
+
     /** A small momentary button with a drawn icon. */
     class IconButton final : public juce::Component,
                              public juce::SettableTooltipClient
@@ -225,6 +242,9 @@ private:
     std::unique_ptr<mixer::InputSelector> input;
     std::unique_ptr<mixer::Toggle> rig, mute, solo, arm, monitor;
     std::unique_ptr<mixer::IconButton> openRig;
+    std::unique_ptr<mixer::SlotButton> instrumentSlot, fxSlot;
+    bool instrumentTrack = false;
+    void showInserts();
     std::unique_ptr<mixer::PanKnob> pan;
 
     juce::Rectangle<int> nameArea, topArea, faderReadout, peakReadout;
