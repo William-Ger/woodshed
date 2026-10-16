@@ -5,7 +5,7 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), typing (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), typing (s), takesEditor (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -14,6 +14,7 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (instrument);
     addChildComponent (pianoRoll);
     addChildComponent (typing);
+    addChildComponent (takesEditor);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
     // Tracks above, the pane below; the divider between them can be dragged.
@@ -48,6 +49,7 @@ juce::Component* MainComponent::paneComponent()
     {
         case Studio::Pane::mixer:  return &mixer;
         case Studio::Pane::editor: return &pianoRoll;
+        case Studio::Pane::takes:  return &takesEditor;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
         default:                   return nullptr;
@@ -57,7 +59,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor })
         c->setVisible (c == shown);
 }
 

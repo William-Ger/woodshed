@@ -71,6 +71,9 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     if (testPane == "editor") pane = Pane::editor;
     else if (testPane == "mixer") pane = Pane::mixer;
     else if (testPane == "none") pane = Pane::none;
+    else if (testPane == "takes") pane = Pane::takes;
+    if (const auto r = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_REGION", {}).getIntValue(); r > 0)
+        selectedRegions = { r };
     automationShown = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_AUTOMATION", {}) == "1";
     if (juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_PLAY", {}) == "1")
         juce::Timer::callAfterDelay (1500, [this] { engineInstance->play(); });
@@ -813,6 +816,28 @@ void Studio::openInEditor (int regionId)
     if (auto r = findRegion (regionId); r.isValid())
         selectTrack ((int) r.getParent()[daw::ids::id]);
     pane = Pane::editor;
+    sendChangeMessage();
+}
+
+juce::ValueTree Studio::getTakeFolder() const
+{
+    if (auto r = findRegion (takeFolderId); daw::Project::isTakeFolder (r))
+        return r;
+    for (int id : selectedRegions)
+        if (auto r = findRegion (id); daw::Project::isTakeFolder (r))
+            return r;
+    return {};
+}
+
+void Studio::openTakes (int regionId)
+{
+    takeFolderId = regionId;
+    if (auto r = findRegion (regionId); r.isValid())
+    {
+        selectTrack ((int) r.getParent()[daw::ids::id]);
+        setSelectedRegions ({ regionId });
+    }
+    pane = Pane::takes;
     sendChangeMessage();
 }
 

@@ -370,6 +370,52 @@ int runProjectTest()
         check (start == 0 && offset == 200, "a take at the very start trims its first samples instead");
     }
 
+    std::cout << "cycle recording and take folders\n";
+    {
+        // Cycle [1000, 2000), recording from 1500 for 2700 samples with 100 of latency:
+        // pass 1 from 1500 (500 samples), passes 2 and 3 full cycles, then 200 (a sliver, dropped).
+        auto passes = Engine::cyclePasses (1500, 1000, 2000, 2700, 100);
+        check (passes.size() == 3 && passes[0].start == 1400 && passes[0].fileOffset == 0 && passes[0].length == 600
+               && passes[1].start == 900 && passes[1].fileOffset == 500 && passes[1].length == 1100 && passes[1].complete
+               && passes[2].start == 900 && passes[2].fileOffset == 1500 && passes[2].length == 1100,
+               "a cycle recording splits into a pass per cycle, each shifted back by the latency");
+        passes = Engine::cyclePasses (1000, 1000, 2000, 2300, 0);
+        check (passes.size() == 3 && ! passes[2].complete && passes[2].length == 300, "a last pass of over a quarter cycle is a take");
+
+        // A folder of two takes of clicks.wav (clicks at file samples 1000 and 5000).
+        for (int i = project->numTracks(); --i >= 0;)
+            project->track (i).setProperty (ids::mute, true, nullptr);
+        auto t = project->addTrack ("Takes");
+        t.setProperty (ids::rigOn, false, nullptr);
+        auto folder = project->addTakeFolder (t, 100000, 8000, "Takes");
+        project->addTake (folder, "Audio/clicks.wav", 0, 0, 8000, "Take 1");        // clicks at 101000, 105000
+        project->addTake (folder, "Audio/clicks.wav", 0, 500, 8000, "Take 2");      // clicks at 100500, 104500
+        auto comp = Project::getComp (folder);
+        check (comp.size() == 1 && comp[0].take == 1 && comp[0].from == 0 && comp[0].to == 8000, "a new folder plays its last take");
+
+        auto r = offline (*project, pool, 110000);
+        check (clicks (r.left.data() + 100000, 10000) == std::vector<int> { 500, 4500 }, "the folder plays its last take");
+
+        project->setCompRange (folder, 3000, 8000, 0);
+        comp = Project::getComp (folder);
+        check (comp.size() == 2 && comp[0].take == 1 && comp[0].to == 3000 && comp[1].take == 0 && comp[1].from == 3000,
+               "swiping take 1 over the second half splits the comp");
+        r = offline (*project, pool, 110000);
+        check (clicks (r.left.data() + 100000, 10000) == std::vector<int> { 500, 5000 }, "the comp plays take 2 then take 1");
+
+        project->setCompRange (folder, 0, 3000, 0);
+        check (Project::getComp (folder).size() == 1, "neighbouring segments of one take merge");
+
+        project->setCompRange (folder, 3000, 8000, 1);
+        auto flat = project->flattenTakeFolder (folder);
+        check (flat.size() == 2 && ! folder.getParent().isValid(), "flattening replaces the folder with a region per segment");
+        r = offline (*project, pool, 110000);
+        check (clicks (r.left.data() + 100000, 10000) == std::vector<int> { 1000, 4500 }, "the flattened regions play the comp");
+        project->state.removeChild (t, nullptr);
+        for (int i = project->numTracks(); --i >= 0;)
+            project->track (i).setProperty (ids::mute, false, nullptr);
+    }
+
     std::cout << "live transport and loop\n";
     {
         juce::AudioDeviceManager devices;

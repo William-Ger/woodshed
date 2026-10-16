@@ -69,6 +69,8 @@ private:
     juce::Rectangle<float> regionRect (int trackIndex, juce::int64 start, juce::int64 length) const;
     void drawGrid (juce::Graphics&, int contentBottom) const;
     void drawRegion (juce::Graphics&, const juce::ValueTree& region, int trackIndex, const RegionLook&);
+    void drawWave (juce::Graphics&, const juce::File&, juce::int64 fileSampleAtLeft, juce::Rectangle<float> area,
+                   juce::Colour, const RegionLook&, const juce::ValueTree& region);
     void drawNotes (juce::Graphics&, const juce::ValueTree& region, juce::Rectangle<float> rect,
                     juce::Rectangle<float> area, juce::Colour, const RegionLook&) const;
     void drawFades (juce::Graphics&, juce::Rectangle<float> rect, juce::Rectangle<float> wave, const RegionLook&) const;

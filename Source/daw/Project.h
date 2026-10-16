@@ -40,7 +40,11 @@ namespace woodshed::daw
                   start, length (ticks, 960 per quarter note, from the region's content origin,
                   which sits at timeline sample start - offset). Only the part of the content
                   inside [start, start + length) plays, so trims, splits and copies treat both
-                  kinds of region alike.
+                  kinds of region alike; or
+                  kind = "folder" (a take folder from cycle recording), with REGION children, the
+                  takes (file, offset, length, and start measured from the folder's content
+                  origin), and comp ("from:to:take;..." from the content origin: which take plays
+                  where; empty means the last take throughout).
 
       MASTER  the Stereo Out's insert effects: FX children as on a track (mastering EQ, a limiter...)
 
@@ -59,7 +63,7 @@ namespace ids
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
     WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
-    WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
+    WOODSHED_ID (comp) WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
 #undef WOODSHED_ID
 }
@@ -67,7 +71,7 @@ namespace ids
 /** Track and region kinds (the `kind` property). */
 namespace kinds
 {
-    inline const juce::String audio { "audio" }, instrument { "instrument" }, midi { "midi" }, aux { "aux" };
+    inline const juce::String audio { "audio" }, instrument { "instrument" }, midi { "midi" }, aux { "aux" }, folder { "folder" };
 }
 
 /** MIDI note positions are in ticks: 960 per quarter note. */
@@ -206,6 +210,24 @@ public:
     /** Everything on a track that can be automated: param id, display name, range and default. */
     struct AutoParam { juce::String id, name; float min = 0.0f, max = 1.0f, def = 0.0f; juce::String unit; float skew = 1.0f; };
     static std::vector<AutoParam> automatableParams (const juce::ValueTree& track);
+
+    // Take folders -------------------------------------------------------------
+    static bool isTakeFolder (const juce::ValueTree& region)   { return region[ids::kind].toString() == kinds::folder; }
+    /** An empty take folder; add takes with addTake. */
+    juce::ValueTree addTakeFolder (juce::ValueTree track, juce::int64 start, juce::int64 length, const juce::String& name);
+    /** A take (one cycle pass) in a folder: `start` from the folder's content origin. */
+    juce::ValueTree addTake (juce::ValueTree takeFolder, const juce::String& relativeFile, juce::int64 start,
+                             juce::int64 offset, juce::int64 length, const juce::String& name);
+    static juce::Array<juce::ValueTree> takes (const juce::ValueTree& folder);
+
+    /** Which take plays where, from the folder's content origin, in time order, no gaps between
+        the folder's ends (segments over time where their take has no audio play silence). */
+    struct CompSegment { juce::int64 from = 0, to = 0; int take = 0; };
+    static std::vector<CompSegment> getComp (const juce::ValueTree& folder);
+    /** Swipe comping: take `take` plays over [from, to) (content-origin samples), the rest stays. */
+    void setCompRange (juce::ValueTree takeFolder, juce::int64 from, juce::int64 to, int take);
+    /** Replaces the folder with plain regions, one per comp segment. Returns their ids. */
+    juce::Array<int> flattenTakeFolder (juce::ValueTree takeFolder);
 
     // MIDI regions ---------------------------------------------------------------
     /** An empty MIDI region on an instrument track. */

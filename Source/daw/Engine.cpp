@@ -552,7 +552,24 @@ void Engine::record()
     recordedSamples = 0;
 
     const auto grid = project->grid();
-    const auto from = getPosition();
+    auto from = getPosition();
+
+    // Cycle recording: with the cycle on, recording loops it, a take per pass. It starts at the
+    // cycle's start if the playhead is outside the cycle.
+    const auto loopStart = (juce::int64) project->state.getProperty (ids::loopStart, 0);
+    const auto loopEnd = (juce::int64) project->state.getProperty (ids::loopEnd, 0);
+    cycleRecording = (bool) project->state[ids::loopOn] && loopEnd > loopStart;
+    if (cycleRecording.load())
+    {
+        cycleStart = loopStart;
+        cycleEnd = loopEnd;
+        if (from < loopStart || from >= loopEnd)
+        {
+            from = loopStart;
+            if (isPlaying())
+                requestedPosition = from;
+        }
+    }
     recordStart = from;
 
     // Recording from a stop gets a bar of count-in (when it's on); punching in while playing doesn't.
@@ -629,12 +646,62 @@ void Engine::finishRecording()
         added = true;
 
         pool.forget (t.file);
-        project->addRegion (track, t.file.getRelativePathFrom (project->folder).replaceCharacter ('\\', '/'),
-                            start, offset, length, track[ids::name].toString());
+        const auto relative = t.file.getRelativePathFrom (project->folder).replaceCharacter ('\\', '/');
+
+        // Two or more passes around the cycle: a take folder, playing the last complete take.
+        const auto passes = cycleRecording.load() ? cyclePasses (recordStart.load(), cycleStart, cycleEnd, samples, latencyAtRecord)
+                                                  : std::vector<Pass>();
+        if (passes.size() >= 2)
+        {
+            auto folder = project->addTakeFolder (track, cycleStart, cycleEnd - cycleStart, track[ids::name].toString());
+            int lastComplete = 0;
+            for (size_t i = 0; i < passes.size(); ++i)
+            {
+                project->addTake (folder, relative, passes[i].start - cycleStart, passes[i].fileOffset, passes[i].length,
+                                  "Take " + juce::String ((int) i + 1));
+                if (passes[i].complete)
+                    lastComplete = (int) i;
+            }
+            project->setCompRange (folder, 0, cycleEnd - cycleStart, lastComplete);
+            continue;
+        }
+
+        project->addRegion (track, relative, start, offset, length, track[ids::name].toString());
     }
+    cycleRecording = false;
 
     takes.clear();
     sendChangeMessage();
+}
+
+std::vector<Engine::Pass> Engine::cyclePasses (juce::int64 recordStart, juce::int64 loopStart, juce::int64 loopEnd,
+                                               juce::int64 recorded, int latency)
+{
+    std::vector<Pass> passes;
+    const auto cycle = loopEnd - loopStart;
+    if (cycle <= 0 || recorded <= 0)
+        return passes;
+
+    juce::int64 file = 0;
+    auto transport = recordStart;
+    while (file < recorded)
+    {
+        const auto wanted = loopEnd - transport;
+        const auto got = juce::jmin (wanted, recorded - file);
+        Pass p;
+        p.start = transport - latency;
+        p.fileOffset = file;
+        p.length = juce::jmin (got + latency, recorded - file);     // the file runs on into the next pass
+        p.complete = got == wanted;
+        if (p.start < 0) { p.fileOffset -= p.start; p.length += p.start; p.start = 0; }
+        // A sliver of a last pass (under a quarter of the cycle) isn't a take.
+        if (p.complete || got >= cycle / 4 || passes.empty())
+            if (p.length > 0)
+                passes.push_back (p);
+        file += got;
+        transport = loopStart;
+    }
+    return passes;
 }
 
 void Engine::finishMidiTake (int trackId, juce::int64 stopAt)
@@ -1155,6 +1222,44 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
             if (! r.hasType (ids::REGION) || Project::isMidiRegion (r) || (bool) r[ids::mute])
                 continue;
 
+            // A take folder plays its comp: each segment from its take, a short crossfade at
+            // every switch (the de-click edges), the folder's fades at its ends.
+            if (Project::isTakeFolder (r))
+            {
+                const auto takeList = Project::takes (r);
+                const auto origin = Project::contentOrigin (r);
+                const auto visibleFrom = (juce::int64) r[ids::start];
+                const auto visibleTo = visibleFrom + (juce::int64) r[ids::length];
+                const auto gain = dbToGain ((double) r.getProperty (ids::gain, 0.0));
+                for (auto& c : Project::getComp (r))
+                {
+                    if (! juce::isPositiveAndBelow (c.take, takeList.size()))
+                        continue;
+                    const auto& take = takeList.getReference (c.take);
+                    auto audio = pool.get (project.resolve (take[ids::file].toString()));
+                    if (audio == nullptr)
+                        continue;
+                    const auto takeFrom = origin + (juce::int64) take[ids::start];
+                    const auto takeTo = takeFrom + (juce::int64) take[ids::length];
+                    const auto from = juce::jmax (origin + c.from, takeFrom, visibleFrom);
+                    const auto to = juce::jmin (origin + c.to, takeTo, visibleTo);
+                    if (to <= from)
+                        continue;
+
+                    RegionPlayback rp;
+                    rp.audio = audio;
+                    rp.start = from;
+                    rp.offset = juce::jlimit ((juce::int64) 0, (juce::int64) audio->getNumSamples(), (juce::int64) take[ids::offset] + (from - takeFrom));
+                    rp.length = juce::jmin (to - from, (juce::int64) audio->getNumSamples() - rp.offset);
+                    rp.gain = gain;
+                    clampFades (rp.length, from == visibleFrom ? (juce::int64) r.getProperty (ids::fadeIn, 0) : 0,
+                                to == visibleTo ? (juce::int64) r.getProperty (ids::fadeOut, 0) : 0, rp.fadeIn, rp.fadeOut);
+                    if (rp.length > 0)
+                        tp.regions.push_back (std::move (rp));
+                }
+                continue;
+            }
+
             RegionPlayback rp;
             rp.audio = pool.get (project.resolve (r[ids::file].toString()));
             if (rp.audio == nullptr)
@@ -1308,7 +1413,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
     const bool isPlaying = playing.load();
     const bool isRec = recording.load();
     const auto& snap = *current;
-    const bool looping = isPlaying && ! isRec && snap.loopOn && snap.loopEnd > snap.loopStart;
+    const bool looping = isPlaying && snap.loopOn && snap.loopEnd > snap.loopStart && (! isRec || cycleRecording.load());
 
     std::array<const float*, 64> ins {};
     float masterL = 0.0f, masterR = 0.0f;
@@ -1372,7 +1477,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
             {
                 const auto& e = b.liveEvents[i];
                 const auto when = pos + e.offset;
-                if ((e.kind != NoteEvent::noteOn && e.kind != NoteEvent::noteOff) || (e.kind == NoteEvent::noteOn && when < recordStart.load()))
+                if ((e.kind != NoteEvent::noteOn && e.kind != NoteEvent::noteOff) || (e.kind == NoteEvent::noteOn && recordedSamples.load() == 0 && when < recordStart.load()))
                     continue;
                 if (midiRecordFifo.getFreeSpace() > 0)
                 {
@@ -1389,7 +1494,9 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         // Recording: the dry input of every armed track, from the record start onwards.
         if (isRec && isPlaying)
         {
-            const auto from = (int) juce::jlimit ((juce::int64) 0, (juce::int64) n, recordStart.load() - pos);
+            // Until the first sample is in, wait for the record start (the count-in plays first);
+            // after that every block counts, wherever the cycle has taken the playhead.
+            const auto from = recordedSamples.load() > 0 ? 0 : (int) juce::jlimit ((juce::int64) 0, (juce::int64) n, recordStart.load() - pos);
             if (from < n)
             {
                 for (auto& t : snap.tracks)

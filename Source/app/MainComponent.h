@@ -7,6 +7,7 @@
 #include "InstrumentPanel.h"
 #include "PianoRoll.h"
 #include "MusicalTyping.h"
+#include "TakesEditor.h"
 
 namespace woodshed::app
 {
@@ -46,6 +47,7 @@ private:
     InstrumentPanel instrument;
     PianoRoll pianoRoll;
     MusicalTyping typing;
+    TakesEditor takesEditor;
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */
     juce::Component* paneComponent();

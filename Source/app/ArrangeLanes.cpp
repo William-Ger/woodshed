@@ -104,7 +104,7 @@ void Lanes::fitFades (juce::int64 length, juce::int64& fadeIn, juce::int64& fade
 
 juce::int64 Lanes::fileLengthOf (const juce::ValueTree& region)
 {
-    if (daw::Project::isMidiRegion (region))
+    if (daw::Project::isMidiRegion (region) || daw::Project::isTakeFolder (region))
         return 0;       // no end to run into
     return view.waveforms.info (view.project().resolve (region[ids::file].toString())).length;
 }
@@ -354,7 +354,10 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
         {
             g.setColour (inkFor (stripColour).withAlpha (0.92f));
             g.setFont (theme::font (11.0f, theme::Weight::semibold));
-            g.drawText (region[ids::name].toString(), juce::Rectangle<float> (textX, strip.getY(), textW, nameBarHeight),
+            auto title = region[ids::name].toString();
+            if (daw::Project::isTakeFolder (region))
+                title << "  (" << daw::Project::takes (region).size() << " takes)";
+            g.drawText (title, juce::Rectangle<float> (textX, strip.getY(), textW, nameBarHeight),
                         juce::Justification::centredLeft, true);
         }
     }
@@ -367,36 +370,37 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
     }
     else
     {
-    // Waveform: only the slice the region plays, and only the part that's on screen.
-    const auto file = view.project().resolve (region[ids::file].toString());
-    const auto info = view.waveforms.info (file);
-    auto* thumb = info.length > 0 ? view.waveforms.thumbnail (file) : nullptr;
-
-    if (thumb != nullptr && wave.getWidth() >= 1.0f && wave.getHeight() > 4.0f)
+    if (daw::Project::isTakeFolder (region))
     {
-        const double rate = info.sampleRate > 0.0 ? info.sampleRate : view.project().grid().sampleRate;
-        const double sppx = view.getSamplesPerPixel();
-        const double fromSample = (double) look.offset + (wave.getX() - rect.getX()) * sppx;
-        const double toSample = fromSample + wave.getWidth() * sppx;
-        // Quiet DI takes are scaled up for display (by the file's peak), then by the region's gain.
-        const auto peak = thumb->getApproximatePeak();
-        const auto normalise = peak > 0.0f ? juce::jlimit (1.0f, 8.0f, 0.85f / peak) : 1.0f;
-        const auto gain = normalise * juce::jlimit (0.25f, 4.0f, juce::Decibels::decibelsToGain ((float) (double) region.getProperty (ids::gain, 0.0)));
-
+        // The comp: each segment's slice of its take; a hairline where the takes switch.
+        const auto takeList = daw::Project::takes (region);
+        const auto origin = look.start - look.offset;
         juce::Graphics::ScopedSaveState s (g);
         g.reduceClipRegion (wave.toNearestInt());
-        g.setColour (colour.withAlpha (0.3f));
-        g.fillRect (wave.withHeight (1.0f).withCentre (wave.getCentre()));
-        g.setColour (colour.interpolatedWith (juce::Colours::white, look.selected ? 0.6f : 0.4f)
-                           .withAlpha (look.muted ? 0.6f : 0.95f));
-        thumb->drawChannel (g, wave.toNearestInt(), fromSample / rate, toSample / rate, 0, gain);
+        for (auto& c : daw::Project::getComp (region))
+        {
+            if (! juce::isPositiveAndBelow (c.take, takeList.size()))
+                continue;
+            const auto& take = takeList.getReference (c.take);
+            const auto takeFrom = origin + (juce::int64) take[ids::start];
+            const auto from = juce::jmax (origin + c.from, takeFrom, look.start);
+            const auto to = juce::jmin (origin + c.to, takeFrom + (juce::int64) take[ids::length], look.start + look.length);
+            if (to <= from)
+                continue;
+            const float x1 = view.xForSample ((double) from), x2 = view.xForSample ((double) to);
+            drawWave (g, view.project().resolve (take[ids::file].toString()), (juce::int64) take[ids::offset] + (from - takeFrom),
+                      wave.withX (x1).withWidth (x2 - x1), colour, look, region);
+            if (from > look.start)
+            {
+                g.setColour (colour.withAlpha (0.7f));
+                g.fillRect (juce::Rectangle<float> (x1, wave.getY(), 1.0f, wave.getHeight()));
+            }
+        }
     }
-    else if (wave.getHeight() > 10.0f)
+    else
     {
-        g.setColour (theme::dimText);
-        g.setFont (theme::font (11.0f));
-        g.drawText (file.existsAsFile() ? "Reading..." : "Missing audio file", wave.reduced (6.0f, 0.0f),
-                    juce::Justification::centredLeft, true);
+        drawWave (g, view.project().resolve (region[ids::file].toString()), look.offset, wave.withX (rect.getX()).withRight (wave.getRight()),
+                  colour, look, region);
     }
 
     drawFades (g, rect, body.withTrimmedTop (nameBarHeight), look);
@@ -414,6 +418,43 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
     {
         g.setColour (colour.withAlpha (0.75f));
         g.drawRoundedRectangle (body.reduced (0.5f), regionRadius, 1.0f);
+    }
+}
+
+void Lanes::drawWave (juce::Graphics& g, const juce::File& file, juce::int64 fileSampleAtLeft, juce::Rectangle<float> area,
+                      juce::Colour colour, const RegionLook& look, const juce::ValueTree& region)
+{
+    // Only the part that's on screen; `area` starts where file sample `fileSampleAtLeft` plays.
+    const auto clip = g.getClipBounds().toFloat();
+    auto wave = area.getIntersection (clip.withY (area.getY()).withHeight (area.getHeight()));
+    const auto info = view.waveforms.info (file);
+    auto* thumb = info.length > 0 ? view.waveforms.thumbnail (file) : nullptr;
+
+    if (thumb != nullptr && wave.getWidth() >= 1.0f && wave.getHeight() > 4.0f)
+    {
+        const double rate = info.sampleRate > 0.0 ? info.sampleRate : view.project().grid().sampleRate;
+        const double sppx = view.getSamplesPerPixel();
+        const double fromSample = (double) fileSampleAtLeft + (wave.getX() - area.getX()) * sppx;
+        const double toSample = fromSample + wave.getWidth() * sppx;
+        // Quiet DI takes are scaled up for display (by the file's peak), then by the region's gain.
+        const auto peak = thumb->getApproximatePeak();
+        const auto normalise = peak > 0.0f ? juce::jlimit (1.0f, 8.0f, 0.85f / peak) : 1.0f;
+        const auto gain = normalise * juce::jlimit (0.25f, 4.0f, juce::Decibels::decibelsToGain ((float) (double) region.getProperty (ids::gain, 0.0)));
+
+        juce::Graphics::ScopedSaveState s (g);
+        g.reduceClipRegion (wave.toNearestInt());
+        g.setColour (colour.withAlpha (0.3f));
+        g.fillRect (wave.withHeight (1.0f).withCentre (wave.getCentre()));
+        g.setColour (colour.interpolatedWith (juce::Colours::white, look.selected ? 0.6f : 0.4f)
+                           .withAlpha (look.muted ? 0.6f : 0.95f));
+        thumb->drawChannel (g, wave.toNearestInt(), fromSample / rate, toSample / rate, 0, gain);
+    }
+    else if (wave.getHeight() > 10.0f && wave.getWidth() > 20.0f)
+    {
+        g.setColour (theme::dimText);
+        g.setFont (theme::font (11.0f));
+        g.drawText (file.existsAsFile() ? "Reading..." : "Missing audio file", wave.reduced (6.0f, 0.0f),
+                    juce::Justification::centredLeft, true);
     }
 }
 
@@ -890,7 +931,7 @@ void Lanes::mouseDrag (const juce::MouseEvent& e)
     if (gesture == Gesture::trimLeft)
     {
         auto newStart = view.snap (mouseSample, snapOn);
-        if (! daw::Project::isMidiRegion (grabbed))
+        if (! daw::Project::isMidiRegion (grabbed) && ! daw::Project::isTakeFolder (grabbed))
             newStart = juce::jmax (newStart, grabStart - grabOffset);       // not before the file starts
         newStart = juce::jmin (newStart, grabEnd - minLength);
         newStart = juce::jmax ((juce::int64) 0, newStart);
@@ -982,6 +1023,8 @@ void Lanes::mouseDoubleClick (const juce::MouseEvent& e)
     {
         if (daw::Project::isMidiRegion (hit.region))
             view.studio.openInEditor ((int) hit.region[ids::id]);
+        else if (daw::Project::isTakeFolder (hit.region))
+            view.studio.openTakes ((int) hit.region[ids::id]);
         return;
     }
 
@@ -1310,6 +1353,21 @@ void Lanes::showRegionMenu()
     m.addItem ("Mute / Unmute", [&studio] { studio.toggleMuteSelectedRegions(); });
     m.addItem ("Loop These Regions", [&studio] { studio.commands.invokeDirectly (cmd::loopToSelection, false); });
     m.addItem ("Remove Fades", [this] { removeFadesFromSelection(); });
+
+    // Take folders: comp them, or make the comp plain regions.
+    for (int id : studio.getSelectedRegions())
+        if (auto r = studio.findRegion (id); daw::Project::isTakeFolder (r))
+        {
+            m.addSeparator();
+            m.addItem ("Open Takes (Comp)", [&studio, id] { studio.openTakes (id); });
+            m.addItem ("Flatten Take Folder", [&studio, id]
+            {
+                auto& p = studio.project();
+                p.undo.beginNewTransaction ("Flatten");
+                studio.setSelectedRegions (p.flattenTakeFolder (studio.findRegion (id)));
+            });
+            break;
+        }
 
     // MIDI regions: open the editor, quantize.
     juce::Array<int> midi;

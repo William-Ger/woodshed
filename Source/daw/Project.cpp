@@ -447,6 +447,127 @@ std::vector<Project::AutoParam> Project::automatableParams (const juce::ValueTre
     return list;
 }
 
+juce::ValueTree Project::addTakeFolder (juce::ValueTree track, juce::int64 start, juce::int64 length, const juce::String& name)
+{
+    juce::ValueTree r (ids::REGION);
+    r.setProperty (ids::id, nextId(), nullptr);
+    r.setProperty (ids::name, name, nullptr);
+    r.setProperty (ids::kind, kinds::folder, nullptr);
+    r.setProperty (ids::start, start, nullptr);
+    r.setProperty (ids::offset, 0, nullptr);
+    r.setProperty (ids::length, juce::jmax ((juce::int64) 1, length), nullptr);
+    r.setProperty (ids::gain, 0.0, nullptr);
+    track.addChild (r, -1, &undo);
+    return r;
+}
+
+juce::ValueTree Project::addTake (juce::ValueTree takeFolder, const juce::String& relativeFile, juce::int64 start,
+                                  juce::int64 offset, juce::int64 length, const juce::String& name)
+{
+    juce::ValueTree t (ids::REGION);
+    t.setProperty (ids::id, nextId(), nullptr);
+    t.setProperty (ids::name, name, nullptr);
+    t.setProperty (ids::file, relativeFile, nullptr);
+    t.setProperty (ids::start, start, nullptr);
+    t.setProperty (ids::offset, offset, nullptr);
+    t.setProperty (ids::length, length, nullptr);
+    takeFolder.addChild (t, -1, &undo);
+    return t;
+}
+
+juce::Array<juce::ValueTree> Project::takes (const juce::ValueTree& folder)
+{
+    juce::Array<juce::ValueTree> list;
+    for (auto c : folder)
+        if (c.hasType (ids::REGION))
+            list.add (c);
+    return list;
+}
+
+std::vector<Project::CompSegment> Project::getComp (const juce::ValueTree& folder)
+{
+    const auto count = takes (folder).size();
+    const auto from = (juce::int64) folder[ids::offset];
+    const auto to = from + (juce::int64) folder[ids::length];
+    std::vector<CompSegment> comp;
+    for (auto& part : juce::StringArray::fromTokens (folder[ids::comp].toString(), ";", {}))
+    {
+        auto bits = juce::StringArray::fromTokens (part, ":", {});
+        if (bits.size() == 3)
+            comp.push_back ({ bits[0].getLargeIntValue(), bits[1].getLargeIntValue(), juce::jlimit (0, juce::jmax (0, count - 1), bits[2].getIntValue()) });
+    }
+
+    // Unset (or a folder trimmed wider than its comp): the last take fills the gaps.
+    std::vector<CompSegment> full;
+    auto cursor = juce::jmin (from, comp.empty() ? from : comp.front().from);
+    for (auto& c : comp)
+    {
+        if (c.from > cursor)
+            full.push_back ({ cursor, c.from, juce::jmax (0, count - 1) });
+        full.push_back (c);
+        cursor = c.to;
+    }
+    if (cursor < to)
+        full.push_back ({ cursor, to, juce::jmax (0, count - 1) });
+    return full;
+}
+
+void Project::setCompRange (juce::ValueTree takeFolder, juce::int64 from, juce::int64 to, int take)
+{
+    if (to <= from)
+        return;
+    std::vector<CompSegment> next;
+    for (auto& c : getComp (takeFolder))
+    {
+        if (c.to <= from || c.from >= to) { next.push_back (c); continue; }
+        if (c.from < from) next.push_back ({ c.from, from, c.take });
+        if (c.to > to)     next.push_back ({ to, c.to, c.take });
+    }
+    next.push_back ({ from, to, take });
+    std::sort (next.begin(), next.end(), [] (auto& a, auto& b) { return a.from < b.from; });
+
+    // Neighbours on the same take become one segment.
+    std::vector<CompSegment> merged;
+    for (auto& c : next)
+        if (! merged.empty() && merged.back().take == c.take && merged.back().to == c.from)
+            merged.back().to = c.to;
+        else
+            merged.push_back (c);
+
+    juce::StringArray parts;
+    for (auto& c : merged)
+        parts.add (juce::String (c.from) + ":" + juce::String (c.to) + ":" + juce::String (c.take));
+    takeFolder.setProperty (ids::comp, parts.joinIntoString (";"), &undo);
+}
+
+juce::Array<int> Project::flattenTakeFolder (juce::ValueTree takeFolder)
+{
+    juce::Array<int> made;
+    auto track = takeFolder.getParent();
+    const auto takeList = takes (takeFolder);
+    if (! track.isValid() || takeList.isEmpty())
+        return made;
+
+    const auto origin = contentOrigin (takeFolder);
+    const auto visibleFrom = (juce::int64) takeFolder[ids::start];
+    const auto visibleTo = visibleFrom + (juce::int64) takeFolder[ids::length];
+    for (auto& c : getComp (takeFolder))
+    {
+        const auto& take = takeList.getReference (c.take);
+        const auto takeFrom = (juce::int64) take[ids::start], takeTo = takeFrom + (juce::int64) take[ids::length];
+        const auto from = juce::jmax (c.from, takeFrom, visibleFrom - origin);
+        const auto to = juce::jmin (c.to, takeTo, visibleTo - origin);
+        if (to <= from)
+            continue;
+        auto r = addRegion (track, take[ids::file].toString(), origin + from, (juce::int64) take[ids::offset] + (from - takeFrom),
+                            to - from, takeFolder[ids::name].toString());
+        r.setProperty (ids::gain, takeFolder.getProperty (ids::gain, 0.0), &undo);
+        made.add ((int) r[ids::id]);
+    }
+    track.removeChild (takeFolder, &undo);
+    return made;
+}
+
 juce::ValueTree Project::addMidiRegion (juce::ValueTree track, juce::int64 start, juce::int64 length, const juce::String& name)
 {
     juce::ValueTree r (ids::REGION);

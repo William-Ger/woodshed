@@ -113,6 +113,9 @@ public:
     // MIDI region, else the selected track's region under (or nearest before) the playhead.
     juce::ValueTree getEditorRegion() const;
     void openInEditor (int regionId);
+    /** The take folder the Takes pane comps (the one opened, else the first selected). */
+    juce::ValueTree getTakeFolder() const;
+    void openTakes (int regionId);
     /** A new empty MIDI region of one bar on an instrument track at `at` (snapped to the bar). */
     juce::ValueTree createMidiRegion (juce::ValueTree track, juce::int64 at);
     /** Snaps the notes (the selected ones, or all) of the editor's region to `gridTicks`. */
@@ -149,7 +152,7 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor };
+    enum class Pane { none, rig, mixer, editor, takes };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
 
@@ -190,7 +193,7 @@ private:
     juce::Array<int> selectedRegions;
     juce::ValueTree clipboard;
     Pane pane = Pane::rig;
-    int editorRegionId = -1;
+    int editorRegionId = -1, takeFolderId = -1;
     bool automationShown = false, importing = false;
     int quantizeTicks = daw::ticksPerQuarter / 4;
     int midiScanTicks = 0;

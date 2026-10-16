@@ -96,6 +96,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/PianoRoll.cpp
         Source/app/MusicalTyping.cpp
         Source/app/PluginHost.cpp
+        Source/app/TakesEditor.cpp
         Source/app/StudioLookAndFeel.cpp
         Source/app/WindowStyle_other.cpp
         ${WOODSHED_RIG_SOURCES}

@@ -307,6 +307,14 @@ public:
                                                     const std::map<int, std::shared_ptr<TrackRuntime>>&,
                                                     const TrackRuntime* master = nullptr);
 
+    /** One pass of a cycle recording: where it belongs on the timeline once latency is taken out
+        (it runs a little past the cycle's end, by the latency, so it covers the whole cycle). */
+    struct Pass { juce::int64 start = 0, fileOffset = 0, length = 0; bool complete = true; };
+    /** A recording of `recorded` samples that started at `recordStart` while cycling over
+        [loopStart, loopEnd): the passes it made, the first one from recordStart. */
+    static std::vector<Pass> cyclePasses (juce::int64 recordStart, juce::int64 loopStart, juce::int64 loopEnd,
+                                          juce::int64 recorded, int latency);
+
     /** Where a recording that started at `recordStart` belongs once latency is taken out. */
     static void placeRecording (juce::int64 recordStart, int latency, juce::int64& start, juce::int64& offset);
 
@@ -393,6 +401,8 @@ private:
     juce::uint64 stopRequestedAt = 0;
     bool finishPending = false;
     int latencyAtRecord = 0;
+    std::atomic<bool> cycleRecording { false };
+    juce::int64 cycleStart = 0, cycleEnd = 0;
     juce::TimeSliceThread writerThread { "Woodshed recorder" };
 
     std::unique_ptr<juce::Thread> bounceThread;
