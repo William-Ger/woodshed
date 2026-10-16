@@ -6,6 +6,7 @@
 #include "RigPanel.h"
 #include "InstrumentPanel.h"
 #include "PianoRoll.h"
+#include "ScoreView.h"
 #include "MusicalTyping.h"
 
 namespace woodshed::app
@@ -45,6 +46,7 @@ private:
     RigPanel rig;
     InstrumentPanel instrument;
     PianoRoll pianoRoll;
+    ScoreView scoreView;
     MusicalTyping typing;
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */

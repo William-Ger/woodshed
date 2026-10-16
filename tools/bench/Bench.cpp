@@ -5,6 +5,7 @@
 //   woodshed-bench run [type ...] [--wav guitar.wav] [--render outDir]
 //   woodshed-bench presets [file.json ...] [--wav guitar.wav] [--render outDir]
 //   woodshed-bench project      (multitrack engine checks; see ProjectTest.cpp)
+//   woodshed-bench score        (Score editor notation layout checks; see ScoreTest.cpp)
 //   woodshed-bench instruments [type ...] [--render dir] [--analyse]   (see InstrumentTest.cpp)
 //
 // Each pedal runs alone at 48 kHz in 64-sample blocks, through the same Chain
@@ -479,6 +480,8 @@ void printKnobs (const juce::StringArray& only)
 } // namespace
 
 int runProjectTest();
+int runScoreTest();
+int renderScoreSamples (const juce::File&);
 int runInstrumentTest (const juce::StringArray& args);
 int writeMidiDemoProject (const juce::File&);
 int renderProject (const juce::File&, const juce::File&);
@@ -534,6 +537,12 @@ int main (int argc, char* argv[])
     if (args[0] == "project")
         return runProjectTest();
 
+    if (args[0] == "score")
+        return runScoreTest();
+
+    if (args[0] == "score-render" && args.size() > 1)
+        return renderScoreSamples (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+
     if (args[0] == "instruments")
     {
         args.remove (0);
@@ -562,7 +571,7 @@ int main (int argc, char* argv[])
     {
         std::cerr << "usage: woodshed-bench list | knobs [type ...] | run [type ...] [--wav file] [--render dir]"
                      " | presets [file.json ...] [--wav file] [--render dir]"
-                     " | instruments [type ...] [--render dir] [--analyse] | project\n";
+                     " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir\n";
         return 2;
     }
 
