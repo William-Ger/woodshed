@@ -34,7 +34,8 @@ set(WOODSHED_ENGINE_SOURCES
     Source/instruments/Keyboards.cpp
     Source/instruments/Synths.cpp
     Source/instruments/Drums.cpp
-    Source/instruments/Orchestral.cpp)
+    Source/instruments/Orchestral.cpp
+    Source/instruments/Plucked.cpp)
 
 # The multitrack engine (song model, playback, recording, bounce); no UI.
 set(WOODSHED_DAW_SOURCES

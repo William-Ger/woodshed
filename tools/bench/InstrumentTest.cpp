@@ -394,7 +394,7 @@ void analyse (const InstrumentType& t)
                  << " c1.5 " << juce::roundToInt (centroid (out, (size_t) secs (1.5)));
             if (vel > 0.9f)
                 line << "  decay(-40dB) " << juce::String (decayTime (out, (size_t) secs (0.01)), 2) << " s"
-                     << "  after off " << juce::String (toDb (peakOf (out, (size_t) secs (3.3))), 0) << " dB";
+                     << "  after off " << juce::String (juce::roundToInt (toDb (peakOf (out, (size_t) secs (3.3))))) << " dB";
         }
         std::cout << line << "\n";
     }

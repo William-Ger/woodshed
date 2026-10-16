@@ -3,8 +3,11 @@
 namespace woodshed
 {
 
-void registerOrchestralInstruments (InstrumentRegistry&)
+void registerPluckedInstruments (InstrumentRegistry&);     // Plucked.cpp
+
+void registerOrchestralInstruments (InstrumentRegistry& r)
 {
+    registerPluckedInstruments (r);
 }
 
 } // namespace woodshed
