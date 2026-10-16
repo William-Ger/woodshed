@@ -463,7 +463,9 @@ void Lanes::drawTakes (juce::Graphics& g)
     if (! engine.isRecording())
         return;
 
-    const auto start = engine.getRecordStart();
+    // Drawn where the take will land once the interface latency is taken out, so it doesn't jump on stop.
+    const auto recordStart = engine.getRecordStart();
+    const auto start = recordStart - engine.getLiveTakeOffset();
     const auto length = juce::jmax ((juce::int64) 1, engine.getRecordedLength());
     auto& p = view.project();
 
@@ -483,6 +485,9 @@ void Lanes::drawTakes (juce::Graphics& g)
             g.setColour (theme::record.withMultipliedBrightness (0.9f));
             g.fillRoundedRectangle (rect, regionRadius);
         }
+        if (auto* peaks = engine.getLivePeaks ((int) p.track (i)[ids::id]))
+            drawLivePeaks (g, *peaks, rect.withTrimmedTop (nameBarHeight).reduced (0.0f, 3.0f), start);
+
         g.setColour (theme::record.withAlpha (0.9f));
         g.drawRoundedRectangle (rect.reduced (0.5f), regionRadius, 1.0f);
         if (rect.getWidth() > 60.0f)
@@ -494,6 +499,45 @@ void Lanes::drawTakes (juce::Graphics& g)
                         juce::Justification::centredLeft, true);
         }
     }
+}
+
+void Lanes::drawLivePeaks (juce::Graphics& g, const daw::LivePeaks& peaks, juce::Rectangle<float> wave, juce::int64 start) const
+{
+    const int count = peaks.size();
+    if (count == 0 || wave.getHeight() < 4.0f)
+        return;
+
+    // Quiet DI scaled up for display, as finished takes are (by the loudest peak so far).
+    float loudest = 0.0f;
+    for (int k = 0; k < count; ++k)
+        loudest = juce::jmax (loudest, peaks[k]);
+    const float scale = loudest > 0.0f ? juce::jlimit (1.0f, 8.0f, 0.85f / loudest) : 1.0f;
+
+    const auto clip = g.getClipBounds().toFloat().getIntersection (wave);
+    if (clip.isEmpty())
+        return;
+
+    const double hop = daw::LivePeaks::hop;
+    const float mid = wave.getCentreY(), half = wave.getHeight() * 0.5f;
+    juce::RectangleList<float> bars;
+
+    for (float x = std::floor (clip.getX()); x < clip.getRight(); x += 1.0f)
+    {
+        const int from = (int) std::floor ((view.sampleAtX ((double) x) - (double) start) / hop);
+        const int to = juce::jmax (from + 1, (int) std::ceil ((view.sampleAtX ((double) x + 1.0) - (double) start) / hop));
+        if (to <= 0 || from >= count)
+            continue;
+
+        float peak = 0.0f;
+        for (int k = juce::jmax (0, from); k < juce::jmin (count, to); ++k)
+            peak = juce::jmax (peak, peaks[k]);
+
+        const float h = juce::jmax (0.5f, juce::jmin (1.0f, peak * scale) * half);
+        bars.addWithoutMerging ({ x, mid - h, 1.0f, h * 2.0f });
+    }
+
+    g.setColour (juce::Colours::white.withAlpha (0.85f));
+    g.fillRectList (bars);
 }
 
 void Lanes::drawHint (juce::Graphics& g, int contentBottom) const

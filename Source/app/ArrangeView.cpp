@@ -493,11 +493,12 @@ void ArrangeView::timerCallback()
 
     if (recordingNow)
     {
-        const auto start = engine.getRecordStart();
+        // The whole take: its live waveform rescales as the playing gets louder.
+        const auto start = engine.getRecordStart() - engine.getLiveTakeOffset();
         const auto length = engine.getRecordedLength();
         if (length != lastRecordedLength)
         {
-            const float x1 = xForSample ((double) (start + juce::jmax ((juce::int64) 0, lastRecordedLength)));
+            const float x1 = xForSample ((double) start);
             const float x2 = xForSample ((double) (start + length));
             lanes->repaint (juce::Rectangle<int> ((int) x1 - 8, 0, (int) (x2 - x1) + 16, lanes->getHeight()));
             lastRecordedLength = length;

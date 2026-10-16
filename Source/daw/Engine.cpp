@@ -272,7 +272,10 @@ void Engine::stop()
         recording = false;
         for (auto& t : takes)
             if (auto it = runtimes.find (t.trackId); it != runtimes.end())
+            {
                 it->second->recorder = nullptr;
+                it->second->livePeaks = nullptr;
+            }
 
         stopRequestedAt = callbackCount.load();
         finishPending = true;
@@ -331,7 +334,9 @@ void Engine::record()
         take.trackId = id;
         take.file = file;
         take.writer = std::make_unique<juce::AudioFormatWriter::ThreadedWriter> (writer.release(), writerThread, 1 << 17);
+        take.peaks = std::make_unique<LivePeaks> (sampleRate);
         it->second->recorder = take.writer.get();
+        it->second->livePeaks = take.peaks.get();
         takes.push_back (std::move (take));
     }
 
@@ -410,6 +415,16 @@ void Engine::finishRecording()
 
     takes.clear();
     sendChangeMessage();
+}
+
+const LivePeaks* Engine::getLivePeaks (int trackId) const
+{
+    if (! isRecording())
+        return nullptr;
+    for (auto& t : takes)
+        if (t.trackId == trackId)
+            return t.peaks.get();
+    return nullptr;
 }
 
 //==============================================================================
@@ -704,6 +719,8 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
                         continue;
                     const float* channel = ins[(size_t) t.input] + from;
                     w->write (&channel, n - from);
+                    if (auto* peaks = t.runtime->livePeaks.load())
+                        peaks->add (channel, n - from);
                 }
                 recordedSamples.fetch_add (n - from);
             }

@@ -300,6 +300,46 @@ int runProjectTest()
         project->removeTrack (b);
     }
 
+    std::cout << "live waveform while recording\n";
+    {
+        LivePeaks peaks (rate, 0.01);                               // room for 0.6 s
+        std::vector<float> ramp (1000);
+        for (size_t i = 0; i < ramp.size(); ++i)
+            ramp[i] = (i % 256 == 100) ? -0.5f : 0.1f;
+        peaks.add (ramp.data(), (int) ramp.size());
+        check (peaks.size() == 1000 / LivePeaks::hop && std::abs (peaks[0] - 0.5f) < 1.0e-6f, "one peak per hop, rectified");
+
+        std::vector<float> lots ((size_t) rate);
+        peaks.add (lots.data(), (int) lots.size());
+        check (peaks.size() == (int) (rate * 0.6 / LivePeaks::hop), "stops at capacity instead of overrunning");
+
+        juce::AudioDeviceManager devices;
+        Engine engine (devices, {});
+        project->state.setProperty (ids::countIn, false, nullptr);
+        project->state.setProperty (ids::loopOn, false, nullptr);
+        engine.prepare (rate, 64);
+        engine.setProject (project.get());
+        a.setProperty (ids::arm, true, nullptr);
+        engine.setPosition (0);
+        engine.record();
+
+        std::vector<float> input (64, 0.25f), l (64), r (64);
+        const float* ins[] { input.data() };
+        for (int block = 0; block < 40; ++block)                    // 2560 samples: 10 peaks
+        {
+            float* outs[] { l.data(), r.data() };
+            engine.audioDeviceIOCallbackWithContext (ins, 1, outs, 2, 64, {});
+        }
+
+        const auto* live = engine.getLivePeaks ((int) a[ids::id]);
+        check (live != nullptr && live->size() == 10 && std::abs ((*live)[9] - 0.25f) < 1.0e-6f,
+               "the armed track's take has its waveform while it records");
+        engine.stop();
+        check (engine.getLivePeaks ((int) a[ids::id]) == nullptr, "no live waveform once stopped");
+        engine.setProject (nullptr);
+        a.setProperty (ids::arm, false, nullptr);
+    }
+
     std::cout << "record placement\n";
     {
         juce::int64 start = 0, offset = 0;

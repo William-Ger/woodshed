@@ -71,6 +71,7 @@ private:
     void drawRegion (juce::Graphics&, const juce::ValueTree& region, int trackIndex, const RegionLook&);
     void drawFades (juce::Graphics&, juce::Rectangle<float> rect, juce::Rectangle<float> wave, const RegionLook&) const;
     void drawTakes (juce::Graphics&);
+    void drawLivePeaks (juce::Graphics&, const daw::LivePeaks&, juce::Rectangle<float> wave, juce::int64 start) const;
     void drawHint (juce::Graphics&, int contentBottom) const;
     void showRegionMenu();
 
