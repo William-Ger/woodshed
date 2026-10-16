@@ -690,7 +690,7 @@ int runProjectTest()
             {
                 Mixer::Block b;
                 b.position = pos;
-                b.numSamples = 64;
+                b.numSamples = (int) juce::jmin ((juce::int64) 64, length - pos);
                 b.playing = true;
                 b.left = l.data() + pos;
                 b.right = r.data() + pos;
