@@ -118,6 +118,12 @@ private:
     juce::AudioDeviceManager::AudioDeviceSetup wantedSetup (bool& known);
     bool switchingDevice = false;
 
+    /** Reopens the interface when it stops calling back (a USB blip leaves a dead device behind
+        under the same name, so the device list alone never shows the change). */
+    void checkAudioAlive();
+    juce::uint64 lastCallbackCount = 0;
+    int silentTicks = 0, retryTicks = 0;
+
     void adopt (std::unique_ptr<daw::Project>);
     void rememberProject (const juce::File&);
 
