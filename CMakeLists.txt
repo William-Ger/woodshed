@@ -41,7 +41,9 @@ set(WOODSHED_ENGINE_SOURCES
 set(WOODSHED_DAW_SOURCES
     Source/daw/Project.cpp
     Source/daw/Engine.cpp
-    Source/daw/MidiFiles.cpp)
+    Source/daw/MidiFiles.cpp
+    Source/daw/Drummer.cpp
+    Source/daw/StepPattern.cpp)
 
 #==============================================================================
 if(NOT WOODSHED_BENCH_ONLY)
@@ -94,6 +96,8 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/Icons.cpp
         Source/app/InstrumentPanel.cpp
         Source/app/PianoRoll.cpp
+        Source/app/DrummerEditor.cpp
+        Source/app/StepSequencer.cpp
         Source/app/MusicalTyping.cpp
         Source/app/StudioLookAndFeel.cpp
         Source/app/WindowStyle_other.cpp
@@ -194,7 +198,7 @@ endif()
 #==============================================================================
 # Offline pedal bench: woodshed-bench list | run [type ...] [--render dir]
 juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
-target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
+target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp tools/bench/DrummerTest.cpp ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(WoodshedBench
     PRIVATE
