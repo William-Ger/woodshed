@@ -22,7 +22,7 @@ namespace cmd
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
         newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation,
-        importMidi, exportMidi, pluginManager, loopRegions
+        importMidi, exportMidi, pluginManager, loopRegions, showScore
     };
 }
 
@@ -111,7 +111,7 @@ public:
     /** Switches an instrument track to another instrument or patch (one undo step). */
     void setInstrument (juce::ValueTree track, const juce::String& type, int patchIndex);
 
-    // The MIDI region the piano roll edits: the one opened explicitly, else the first selected
+    // The MIDI region the piano roll (and the score) edits: the one opened explicitly, else the first selected
     // MIDI region, else the selected track's region under (or nearest before) the playhead.
     juce::ValueTree getEditorRegion() const;
     void openInEditor (int regionId);
@@ -156,7 +156,7 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor, takes };
+    enum class Pane { none, rig, mixer, editor, takes, score };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
 

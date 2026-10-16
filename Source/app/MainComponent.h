@@ -6,6 +6,7 @@
 #include "RigPanel.h"
 #include "InstrumentPanel.h"
 #include "PianoRoll.h"
+#include "ScoreView.h"
 #include "MusicalTyping.h"
 #include "TakesEditor.h"
 
@@ -46,6 +47,7 @@ private:
     RigPanel rig;
     InstrumentPanel instrument;
     PianoRoll pianoRoll;
+    ScoreView scoreView;
     MusicalTyping typing;
     TakesEditor takesEditor;
 

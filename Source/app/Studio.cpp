@@ -67,10 +67,11 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
         p = daw::Project::load (last);
     adopt (p != nullptr ? std::move (p) : daw::Project::createNew (preferredSampleRate));
 
-    // Test launches can open a pane (rig, mixer, editor) and select a track by number.
+    // Test launches can open a pane (rig, mixer, editor, score) and select a track by number.
     const auto testPane = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_PANE", {});
     if (testPane == "editor") pane = Pane::editor;
     else if (testPane == "mixer") pane = Pane::mixer;
+    else if (testPane == "score") pane = Pane::score;
     else if (testPane == "none") pane = Pane::none;
     else if (testPane == "takes") pane = Pane::takes;
     if (const auto r = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_REGION", {}).getIntValue(); r > 0)
@@ -912,7 +913,8 @@ void Studio::openInEditor (int regionId)
     editorRegionId = regionId;
     if (auto r = findRegion (regionId); r.isValid())
         selectTrack ((int) r.getParent()[daw::ids::id]);
-    pane = Pane::editor;
+    if (pane != Pane::score)     // the score stays open on the region; otherwise the piano roll
+        pane = Pane::editor;
     sendChangeMessage();
 }
 
