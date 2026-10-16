@@ -532,8 +532,9 @@ void InstrumentPanel::sync()
     }
 
     auto track = studio.getSelectedTrack();
-    if (! daw::Project::isInstrumentTrack (track))
+    if (! daw::Project::isInstrumentTrack (track) && ! daw::Project::isAuxTrack (track))
         track = {};
+    const bool aux = daw::Project::isAuxTrack (track);
 
     shownTrack = track;
     inserts.setTrack (track);
@@ -555,7 +556,11 @@ void InstrumentPanel::sync()
     }
 
     for (auto* b : { &instrumentButton, &patchButton, &previousPatch, &nextPatch, &typingButton })
+    {
         b->setEnabled (track.isValid());
+        b->setVisible (! aux);
+    }
+    knobView.setVisible (! aux);
     resized();
     repaint();
 }
@@ -641,6 +646,12 @@ void InstrumentPanel::resized()
     header.removeFromLeft (4);
     nextPatch.setBounds (header.removeFromLeft (26));
 
+    if (daw::Project::isAuxTrack (shownTrack))
+    {
+        // An aux is all effects.
+        inserts.setBounds (r);
+        return;
+    }
     inserts.setBounds (r.removeFromRight (juce::jlimit (240, 340, r.getWidth() / 3)));
     knobView.setBounds (r.reduced (12, 8));
     const int w = knobView.getWidth() - knobView.getScrollBarThickness();

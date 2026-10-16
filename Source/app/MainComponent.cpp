@@ -82,7 +82,8 @@ void MainComponent::resized()
 
 void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
 {
-    const bool instrumentTrack = daw::Project::isInstrumentTrack (studio.getSelectedTrack());
+    const auto selected = studio.getSelectedTrack();
+    const bool instrumentTrack = daw::Project::isInstrumentTrack (selected) || daw::Project::isAuxTrack (selected);
     if (studio.getPane() != shownPane || instrumentTrack != shownInstrument)
     {
         shownPane = studio.getPane();

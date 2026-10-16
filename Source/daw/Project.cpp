@@ -199,6 +199,42 @@ juce::ValueTree Project::addInstrumentTrack (const juce::String& name, const juc
     return t;
 }
 
+juce::ValueTree Project::addAuxTrack (const juce::String& name, int insertIndex)
+{
+    undo.beginNewTransaction();
+    auto t = addTrack (name, insertIndex);
+    t.setProperty (ids::kind, kinds::aux, &undo);
+    t.setProperty (ids::rigOn, false, &undo);
+    return t;
+}
+
+juce::ValueTree Project::addSend (juce::ValueTree track, int busId, double levelDb, bool pre)
+{
+    for (auto s : sends (track))
+        if ((int) s[ids::bus] == busId)
+        {
+            s.setProperty (ids::level, levelDb, &undo);
+            s.setProperty (ids::pre, pre, &undo);
+            return s;
+        }
+
+    juce::ValueTree send (ids::SEND);
+    send.setProperty (ids::bus, busId, nullptr);
+    send.setProperty (ids::level, levelDb, nullptr);
+    send.setProperty (ids::pre, pre, nullptr);
+    track.addChild (send, -1, &undo);
+    return send;
+}
+
+juce::Array<juce::ValueTree> Project::sends (const juce::ValueTree& track)
+{
+    juce::Array<juce::ValueTree> list;
+    for (auto c : track)
+        if (c.hasType (ids::SEND))
+            list.add (c);
+    return list;
+}
+
 juce::ValueTree Project::addInsert (juce::ValueTree track, const juce::String& pedalType, const std::vector<float>& knobs, int index)
 {
     juce::ValueTree fx (ids::FX);
@@ -376,6 +412,13 @@ std::vector<Project::AutoParam> Project::automatableParams (const juce::ValueTre
                                   k < values.size() ? values[k] : spec.def, spec.unit, spec.skew });
             }
         }
+    }
+
+    for (auto send : sends (track))
+    {
+        const auto bus = track.getParent().getChildWithProperty (ids::id, send[ids::bus]);
+        list.push_back ({ "send:" + send[ids::bus].toString(), "Send to " + bus[ids::name].toString(), -60.0f, 6.0f,
+                          (float) (double) send.getProperty (ids::level, 0.0), "dB" });
     }
 
     for (auto fx : inserts (track))

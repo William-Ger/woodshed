@@ -100,7 +100,8 @@ TrackHeader::TrackHeader (ArrangeView& v, juce::ValueTree t)
     for (auto* c : { &mute, &solo, &arm, &monitor })
         addAndMakeVisible (*c);
     // An instrument has no input to monitor: what you play always sounds.
-    monitor.setVisible (! daw::Project::isInstrumentTrack (track));
+    monitor.setVisible (! daw::Project::isInstrumentTrack (track) && ! daw::Project::isAuxTrack (track));
+    arm.setVisible (! daw::Project::isAuxTrack (track));     // an aux has nothing to record
 
     name.setText (track[ids::name].toString(), juce::dontSendNotification);
     name.setFont (theme::font (13.0f, theme::Weight::medium));
@@ -215,7 +216,7 @@ void TrackHeader::paint (juce::Graphics& g)
     {
         const bool instrument = daw::Project::isInstrumentTrack (track);
         const auto box = juce::Rectangle<float> ((float) getWidth() - 32.0f, (float) mute.getY(), 20.0f, 20.0f);
-        icons::draw (g, instrument ? icons::keyboard() : icons::waveform(), box.reduced (1.0f),
+        icons::draw (g, instrument ? icons::keyboard() : daw::Project::isAuxTrack (track) ? icons::mixer() : icons::waveform(), box.reduced (1.0f),
                      selected ? theme::dimText : theme::faintText, 1.4f);
     }
 
@@ -238,7 +239,7 @@ void TrackHeader::resized()
 
 juce::Rectangle<int> TrackHeader::automationChip() const
 {
-    const int left = arm.getRight() + (monitor.isVisible() ? 28 : 6);
+    const int left = (arm.isVisible() ? arm.getRight() : solo.getRight()) + (monitor.isVisible() ? 28 : 6);
     return { left, mute.getY(), juce::jmax (20, getWidth() - 8 - left), mute.getHeight() };
 }
 

@@ -16,13 +16,16 @@ namespace woodshed::daw
              markers (JSON array of { id, name, position }; a property, so the children stay tracks)
       TRACK  id (int, unique), name, colour (ARGB int), volume (dB), pan (-1..1),
              mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool),
-             kind ("audio" when absent, or "instrument")
+             kind ("audio" when absent, "instrument", or "aux": a bus that plays the sends it receives
+             through its inserts and fader; it has no regions or input)
         RIG        state (XML string of the track's rig: its board, amp, cab and knobs); audio tracks
         INSTRUMENT type (InstrumentRegistry id), patch (name), knobs (comma-separated real values in
                    the instrument's knob order); instrument tracks
         FX         id, type (pedal Registry id), on (bool), knobs (comma-separated real values in the
                    pedal's knob order); the track's insert effects in signal order, after the rig or
                    instrument
+        SEND       bus (an aux track's id), level (dB), pre (bool: before the fader and pan); the
+                   track's signal, also sent to that aux
         AUTOMATION param ("volume" in dB, "pan" -1..1, "inst:<knob index>" or "fx:<FX id>:<knob index>"
                    in the knob's real units), points ("sample:value;..." in time order). With
                    points, the parameter follows the line between them (and holds the first and
@@ -52,6 +55,7 @@ namespace ids
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
     WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
+    WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
 #undef WOODSHED_ID
 }
@@ -59,7 +63,7 @@ namespace ids
 /** Track and region kinds (the `kind` property). */
 namespace kinds
 {
-    inline const juce::String audio { "audio" }, instrument { "instrument" }, midi { "midi" };
+    inline const juce::String audio { "audio" }, instrument { "instrument" }, midi { "midi" }, aux { "aux" };
 }
 
 /** MIDI note positions are in ticks: 960 per quarter note. */
@@ -149,6 +153,14 @@ public:
                                         const juce::String& patchName, const std::vector<float>& knobs,
                                         int insertIndex = -1);
     static bool isInstrumentTrack (const juce::ValueTree& track) { return track[ids::kind].toString() == kinds::instrument; }
+    static bool isAuxTrack (const juce::ValueTree& track)        { return track[ids::kind].toString() == kinds::aux; }
+    /** An aux (bus) track: other tracks reach it through sends. */
+    juce::ValueTree addAuxTrack (const juce::String& name, int insertIndex = -1);
+
+    // Sends ----------------------------------------------------------------------
+    /** A send from `track` to the aux `busId` at `levelDb` (or the existing one, updated). */
+    juce::ValueTree addSend (juce::ValueTree track, int busId, double levelDb = 0.0, bool pre = false);
+    static juce::Array<juce::ValueTree> sends (const juce::ValueTree& track);
 
     // Insert effects ------------------------------------------------------------
     /** Adds a pedal from the Registry to the track's inserts (at `index`, or the end). */

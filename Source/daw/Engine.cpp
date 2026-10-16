@@ -172,6 +172,10 @@ void Mixer::render (const Snapshot& snap, const Block& b)
     juce::FloatVectorOperations::clear (b.right, n);
 
     for (auto& track : snap.tracks)
+        if (track.aux && track.runtime->busInput.getNumSamples() >= n)
+            track.runtime->busInput.clear (0, n);
+
+    for (auto& track : snap.tracks)
     {
         auto& rt = *track.runtime;
         jassert (rt.work.getNumSamples() >= n);
@@ -179,7 +183,18 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         float* c = rt.work.getWritePointer (1);
         juce::FloatVectorOperations::clear (a, n);
 
-        if (track.instrument != nullptr)
+        if (track.aux)
+        {
+            // What the sends brought in this block.
+            if (rt.busInput.getNumSamples() >= n)
+            {
+                juce::FloatVectorOperations::copy (a, rt.busInput.getReadPointer (0), n);
+                juce::FloatVectorOperations::copy (c, rt.busInput.getReadPointer (1), n);
+            }
+            else
+                juce::FloatVectorOperations::clear (c, n);
+        }
+        else if (track.instrument != nullptr)
         {
             juce::FloatVectorOperations::clear (c, n);
             collectNoteEvents (track, rt, b);
@@ -252,16 +267,46 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         rt.gainLeft.setTargetValue (g * std::cos (angle) * juce::MathConstants<float>::sqrt2);
         rt.gainRight.setTargetValue (g * std::sin (angle) * juce::MathConstants<float>::sqrt2);
 
+        // Sends: their levels, automated or not, and the pre-fader ones before the fader.
+        std::array<float, 32> sendGains {};
+        const size_t numSends = juce::jmin (track.sends.size(), sendGains.size());
+        for (size_t i = 0; i < numSends; ++i)
+            sendGains[i] = track.audible ? track.sends[i].gain : 0.0f;
+        for (auto& line : track.automation)
+            if (line.target == TrackPlayback::AutoLine::sendLevel && juce::isPositiveAndBelow (line.knob, (int) numSends))
+                sendGains[(size_t) line.knob] = track.audible ? dbToGain ((double) Project::evaluate (line.points, b.position)) : 0.0f;
+
+        auto sendTo = [&] (size_t i)
+        {
+            const auto& send = track.sends[i];
+            if (sendGains[i] <= 0.0f || ! juce::isPositiveAndBelow (send.target, (int) snap.tracks.size()))
+                return;
+            auto& bus = snap.tracks[(size_t) send.target].runtime->busInput;
+            if (bus.getNumSamples() < n)
+                return;
+            juce::FloatVectorOperations::addWithMultiply (bus.getWritePointer (0), a, sendGains[i], n);
+            juce::FloatVectorOperations::addWithMultiply (bus.getWritePointer (1), c, sendGains[i], n);
+        };
+        for (size_t i = 0; i < numSends; ++i)
+            if (track.sends[i].pre)
+                sendTo (i);
+
         float peakL = 0.0f, peakR = 0.0f;
         for (int i = 0; i < n; ++i)
         {
             const float l = a[i] * rt.gainLeft.getNextValue();
             const float r = c[i] * rt.gainRight.getNextValue();
+            a[i] = l;
+            c[i] = r;
             b.left[i] += l;
             b.right[i] += r;
             peakL = juce::jmax (peakL, std::abs (l));
             peakR = juce::jmax (peakR, std::abs (r));
         }
+
+        for (size_t i = 0; i < numSends; ++i)
+            if (! track.sends[i].pre)
+                sendTo (i);
 
         rt.peakLeft.store (juce::jmax (rt.peakLeft.load (std::memory_order_relaxed), peakL), std::memory_order_relaxed);
         rt.peakRight.store (juce::jmax (rt.peakRight.load (std::memory_order_relaxed), peakR), std::memory_order_relaxed);
@@ -709,6 +754,7 @@ Engine::Levels Engine::takeMasterLevels()
 void Engine::prepareRig (TrackRuntime& rt)
 {
     rt.work.setSize (2, blockSize, false, true, true);
+    rt.busInput.setSize (2, blockSize, false, true, true);
     rt.gainLeft.reset (sampleRate, 0.03);
     rt.gainRight.reset (sampleRate, 0.03);
 
@@ -792,7 +838,7 @@ void Engine::syncRuntimes()
             auto rt = std::make_shared<TrackRuntime>();
             rt->id = id;
             syncTrackDevices (*rt, t, sampleRate, blockSize);
-            if (makeRig && ! Project::isInstrumentTrack (t))
+            if (makeRig && ! Project::isInstrumentTrack (t) && ! Project::isAuxTrack (t))
             {
                 rt->rig = makeRig();
                 restoreRig (*rt->rig, t);
@@ -841,6 +887,9 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         tp.monitor = (bool) t[ids::monitor];
         tp.rigOn = (bool) t.getProperty (ids::rigOn, true);
         tp.input = (int) t.getProperty (ids::input, 0);
+        tp.aux = Project::isAuxTrack (t);
+        if (tp.aux)
+            tp.rigOn = false;
 
         const auto& rt = *it->second;
         for (auto& fx : rt.inserts)
@@ -886,6 +935,21 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
             {
                 line.target = TrackPlayback::AutoLine::instrumentKnob;
                 line.knob = param.fromFirstOccurrenceOf (":", false, false).getIntValue();
+            }
+            else if (param.startsWith ("send:"))
+            {
+                line.target = TrackPlayback::AutoLine::sendLevel;
+                line.knob = -1;
+                const int busId = param.fromFirstOccurrenceOf (":", false, false).getIntValue();
+                int index = 0;
+                for (auto send : Project::sends (t))
+                {
+                    if ((int) send[ids::bus] == busId)
+                        line.knob = index;
+                    ++index;
+                }
+                if (line.knob < 0)
+                    continue;
             }
             else if (param.startsWith ("fx:"))
             {
@@ -968,6 +1032,29 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         }
 
         snap->tracks.push_back (std::move (tp));
+    }
+
+    // Aux tracks play after every other track (so their sends have arrived), in project order;
+    // then each send finds its aux. A send to an aux that plays earlier (aux to aux, upwards) is
+    // dropped, so there are never loops.
+    std::stable_partition (snap->tracks.begin(), snap->tracks.end(), [] (const TrackPlayback& t) { return ! t.aux; });
+    std::map<int, int> indexOfTrack;
+    for (size_t i = 0; i < snap->tracks.size(); ++i)
+        indexOfTrack[snap->tracks[i].runtime->id] = (int) i;
+
+    for (size_t i = 0; i < snap->tracks.size(); ++i)
+    {
+        auto& tp = snap->tracks[i];
+        for (auto send : Project::sends (project.trackById (tp.runtime->id)))
+        {
+            TrackPlayback::Send sp;
+            sp.gain = dbToGain ((double) send.getProperty (ids::level, 0.0));
+            sp.pre = (bool) send[ids::pre];
+            if (auto it = indexOfTrack.find ((int) send[ids::bus]); it != indexOfTrack.end()
+                && it->second > (int) i && snap->tracks[(size_t) it->second].aux)
+                sp.target = it->second;
+            tp.sends.push_back (sp);
+        }
     }
 
     return snap;
@@ -1285,11 +1372,12 @@ void Engine::startBounce (const juce::File& wav, juce::int64 start, juce::int64 
         auto rt = std::make_shared<TrackRuntime>();
         rt->id = (int) t[ids::id];
         rt->work.setSize (2, bounceBlock);
+        rt->busInput.setSize (2, bounceBlock);
         rt->gainLeft.reset (sampleRate, 0.03);
         rt->gainRight.reset (sampleRate, 0.03);
         syncTrackDevices (*rt, t, sampleRate, bounceBlock);
 
-        if (makeRig && ! Project::isInstrumentTrack (t))
+        if (makeRig && ! Project::isInstrumentTrack (t) && ! Project::isAuxTrack (t))
         {
             rt->rig = makeRig();
             restoreRig (*rt->rig, t);

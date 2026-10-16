@@ -586,6 +586,43 @@ int runProjectTest()
             check (! Project::automationNode (keys, "volume").isValid(), "an emptied line is removed");
         }
 
+        // Sends and aux tracks.
+        {
+            auto bus = project->addAuxTrack ("Reverb");
+            auto busRt = std::make_shared<TrackRuntime>();
+            busRt->id = (int) bus[ids::id];
+            busRt->work.setSize (2, 64);
+            busRt->busInput.setSize (2, 64);
+            busRt->gainLeft.reset (rate, 0.0);
+            busRt->gainRight.reset (rate, 0.0);
+            runtimes[busRt->id] = busRt;
+
+            auto send = project->addSend (keys, (int) bus[ids::id], 0.0, false);
+            auto l2 = render (60000);
+            check (std::abs (l2[48000] - 2.0f) < 0.02f, "a 0 dB send doubles the note through an empty aux (" + juce::String (l2[48000], 3) + ")");
+
+            keys.setProperty (ids::volume, -100.0, nullptr);
+            l2 = render (60000);
+            check (std::abs (l2[48000]) < 0.001f, "a post-fader send follows the fader down");
+            send.setProperty (ids::pre, true, nullptr);
+            l2 = render (60000);
+            check (std::abs (l2[48000] - 1.0f) < 0.02f, "a pre-fader send ignores the fader");
+            keys.setProperty (ids::volume, 0.0, nullptr);
+            send.setProperty (ids::pre, false, nullptr);
+
+            project->setAutomation (keys, "send:" + bus[ids::id].toString(), { { 0, -6.0206f } });
+            l2 = render (60000);
+            check (std::abs (l2[48000] - 1.5f) < 0.02f, "send level automation (" + juce::String (l2[48000], 3) + ")");
+            project->setAutomation (keys, "send:" + bus[ids::id].toString(), {});
+
+            bus.setProperty (ids::mute, true, nullptr);
+            l2 = render (60000);
+            check (std::abs (l2[48000] - 1.0f) < 0.02f, "a muted aux plays nothing");
+            project->state.removeChild (bus, nullptr);
+            keys.removeChild (send, nullptr);
+            runtimes.erase (busRt->id);
+        }
+
         check (Project::decodeValues (Project::encodeValues ({ 1.0f, -0.5f, 2000.0f, 0.125f })) == std::vector<float> { 1.0f, -0.5f, 2000.0f, 0.125f },
                "knob values survive encoding");
 
@@ -762,6 +799,18 @@ int writeMidiDemoProject (const juce::File& folder)
                 if (s % 2 == 0)                  project->addNote (beat, { 42, s % 4 == 0 ? 90 : 65, at, q / 4 });
             }
     }
+
+    // A shared reverb on an aux, fed by the keys and the lead.
+    auto verb = project->addAuxTrack ("Reverb");
+    if (auto* hall = woodshed::Registry::get().find ("reverb.hall"))
+    {
+        std::vector<float> values;
+        for (auto& k : hall->info.knobs)
+            values.push_back (k.id == "mix" ? k.max : k.def);
+        project->addInsert (verb, "reverb.hall", values);
+    }
+    project->addSend (keys, (int) verb[ids::id], -12.0);
+    project->addSend (lead, (int) verb[ids::id], -8.0);
 
     // Automation: the chords fade in over two bars; the lead's filter opens up.
     project->setAutomation (keys, "volume", { { 0, -30.0f }, { bar * 2, 0.0f } });

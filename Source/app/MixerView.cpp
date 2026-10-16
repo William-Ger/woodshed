@@ -191,11 +191,20 @@ void MixerView::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Ide
         return;
     }
 
+    // A send, insert or instrument changed: its track's strip shows it.
+    if (tree.hasType (ids::SEND) || tree.hasType (ids::FX) || tree.hasType (ids::INSTRUMENT))
+    {
+        for (auto* s : strips)
+            if (s->getTree() == tree.getParent())
+                s->refresh();
+        return;
+    }
+
     if (! tree.hasType (ids::TRACK))
         return;
 
     for (auto* s : strips)
-        if (s->getTree() == tree)
+        if (s->getTree() == tree || property == ids::name)     // sends show their aux's name
             s->refresh();
 
     if (property == ids::solo)
@@ -206,12 +215,20 @@ void MixerView::valueTreeChildAdded (juce::ValueTree& parent, juce::ValueTree&)
 {
     if (parent == observed)
         rebuild();
+    else if (parent.hasType (ids::TRACK))
+        for (auto* s : strips)
+            if (s->getTree() == parent)
+                s->refresh();
 }
 
 void MixerView::valueTreeChildRemoved (juce::ValueTree& parent, juce::ValueTree&, int)
 {
     if (parent == observed)
         rebuild();
+    else if (parent.hasType (ids::TRACK))
+        for (auto* s : strips)
+            if (s->getTree() == parent)
+                s->refresh();
 }
 
 void MixerView::valueTreeChildOrderChanged (juce::ValueTree& parent, int, int)

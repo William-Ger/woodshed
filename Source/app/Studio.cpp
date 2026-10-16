@@ -499,6 +499,24 @@ juce::ValueTree Studio::addInstrumentTrack (const juce::String& type, int patchI
     return t;
 }
 
+juce::ValueTree Studio::addAuxTrack (const juce::String& name, const juce::String& withEffect)
+{
+    auto& p = *currentProject;
+    const auto selected = getSelectedTrack();
+    const int index = selected.isValid() ? p.state.indexOf (selected) + 1 : -1;
+    auto t = p.addAuxTrack (name, index);
+    p.undo.setCurrentTransactionName ("New Aux");
+    if (auto* type = Registry::get().find (withEffect))
+    {
+        std::vector<float> values;
+        for (auto& k : type->info.knobs)
+            values.push_back (k.id == "mix" ? k.max : k.def);      // a bus effect runs fully wet
+        p.addInsert (t, withEffect, values);
+    }
+    selectTrack ((int) t[daw::ids::id]);
+    return t;
+}
+
 void Studio::setInstrument (juce::ValueTree track, const juce::String& type, int patchIndex)
 {
     auto* it = InstrumentRegistry::get().find (type);
@@ -555,6 +573,12 @@ void Studio::showNewTrackMenu()
         }
     }
     m.addSubMenu ("Software Instrument", instruments, instruments.getNumItems() > 0);
+    juce::PopupMenu aux;
+    aux.addItem ("Reverb", [this] { addAuxTrack ("Reverb", "reverb.hall"); });
+    aux.addItem ("Delay", [this] { addAuxTrack ("Delay", "delay.digital"); });
+    aux.addItem ("Plate", [this] { addAuxTrack ("Plate", "reverb.plate"); });
+    aux.addItem ("Empty Aux", [this] { addAuxTrack ("Aux"); });
+    m.addSubMenu ("Aux  (a bus that tracks send to)", aux);
     m.addItem ("Drums  (a drum kit to program or play)", InstrumentRegistry::get().find ("drums.kit") != nullptr,
                false, [this] { addInstrumentTrack ("drums.kit"); });
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());

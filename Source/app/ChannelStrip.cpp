@@ -513,6 +513,164 @@ void InputSelector::mouseDown (const juce::MouseEvent&)
 }
 
 //==============================================================================
+SendSlot::SendSlot (Studio& s, juce::ValueTree t, int i) : studio (s), track (std::move (t)), index (i)
+{
+    setTooltip ("Send: this track's signal also goes to an aux (a shared reverb, say). Drag for level, click for options.");
+}
+
+juce::ValueTree SendSlot::send() const
+{
+    return daw::Project::sends (track)[index];
+}
+
+void SendSlot::paint (juce::Graphics& g)
+{
+    const auto b = getLocalBounds().toFloat();
+    const bool hover = isMouseOver();
+    auto s = send();
+    if (! s.isValid())
+    {
+        if (index != daw::Project::sends (track).size())
+            return;
+        drawChip (g, b, hover, isMouseButtonDown());
+        g.setColour (hover ? theme::text : theme::faintText);
+        g.setFont (theme::font (11.0f, theme::Weight::medium));
+        g.drawText ("+ Send", b, juce::Justification::centred, false);
+        return;
+    }
+
+    drawChip (g, b, hover, isMouseButtonDown());
+    const double db = (double) s.getProperty (ids::level, 0.0);
+    const auto fill = b.reduced (1.0f).withWidth ((b.getWidth() - 2.0f) * faderPos (db));
+    g.setColour (theme::accent.withAlpha ((bool) s[ids::pre] ? 0.18f : 0.32f));
+    g.fillRoundedRectangle (fill, theme::radiusChip);
+
+    const auto bus = track.getParent().getChildWithProperty (ids::id, s[ids::bus]);
+    g.setColour (theme::text);
+    g.setFont (theme::font (10.5f, theme::Weight::medium));
+    auto area = b.reduced (5.0f, 0.0f);
+    g.drawFittedText (((bool) s[ids::pre] ? "pre " : "") + bus[ids::name].toString(), area.removeFromLeft (area.getWidth() * 0.6f).toNearestInt(),
+                      juce::Justification::centredLeft, 1, 0.7f);
+    g.setFont (theme::readout (9.5f, theme::Weight::medium));
+    g.setColour (theme::dimText);
+    g.drawText (dbText (db), area, juce::Justification::centredRight, false);
+}
+
+void SendSlot::mouseDown (const juce::MouseEvent& e)
+{
+    dragged = false;
+    if (auto s = send(); s.isValid())
+    {
+        dragStartPos = faderPos ((double) s.getProperty (ids::level, 0.0));
+        if (! e.mods.isPopupMenu())
+            studio.project().undo.beginNewTransaction ("Send Level");
+    }
+    repaint();
+}
+
+void SendSlot::mouseDrag (const juce::MouseEvent& e)
+{
+    auto s = send();
+    if (! s.isValid() || e.mods.isPopupMenu() || e.getDistanceFromDragStart() < 2)
+        return;
+    dragged = true;
+    const float delta = (float) (e.getDistanceFromDragStartX() - e.getDistanceFromDragStartY()) / (e.mods.isShiftDown() ? 600.0f : 150.0f);
+    const auto pos = juce::jlimit (0.0f, 1.0f, dragStartPos + delta);
+    s.setProperty (ids::level, pos <= 0.0f ? silenceDb : std::round (faderDb (pos) * 10.0) / 10.0, &studio.project().undo);
+    repaint();
+}
+
+void SendSlot::mouseUp (const juce::MouseEvent& e)
+{
+    repaint();
+    if (dragged || ! getLocalBounds().contains (e.getPosition()))
+        return;
+    if (send().isValid()) showSendMenu();
+    else if (index == daw::Project::sends (track).size()) showAddMenu();
+}
+
+void SendSlot::mouseDoubleClick (const juce::MouseEvent&)
+{
+    if (auto s = send(); s.isValid())
+    {
+        studio.project().undo.beginNewTransaction ("Send Level");
+        s.setProperty (ids::level, 0.0, &studio.project().undo);
+    }
+}
+
+void SendSlot::showAddMenu()
+{
+    juce::PopupMenu m;
+    m.addSectionHeader ("Send to");
+    auto& p = studio.project();
+    for (int i = 0; i < p.numTracks(); ++i)
+    {
+        auto t = p.track (i);
+        if (! daw::Project::isAuxTrack (t) || t == track)
+            continue;
+        const int busId = (int) t[ids::id];
+        m.addItem (t[ids::name].toString(), [this, busId]
+        {
+            auto& pr = studio.project();
+            pr.undo.beginNewTransaction ("Add Send");
+            pr.addSend (track, busId, -10.0);
+        });
+    }
+    m.addSeparator();
+    auto addNew = [this] (const juce::String& name, const juce::String& effect)
+    {
+        return [this, name, effect]
+        {
+            const auto source = track;
+            auto bus = studio.addAuxTrack (name, effect);
+            auto& pr = studio.project();
+            pr.addSend (source, (int) bus[ids::id], -10.0);     // part of the New Aux step
+            studio.selectTrack ((int) source[ids::id]);
+        };
+    };
+    m.addItem ("New Reverb Aux", addNew ("Reverb", "reverb.hall"));
+    m.addItem ("New Delay Aux", addNew ("Delay", "delay.digital"));
+    m.addItem ("New Empty Aux", addNew ("Aux", {}));
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+void SendSlot::showSendMenu()
+{
+    auto s = send();
+    juce::PopupMenu m;
+    m.addItem ("Pre-Fader", true, (bool) s[ids::pre], [this, s]() mutable
+    {
+        auto& pr = studio.project();
+        pr.undo.beginNewTransaction ("Send Pre/Post");
+        s.setProperty (ids::pre, ! (bool) s[ids::pre], &pr.undo);
+    });
+    juce::PopupMenu to;
+    auto& p = studio.project();
+    for (int i = 0; i < p.numTracks(); ++i)
+    {
+        auto t = p.track (i);
+        if (! daw::Project::isAuxTrack (t) || t == track)
+            continue;
+        to.addItem (t[ids::name].toString(), true, (int) s[ids::bus] == (int) t[ids::id], [this, s, busId = (int) t[ids::id]]() mutable
+        {
+            auto& pr = studio.project();
+            pr.undo.beginNewTransaction ("Send Destination");
+            s.setProperty (ids::bus, busId, &pr.undo);
+        });
+    }
+    m.addSubMenu ("Send To", to);
+    m.addItem ("Show Aux", [this, s] { studio.selectTrack ((int) s[ids::bus]); studio.setPane (Studio::Pane::rig); });
+    m.addSeparator();
+    m.addItem ("Remove Send", [this, s]
+    {
+        auto& pr = studio.project();
+        pr.undo.beginNewTransaction ("Remove Send");
+        track.removeChild (s, &pr.undo);
+    });
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+//==============================================================================
 void SlotButton::paint (juce::Graphics& g)
 {
     const auto b = getLocalBounds().toFloat();
@@ -664,7 +822,7 @@ namespace
         /** Everything above the fader (identical on the master so the faders line up). */
         int controlsHeight() const
         {
-            const int io = tall ? chipH * 3 + 8 : chipH;
+            const int io = tall ? chipH * 5 + 16 : chipH;
             const int buttons = tall ? buttonH * 2 + 4 : buttonH;
             return io + gap + panH + gap + buttons;
         }
@@ -705,10 +863,18 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
 
         // Instrument tracks show their instrument where audio tracks show their input and rig.
         instrumentTrack = daw::Project::isInstrumentTrack (tree);
+        auxTrack = daw::Project::isAuxTrack (tree);
+        for (int i = 0; i < 2; ++i)
+        {
+            sendSlots[i] = std::make_unique<mixer::SendSlot> (s, tree, i);
+            addAndMakeVisible (*sendSlots[i]);
+        }
         instrumentSlot = std::make_unique<mixer::SlotButton>();
         instrumentSlot->setTooltip ("This track's instrument: click to edit its sound");
         instrumentSlot->text = [this]
         {
+            if (auxTrack)
+                return juce::String ("Aux Bus");
             const auto inst = tree.getChildWithName (ids::INSTRUMENT);
             if (auto* type = InstrumentRegistry::get().find (inst[ids::type].toString()))
                 return type->info.name;
@@ -726,7 +892,13 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
         fxSlot->lit = [this] { return ! daw::Project::inserts (tree).isEmpty(); };
         fxSlot->onClick = [this] { showInserts(); };
 
-        if (instrumentTrack)
+        if (auxTrack)
+        {
+            instrumentSlot->setTooltip ("An aux bus: tracks reach it through their sends. Click to edit its effects.");
+            for (auto* c : std::initializer_list<juce::Component*> { instrumentSlot.get(), fxSlot.get(), mute.get(), solo.get(), pan.get() })
+                addAndMakeVisible (c);
+        }
+        else if (instrumentTrack)
             for (auto* c : std::initializer_list<juce::Component*> { instrumentSlot.get(), fxSlot.get(), mute.get(), solo.get(), arm.get(), pan.get() })
                 addAndMakeVisible (c);
         else
@@ -752,7 +924,7 @@ juce::Colour ChannelStrip::trackColour() const
 void ChannelStrip::showInserts()
 {
     select();
-    if (instrumentTrack)
+    if (instrumentTrack || auxTrack)
     {
         studio.setPane (Studio::Pane::rig);     // the instrument panel has the effects beside it
         return;
@@ -907,7 +1079,16 @@ void ChannelStrip::resized()
     if (! master)
     {
         auto c = topArea;
-        if (instrumentTrack)
+        const int ioBottom = c.getY() + (m.tall ? m.chipH * 5 + 16 : m.chipH);
+        for (auto& slot : sendSlots)
+            slot->setBounds ({});
+        if (m.tall)
+        {
+            // The sends sit in the last two rows of the io block, whatever the track kind.
+            sendSlots[1]->setBounds (c.getX(), ioBottom - m.chipH, c.getWidth(), m.chipH);
+            sendSlots[0]->setBounds (c.getX(), ioBottom - m.chipH * 2 - 4, c.getWidth(), m.chipH);
+        }
+        if (instrumentTrack || auxTrack)
         {
             if (m.tall)
             {
@@ -944,18 +1125,20 @@ void ChannelStrip::resized()
             input->setBounds (row);
             fxSlot->setBounds ({});
         }
+        c.setTop (ioBottom);
         c.removeFromTop (m.gap);
         pan->setBounds (c.removeFromTop (m.panH));
         c.removeFromTop (m.gap);
 
         mixer::Toggle* buttons[] { mute.get(), solo.get(), arm.get(), monitor.get() };
-        if (instrumentTrack)
+        if (instrumentTrack || auxTrack)
         {
             auto line = c.removeFromTop (m.buttonH);
-            const int w = (line.getWidth() - 6) / 3;
-            for (int i = 0; i < 3; ++i)
+            const int count = auxTrack ? 2 : 3;
+            const int w = (line.getWidth() - 3 * (count - 1)) / count;
+            for (int i = 0; i < count; ++i)
             {
-                buttons[i]->setBounds (i < 2 ? line.removeFromLeft (w) : line);
+                buttons[i]->setBounds (i < count - 1 ? line.removeFromLeft (w) : line);
                 line.removeFromLeft (3);
             }
         }

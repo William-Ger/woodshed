@@ -94,6 +94,7 @@ struct TrackRuntime
     juce::int64 expectedPosition = -1;                                  // audio thread: where the next block should start
     bool notesSounding = false;                                         // audio thread
     juce::AudioBuffer<float> work;                                      // audio thread scratch
+    juce::AudioBuffer<float> busInput;                                  // aux tracks: the sends they receive
     juce::SmoothedValue<float> gainLeft, gainRight;
     std::atomic<float> peakLeft { 0.0f }, peakRight { 0.0f };          // audio thread accumulates
     float shownLeft = 0.0f, shownRight = 0.0f;                          // message thread: last 30 Hz frame
@@ -135,11 +136,17 @@ struct TrackPlayback
     std::vector<MidiPlayback> midi;                                     // in time order, offs first
     std::vector<InsertPlayback> inserts;
 
+    /** A send: this track's signal also goes to the aux at `target` (an index into the snapshot's
+        tracks, always later than this one, so it plays after every track feeding it). */
+    struct Send { int target = -1; float gain = 1.0f; bool pre = false; };
+    std::vector<Send> sends;
+    bool aux = false;
+
     /** An automation line and what it drives. */
     struct AutoLine
     {
-        enum Target { volume, pan, instrumentKnob, insertKnob } target = volume;
-        int insert = 0, knob = 0;           // insertKnob: index into `inserts`; knobs: knob index
+        enum Target { volume, pan, instrumentKnob, insertKnob, sendLevel } target = volume;
+        int insert = 0, knob = 0;           // insertKnob: index into `inserts`; knobs: knob index; sendLevel: index into `sends`
         std::vector<AutoPoint> points;      // at least one, in time order
     };
     std::vector<AutoLine> automation;

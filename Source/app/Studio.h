@@ -85,6 +85,8 @@ public:
     juce::ValueTree addTrack();
     /** A software instrument track after the selected one, playing `type` with its patch `patchIndex`. */
     juce::ValueTree addInstrumentTrack (const juce::String& type, int patchIndex = 0);
+    /** An aux (bus) after the selected track; with `withEffect`, that pedal type on it (a shared reverb). */
+    juce::ValueTree addAuxTrack (const juce::String& name, const juce::String& withEffect = {});
     /** Logic's New Track choice: Audio, Software Instrument (by category) or Drums, at the mouse. */
     void showNewTrackMenu();
     /** Switches an instrument track to another instrument or patch (one undo step). */

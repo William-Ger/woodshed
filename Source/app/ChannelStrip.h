@@ -154,6 +154,34 @@ namespace mixer
         std::function<void()> onClick;
     };
 
+    /** One of a strip's sends (Logic's send slots): the aux it goes to and its level. Drag to set
+        the level, double-click for 0 dB, click for pre/post, another aux or remove. With no send
+        at its position it offers "+ Send" (the first empty slot only). */
+    class SendSlot final : public juce::Component,
+                           public juce::SettableTooltipClient
+    {
+    public:
+        SendSlot (Studio&, juce::ValueTree track, int index);
+        void paint (juce::Graphics&) override;
+        void mouseDown (const juce::MouseEvent&) override;
+        void mouseDrag (const juce::MouseEvent&) override;
+        void mouseUp (const juce::MouseEvent&) override;
+        void mouseDoubleClick (const juce::MouseEvent&) override;
+        void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override   { repaint(); }
+
+    private:
+        juce::ValueTree send() const;
+        void showAddMenu();
+        void showSendMenu();
+
+        Studio& studio;
+        juce::ValueTree track;
+        int index;
+        float dragStartPos = 0.0f;
+        bool dragged = false;
+    };
+
     /** A small momentary button with a drawn icon. */
     class IconButton final : public juce::Component,
                              public juce::SettableTooltipClient
@@ -243,7 +271,8 @@ private:
     std::unique_ptr<mixer::Toggle> rig, mute, solo, arm, monitor;
     std::unique_ptr<mixer::IconButton> openRig;
     std::unique_ptr<mixer::SlotButton> instrumentSlot, fxSlot;
-    bool instrumentTrack = false;
+    std::unique_ptr<mixer::SendSlot> sendSlots[2];
+    bool instrumentTrack = false, auxTrack = false;
     void showInserts();
     std::unique_ptr<mixer::PanKnob> pan;
 
