@@ -973,8 +973,7 @@ int main (int argc, char* argv[])
                      " | presets [file.json ...] [--wav file] [--render dir]"
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
-                     " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>
-";
+                     " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>\n";
         return 2;
     }
 
