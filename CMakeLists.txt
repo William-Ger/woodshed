@@ -106,16 +106,27 @@ if(NOT WOODSHED_BENCH_ONLY)
         JUCE_APPLICATION_VERSION_STRING="0.2.0")
 
     # macOS ties microphone permission to the code signature, and an ad-hoc signature changes
-    # every build, so each rebuild would silently lose audio input. Re-sign with a stable local
-    # identity after every build when one is in the keychain (create it in Keychain Access →
-    # Certificate Assistant → Create a Certificate, type Code Signing).
-    if(APPLE)
-        set(WOODSHED_SIGN_IDENTITY "Woodshed Local Signing" CACHE STRING
-            "Keychain code-signing identity used to re-sign Woodshed.app after each build")
-        add_custom_command(TARGET WoodshedStudio POST_BUILD
-            COMMAND sh -c "if security find-identity -p codesigning | grep -q \"$1\"; then codesign --force --sign \"$1\" \"$2\"; else echo \"Woodshed: no '$1' signing identity; microphone permission will reset on each rebuild\"; fi"
-                    sign "${WOODSHED_SIGN_IDENTITY}" "$<TARGET_BUNDLE_DIR:WoodshedStudio>"
-            VERBATIM)
+    # every build, so each rebuild would silently lose audio input. Sign with a stable local
+    # identity instead when one is in the keychain (create it in Keychain Access → Certificate
+    # Assistant → Create a Certificate, type Code Signing).
+    set(WOODSHED_SIGN_IDENTITY "Woodshed Local Signing" CACHE STRING
+        "Keychain code-signing identity for Woodshed.app; empty to sign ad hoc")
+    if(APPLE AND WOODSHED_SIGN_IDENTITY)
+        execute_process(COMMAND security find-identity -p codesigning
+                        OUTPUT_VARIABLE WOODSHED_IDENTITIES ERROR_QUIET)
+        string(FIND "${WOODSHED_IDENTITIES}" "${WOODSHED_SIGN_IDENTITY}" WOODSHED_IDENTITY_AT)
+        if(WOODSHED_IDENTITY_AT GREATER -1)
+            set_target_properties(WoodshedStudio PROPERTIES
+                XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${WOODSHED_SIGN_IDENTITY}"
+                XCODE_ATTRIBUTE_CODE_SIGN_STYLE Manual)
+            if(NOT CMAKE_GENERATOR STREQUAL "Xcode")
+                add_custom_command(TARGET WoodshedStudio POST_BUILD
+                    COMMAND codesign --force --sign "${WOODSHED_SIGN_IDENTITY}" "$<TARGET_BUNDLE_DIR:WoodshedStudio>"
+                    VERBATIM)
+            endif()
+        else()
+            message(STATUS "Woodshed: no '${WOODSHED_SIGN_IDENTITY}' signing identity; microphone permission will reset on each rebuild")
+        endif()
     endif()
 
     if(WIN32 AND ASIO_SDK_PATH)
