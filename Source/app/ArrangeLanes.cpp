@@ -1349,7 +1349,7 @@ void Lanes::mouseMagnify (const juce::MouseEvent& e, float scale)
 bool Lanes::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (auto& f : files)
-        if (isAudioFile (f))
+        if (isAudioFile (f) || juce::File (f).hasFileExtension ("mid;midi"))
             return true;
     return false;
 }
@@ -1382,6 +1382,14 @@ void Lanes::filesDropped (const juce::StringArray& files, int x, int y)
 {
     dropping = false;
     dropTarget (x, y);
+
+    // MIDI files: each part on a new instrument track, where it was dropped.
+    for (auto& path : files)
+        if (juce::File (path).hasFileExtension ("mid;midi"))
+        {
+            view.studio.importMidiFile (juce::File (path), dropAt);
+            return;
+        }
 
     auto& p = view.project();
     auto& studio = view.studio;

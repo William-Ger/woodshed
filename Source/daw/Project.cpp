@@ -201,7 +201,6 @@ juce::ValueTree Project::master()
 juce::ValueTree Project::addInstrumentTrack (const juce::String& name, const juce::String& instrumentType,
                                              const juce::String& patchName, const std::vector<float>& knobs, int insertIndex)
 {
-    undo.beginNewTransaction();
     auto t = addTrack (name, insertIndex);
     t.setProperty (ids::kind, kinds::instrument, &undo);
     t.setProperty (ids::rigOn, false, &undo);
@@ -215,7 +214,6 @@ juce::ValueTree Project::addInstrumentTrack (const juce::String& name, const juc
 
 juce::ValueTree Project::addAuxTrack (const juce::String& name, int insertIndex)
 {
-    undo.beginNewTransaction();
     auto t = addTrack (name, insertIndex);
     t.setProperty (ids::kind, kinds::aux, &undo);
     t.setProperty (ids::rigOn, false, &undo);

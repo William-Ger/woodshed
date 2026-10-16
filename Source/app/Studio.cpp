@@ -1,6 +1,7 @@
 #include "Studio.h"
 #include "SettingsWindow.h"
 #include "../PluginProcessor.h"
+#include "../daw/MidiFiles.h"
 
 namespace woodshed::app
 {
@@ -493,8 +494,9 @@ juce::ValueTree Studio::addInstrumentTrack (const juce::String& type, int patchI
     const int index = selected.isValid() ? p.state.indexOf (selected) + 1 : -1;
     const auto name = patch != nullptr ? patch->name : info.name;
 
+    if (! importing)
+        p.undo.beginNewTransaction ("New Instrument Track");
     auto t = p.addInstrumentTrack (name, type, patch != nullptr ? patch->name : juce::String(), patchValues (info, patch), index);
-    p.undo.setCurrentTransactionName ("New Instrument Track");
     selectTrack ((int) t[daw::ids::id]);
     return t;
 }
@@ -504,8 +506,8 @@ juce::ValueTree Studio::addAuxTrack (const juce::String& name, const juce::Strin
     auto& p = *currentProject;
     const auto selected = getSelectedTrack();
     const int index = selected.isValid() ? p.state.indexOf (selected) + 1 : -1;
+    p.undo.beginNewTransaction ("New Aux");
     auto t = p.addAuxTrack (name, index);
-    p.undo.setCurrentTransactionName ("New Aux");
     if (auto* type = Registry::get().find (withEffect))
     {
         std::vector<float> values;
@@ -540,6 +542,117 @@ void Studio::setInstrument (juce::ValueTree track, const juce::String& type, int
     inst.setProperty (daw::ids::knobs, daw::Project::encodeValues (patchValues (info, patch)), &p.undo);
     if (autoNamed)
         track.setProperty (daw::ids::name, patch != nullptr ? patch->name : info.name, &p.undo);
+}
+
+namespace
+{
+/** The built-in instrument (and sound) closest to a General MIDI program, or the drum kit. */
+std::pair<juce::String, juce::String> instrumentForProgram (int program, bool drums)
+{
+    if (drums)                  return { "drums.kit", "Studio Kit" };
+    if (program < 4)            return { "keys.piano", program == 3 ? "Honky Tonk" : "Concert Grand" };
+    if (program < 6)            return { "keys.epiano", program == 4 ? "Stage Tines" : "FM Ballad" };
+    if (program == 6)           return { "keys.clav", "Funky Clav" };
+    if (program == 7)           return { "keys.clav", "Mellow Neck" };
+    if (program < 16)           return { "mallet.keys", program == 11 ? "Vibraphone" : program == 9 ? "Glockenspiel" : program == 14 ? "Tubular Bells" : program == 8 ? "Celesta" : "Marimba" };
+    if (program < 24)           return { "keys.organ", program == 19 ? "Cathedral" : program == 17 ? "Rock Overdrive" : "Jazz Trio" };
+    if (program < 32)           return { "pluck.guitar", program == 24 ? "Nylon Guitar" : "Steel Guitar" };
+    if (program < 38)           return { "bass.electric", program == 35 ? "Fretless" : program == 36 || program == 37 ? "Slap Bass" : program == 34 ? "Pick Bass" : "Finger Bass" };
+    if (program < 40)           return { "synth.mono", "Fat Bass" };
+    if (program == 45)          return { "orch.strings", "Pizzicato" };
+    if (program == 46)          return { "pluck.guitar", "Harp" };
+    if (program < 52)           return { "orch.strings", program == 44 ? "Tremolo" : program >= 48 ? "Full Section" : "Chamber" };
+    if (program < 56)           return { "orch.choir", program == 53 ? "Oohs" : "Aahs" };
+    if (program < 64)           return { "orch.brass", program == 56 ? "Trumpets" : program == 57 ? "Trombones" : program == 59 ? "Muted Trumpet" : program == 60 ? "Horns" : "Brass Section" };
+    if (program < 80)           return { "synth.fm", "Glass Mallet" };
+    if (program < 88)           return { "synth.mono", "Saw Lead" };
+    if (program < 104)          return { "synth.pad", "Warm Analog Pad" };
+    if (program < 112)          return { "pluck.guitar", program == 107 ? "Koto" : "Steel Guitar" };
+    if (program < 120)          return { "mallet.keys", "Kalimba" };
+    return { "synth.pad", "Dark Drone" };
+}
+}
+
+int Studio::importMidiFile (const juce::File& file, juce::int64 at)
+{
+    daw::midifile::Contents contents;
+    if (! daw::midifile::read (file, contents) || contents.parts.empty())
+    {
+        flash ("No notes in " + file.getFileName());
+        return 0;
+    }
+
+    auto& p = *currentProject;
+    p.undo.beginNewTransaction ("Import MIDI File");
+
+    // An empty song takes the file's tempo and meter.
+    if (p.contentEnd() == 0)
+    {
+        if (contents.tempo > 0.0)
+            p.state.setProperty (daw::ids::tempo, std::round (contents.tempo * 100.0) / 100.0, &p.undo);
+        if (contents.beatsPerBar > 0 && contents.beatUnit > 0)
+        {
+            p.state.setProperty (daw::ids::beatsPerBar, contents.beatsPerBar, &p.undo);
+            p.state.setProperty (daw::ids::beatUnit, contents.beatUnit, &p.undo);
+        }
+    }
+
+    const juce::ScopedValueSetter<bool> quiet (importing, true);
+    juce::Array<int> added;
+    for (auto& part : contents.parts)
+    {
+        const auto [type, patchName] = instrumentForProgram (part.program, part.channel == 10);
+        int patchIndex = 0;
+        if (auto* it = InstrumentRegistry::get().find (type))
+            for (size_t i = 0; i < it->info.patches.size(); ++i)
+                if (it->info.patches[i].name == patchName)
+                    patchIndex = (int) i;
+        auto track = addInstrumentTrack (type, patchIndex);
+        if (! track.isValid())
+            continue;
+        track.setProperty (daw::ids::name, part.name, &p.undo);
+        added.add ((int) daw::midifile::addPart (p, track, part, at)[daw::ids::id]);
+    }
+    setSelectedRegions (added);
+    flash ("Imported " + juce::String (added.size()) + (added.size() == 1 ? " part" : " parts") + " from " + file.getFileName());
+    return added.size();
+}
+
+void Studio::importMidiDialog()
+{
+    chooser = std::make_unique<juce::FileChooser> ("Import a MIDI file", juce::File::getSpecialLocation (juce::File::userHomeDirectory), "*.mid;*.midi");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc)
+    {
+        if (fc.getResult().existsAsFile())
+            importMidiFile (fc.getResult(), engineInstance->getPosition());
+    });
+}
+
+void Studio::exportMidiDialog()
+{
+    juce::Array<juce::ValueTree> regions;
+    for (int id : selectedRegions)
+        if (auto r = findRegion (id); daw::Project::isMidiRegion (r))
+            regions.add (r);
+    if (regions.isEmpty())
+        for (auto t : currentProject->state)
+            for (auto r : t)
+                if (r.hasType (daw::ids::REGION) && daw::Project::isMidiRegion (r))
+                    regions.add (r);
+    if (regions.isEmpty())
+    {
+        flash ("No MIDI regions to export");
+        return;
+    }
+
+    const auto name = currentProject->state[daw::ids::name].toString();
+    chooser = std::make_unique<juce::FileChooser> ("Export MIDI", currentProject->folder.getChildFile (name + ".mid"), "*.mid");
+    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [this, regions] (const juce::FileChooser& fc)
+    {
+        const auto file = fc.getResult().withFileExtension ("mid");
+        if (fc.getResult() != juce::File())
+            flash (daw::midifile::write (*currentProject, regions, file) ? "Exported " + file.getFileName() : juce::String ("Couldn't export the MIDI file"));
+    });
 }
 
 void Studio::showNewTrackMenu()

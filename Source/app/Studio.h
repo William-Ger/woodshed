@@ -20,7 +20,8 @@ namespace cmd
         newTrack, deleteTrack, duplicateTrack,
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
-        newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation
+        newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation,
+        importMidi, exportMidi
     };
 }
 
@@ -87,6 +88,12 @@ public:
     juce::ValueTree addInstrumentTrack (const juce::String& type, int patchIndex = 0);
     /** An aux (bus) after the selected track; with `withEffect`, that pedal type on it (a shared reverb). */
     juce::ValueTree addAuxTrack (const juce::String& name, const juce::String& withEffect = {});
+    /** Each part of a .mid file on a new instrument track (chosen by its General MIDI program),
+        starting at `at`. An empty song takes the file's tempo. Returns how many parts. */
+    int importMidiFile (const juce::File&, juce::int64 at);
+    void importMidiDialog();
+    /** The selected MIDI regions (or all of them) as a .mid file. */
+    void exportMidiDialog();
     /** Logic's New Track choice: Audio, Software Instrument (by category) or Drums, at the mouse. */
     void showNewTrackMenu();
     /** Switches an instrument track to another instrument or patch (one undo step). */
@@ -173,7 +180,7 @@ private:
     juce::ValueTree clipboard;
     Pane pane = Pane::rig;
     int editorRegionId = -1;
-    bool automationShown = false;
+    bool automationShown = false, importing = false;
     int quantizeTicks = daw::ticksPerQuarter / 4;
     int midiScanTicks = 0;
     struct Audition { int pitch; int ticksLeft; };

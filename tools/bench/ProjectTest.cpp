@@ -3,6 +3,7 @@
 // the live callback, and every click must land on exactly the sample the timeline says.
 
 #include "../../Source/daw/Engine.h"
+#include "../../Source/daw/MidiFiles.h"
 #include "../../Source/instruments/Instrument.h"
 #include <iostream>
 
@@ -652,6 +653,29 @@ int runProjectTest()
             }
             check (L[10] > 2.0f, "a master effect processes the mix (" + juce::String (L[10], 2) + ")");
             project->state.removeChild (m, nullptr);
+        }
+
+        // MIDI files: export the keys region and read it back.
+        {
+            const auto mid = folder.getChildFile ("test.mid");
+            // The split halves of the keys region: one note each, at 48000 and 72000 samples
+            // (1920 and 2880 ticks at 120 bpm).
+            const juce::Array<juce::ValueTree> list { region, right };
+            check (midifile::write (*project, list, mid), "MIDI regions export as a .mid file");
+            midifile::Contents contents;
+            check (midifile::read (mid, contents) && contents.parts.size() == 2
+                   && juce::approximatelyEqual (contents.tempo, 120.0) && contents.beatsPerBar == 4,
+                   "the .mid file reads back with a part per region, the tempo and the meter");
+            if (contents.parts.size() == 2 && contents.parts[0].notes.size() == 1 && contents.parts[1].notes.size() == 1)
+            {
+                auto& a0 = contents.parts[0].notes[0];
+                auto& b0 = contents.parts[1].notes[0];
+                check (a0.pitch == 60 && a0.start == 1920 && a0.length == 480 && b0.pitch == 64 && b0.start == 2880 && b0.velocity == 127,
+                       "exported notes keep their pitch, time, length and velocity");
+                auto imported = midifile::addPart (*project, keys, contents.parts[1], 0);
+                check (imported.getNumChildren() == 1 && (juce::int64) imported[ids::length] >= 96000, "a part imports as a MIDI region");
+                keys.removeChild (imported, nullptr);
+            }
         }
 
         check (Project::decodeValues (Project::encodeValues ({ 1.0f, -0.5f, 2000.0f, 0.125f })) == std::vector<float> { 1.0f, -0.5f, 2000.0f, 0.125f },

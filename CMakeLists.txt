@@ -40,7 +40,8 @@ set(WOODSHED_ENGINE_SOURCES
 # The multitrack engine (song model, playback, recording, bounce); no UI.
 set(WOODSHED_DAW_SOURCES
     Source/daw/Project.cpp
-    Source/daw/Engine.cpp)
+    Source/daw/Engine.cpp
+    Source/daw/MidiFiles.cpp)
 
 #==============================================================================
 if(NOT WOODSHED_BENCH_ONLY)
