@@ -105,6 +105,19 @@ if(NOT WOODSHED_BENCH_ONLY)
         JUCE_APPLICATION_NAME_STRING="Woodshed"
         JUCE_APPLICATION_VERSION_STRING="0.2.0")
 
+    # macOS ties microphone permission to the code signature, and an ad-hoc signature changes
+    # every build, so each rebuild would silently lose audio input. Re-sign with a stable local
+    # identity after every build when one is in the keychain (create it in Keychain Access →
+    # Certificate Assistant → Create a Certificate, type Code Signing).
+    if(APPLE)
+        set(WOODSHED_SIGN_IDENTITY "Woodshed Local Signing" CACHE STRING
+            "Keychain code-signing identity used to re-sign Woodshed.app after each build")
+        add_custom_command(TARGET WoodshedStudio POST_BUILD
+            COMMAND sh -c "if security find-identity -p codesigning | grep -q \"$1\"; then codesign --force --sign \"$1\" \"$2\"; else echo \"Woodshed: no '$1' signing identity; microphone permission will reset on each rebuild\"; fi"
+                    sign "${WOODSHED_SIGN_IDENTITY}" "$<TARGET_BUNDLE_DIR:WoodshedStudio>"
+            VERBATIM)
+    endif()
+
     if(WIN32 AND ASIO_SDK_PATH)
         target_include_directories(WoodshedStudio PRIVATE "${ASIO_SDK_PATH}/common")
         target_compile_definitions(WoodshedStudio PRIVATE JUCE_ASIO=1)
