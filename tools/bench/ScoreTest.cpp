@@ -238,6 +238,12 @@ void renderTo (const Layout& l, const juce::File& file, float staffSpace = 10.0f
         g.fillAll (style.paper);
         r.paint (g, style, [] (int id) { return id == 3; }, { 0.0f, r.getWidth() });
     }
+    bool hitsMatch = true;
+    for (auto& e : l.elements)
+        for (auto& h : e.notes)
+            hitsMatch = hitsMatch && r.noteAt (r.noteBounds (h.id).getCentre()) == h.id;
+    check (hitsMatch, "every notehead hit-tests to its own note in " + file.getFileName());
+
     file.deleteFile();
     juce::FileOutputStream out (file);
     juce::PNGImageFormat().writeImageToStream (image, out);
@@ -343,5 +349,10 @@ int renderScoreSamples (const juce::File& folder)
         o.to = 3840 * 3;
         renderTo (layout (n, o), folder.getChildFile ("glyphs.png"), 24.0f, 0.2);
     }
-    return 0;
+    {
+        Renderer empty;
+        empty.setLayout ({}, 9.0f, 0.1);
+        check (empty.getWidth() <= 0.0f && empty.noteAt ({ 1.0f, 1.0f }) < 0, "an empty layout (no region) lays out as nothing");
+    }
+    return failures == 0 ? 0 : 1;
 }

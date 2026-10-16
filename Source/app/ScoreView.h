@@ -89,7 +89,7 @@ private:
     // Dragging notes.
     std::vector<std::pair<juce::ValueTree, int>> dragFrom;
     int dragSteps = 0;
-    bool dragging = false;
+    bool dragging = false, dragChanged = false;
 
     juce::ComboBox resolutionChoice, keyChoice, staffChoice;
     juce::TextButton interpretButton { "Interpretation" }, zoomOutButton { "-" }, zoomInButton { "+" };

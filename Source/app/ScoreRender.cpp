@@ -411,6 +411,8 @@ float Renderer::middleY (int staff) const
 
 int Renderer::staffAt (float y) const
 {
+    if (staffTops.empty())
+        return 0;
     int best = 0;
     float bestDistance = std::numeric_limits<float>::max();
     for (size_t i = 0; i < staffTops.size(); ++i)
@@ -433,7 +435,7 @@ int Renderer::stepAt (int staff, float y) const
 
 float Renderer::xForTick (double tick) const
 {
-    if (layout.bars.empty())
+    if (layout.bars.empty() || barX.empty())
         return contentLeft;
     const int b = layout.barAt ((juce::int64) std::floor (tick));
     const auto& bar = layout.bars[(size_t) b];
@@ -442,7 +444,7 @@ float Renderer::xForTick (double tick) const
 
 double Renderer::tickAtX (float x) const
 {
-    if (layout.bars.empty())
+    if (layout.bars.empty() || barX.empty())
         return 0.0;
     size_t b = 0;
     while (b + 1 < barX.size() && x >= barX[b + 1])
@@ -478,6 +480,17 @@ void Renderer::setLayout (const Layout& l, float staffSpace, double pixelsPerTic
     ppt = juce::jmax (0.001, pixelsPerTick);
     padLeft = 2.0f * sp;
     padRight = 0.8f * sp;
+
+    if (layout.staves.empty())
+    {
+        staffTops.clear();
+        barX.clear();
+        barWidth.clear();
+        geometry.clear();
+        hits.clear();
+        width = height = contentLeft = 0.0f;
+        return;
+    }
 
     // Vertically: room for ledger lines and stems above and below each staff.
     const size_t numStaves = layout.staves.size();

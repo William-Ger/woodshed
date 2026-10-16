@@ -457,7 +457,7 @@ void ScoreView::transpose (const std::vector<std::pair<juce::ValueTree, int>>& f
 void ScoreView::mouseDown (const juce::MouseEvent& e)
 {
     grabKeyboardFocus();
-    dragging = false;
+    dragging = dragChanged = false;
     dragFrom.clear();
     dragSteps = 0;
     if (! region.isValid() || ! scoreArea().contains (e.getPosition()))
@@ -505,8 +505,9 @@ void ScoreView::mouseDrag (const juce::MouseEvent& e)
     const int steps = -juce::roundToInt ((float) e.getDistanceFromDragStartY() / halfSpace);
     if (steps == dragSteps)
         return;
-    if (dragSteps == 0)
+    if (! dragChanged)
         studio.project().undo.beginNewTransaction ("Change Pitch");
+    dragChanged = true;
     dragSteps = steps;
     transpose (dragFrom, steps, e.mods.isShiftDown());
     studio.auditionNote (daw::Project::noteFrom (dragFrom.front().first).pitch);
