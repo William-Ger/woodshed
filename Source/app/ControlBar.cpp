@@ -281,6 +281,7 @@ void ControlBar::Readout::mouseDown (const juce::MouseEvent& e)
         draggingTempo = true;
         tempoTransactionStarted = false;
         dragStartTempo = (double) owner.studio.project().state.getProperty (tempo, 120.0);
+        dragStartGrid = owner.studio.project().grid();
         repaint (tempoArea);
     }
     else if (signatureArea.contains (e.getPosition()))
@@ -310,7 +311,9 @@ void ControlBar::Readout::mouseDrag (const juce::MouseEvent& e)
         project.undo.beginNewTransaction ("Change Tempo");
         tempoTransactionStarted = true;
     }
-    project.setTempoChange (0.0, bpm);
+    // Just the tempo while dragging; regions go back on their bars once, at the end, so a long
+    // drag doesn't round their positions over and over.
+    project.state.setProperty (tempo, bpm, &project.undo);
 }
 
 void ControlBar::Readout::mouseUp (const juce::MouseEvent&)
@@ -318,6 +321,8 @@ void ControlBar::Readout::mouseUp (const juce::MouseEvent&)
     if (draggingTempo)
     {
         draggingTempo = false;
+        if (tempoTransactionStarted)
+            owner.studio.project().keepMusicalPositions (dragStartGrid);
         repaint (tempoArea);
     }
 }

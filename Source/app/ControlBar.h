@@ -100,6 +100,7 @@ public:
         bool countingIn = false;
         bool draggingTempo = false, tempoTransactionStarted = false;
         double dragStartTempo = 120.0;
+        daw::TimeGrid dragStartGrid;        // the map before a tempo drag, to re-place everything once at the end
         std::unique_ptr<juce::TextEditor> tempoEditor;
     };
 
