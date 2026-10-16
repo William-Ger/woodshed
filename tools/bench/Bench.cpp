@@ -481,6 +481,7 @@ void printKnobs (const juce::StringArray& only)
 int runProjectTest();
 int runInstrumentTest (const juce::StringArray& args);
 int writeMidiDemoProject (const juce::File&);
+int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
 
 int main (int argc, char* argv[])
@@ -538,6 +539,10 @@ int main (int argc, char* argv[])
         args.remove (0);
         return runInstrumentTest (args);
     }
+
+    if (args[0] == "render-project" && args.size() > 2)
+        return renderProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]),
+                              juce::File::getCurrentWorkingDirectory().getChildFile (args[2]));
 
     if (args[0] == "demo-midi" && args.size() > 1)
         return writeMidiDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));

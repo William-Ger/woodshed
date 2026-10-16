@@ -782,3 +782,77 @@ int writeMidiDemoProject (const juce::File& folder)
     std::cout << "wrote " << project->projectFile().getFullPathName() << "\n";
     return 0;
 }
+
+/** woodshed-bench render-project <folder> <out.wav>: the whole song, offline, through each
+    track's instrument and inserts (audio tracks play dry: the guitar rig is the app's). */
+int renderProject (const juce::File& folder, const juce::File& out);
+int renderProject (const juce::File& folder, const juce::File& out)
+{
+    juce::ScopedJuceInitialiser_GUI init;
+    auto project = Project::load (folder);
+    if (project == nullptr)
+    {
+        std::cerr << "can't open " << folder.getFullPathName() << "\n";
+        return 1;
+    }
+
+    constexpr int block = 512;
+    AudioPool pool;
+    std::map<int, std::shared_ptr<TrackRuntime>> runtimes;
+    for (auto t : project->state)
+    {
+        if (! t.hasType (ids::TRACK)) continue;
+        auto rt = std::make_shared<TrackRuntime>();
+        rt->id = (int) t[ids::id];
+        rt->work.setSize (2, block);
+        rt->gainLeft.reset (rate, 0.03);
+        rt->gainRight.reset (rate, 0.03);
+        rt->events.reserve (4096);
+        if (Project::isInstrumentTrack (t))
+            if (auto* type = woodshed::InstrumentRegistry::get().find (t.getChildWithName (ids::INSTRUMENT)[ids::type].toString()))
+            {
+                rt->instrument = type->create();
+                rt->instrument->prepare (rate, block);
+            }
+        for (auto fx : Project::inserts (t))
+            if (auto* type = woodshed::Registry::get().find (fx[ids::type].toString()))
+            {
+                std::shared_ptr<woodshed::Pedal> pedal = type->create();
+                pedal->prepare (rate, block);
+                rt->inserts.push_back ({ (int) fx[ids::id], fx[ids::type].toString(), pedal });
+            }
+        runtimes[rt->id] = rt;
+    }
+
+    auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+    for (auto& t : snap->tracks)
+    {
+        t.runtime->gainLeft.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
+        t.runtime->gainRight.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
+    }
+
+    const auto length = project->contentEnd() + (juce::int64) (rate * 3.0);
+    juce::AudioBuffer<float> buf (2, (int) length);
+    buf.clear();
+    for (juce::int64 pos = 0; pos < length; pos += block)
+    {
+        Mixer::Block b;
+        b.position = pos;
+        b.numSamples = (int) juce::jmin ((juce::int64) block, length - pos);
+        b.playing = true;
+        b.left = buf.getWritePointer (0, (int) pos);
+        b.right = buf.getWritePointer (1, (int) pos);
+        Mixer::render (*snap, b);
+    }
+    buf.applyGain (snap->masterGain);
+
+    out.deleteFile();
+    std::unique_ptr<juce::OutputStream> stream (out.createOutputStream());
+    juce::WavAudioFormat wav;
+    auto writer = wav.createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (rate).withNumChannels (2).withBitsPerSample (24));
+    if (writer == nullptr || ! writer->writeFromAudioSampleBuffer (buf, 0, buf.getNumSamples()))
+        return 1;
+    std::cout << "wrote " << out.getFullPathName() << "  peak " << juce::Decibels::gainToDecibels (buf.getMagnitude (0, buf.getNumSamples()))
+              << " dBFS, rms " << juce::Decibels::gainToDecibels (buf.getRMSLevel (0, 0, buf.getNumSamples())) << " dBFS\n";
+    return 0;
+}
