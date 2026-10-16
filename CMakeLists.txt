@@ -15,7 +15,7 @@ FetchContent_MakeAvailable(JUCE)
 
 option(WOODSHED_BENCH_ONLY "Only configure the offline pedal bench (fast builds for DSP work)" OFF)
 
-# The DSP engine and every pedal; shared by the app and the offline bench.
+# The DSP engine, every pedal and every software instrument; shared by the app and the offline bench.
 set(WOODSHED_ENGINE_SOURCES
     Source/engine/Registry.cpp
     Source/engine/Chain.cpp
@@ -29,7 +29,12 @@ set(WOODSHED_ENGINE_SOURCES
     Source/pedals/Delay.cpp
     Source/pedals/Reverb.cpp
     Source/pedals/Glitch.cpp
-    Source/pedals/Weird.cpp)
+    Source/pedals/Weird.cpp
+    Source/instruments/InstrumentRegistry.cpp
+    Source/instruments/Keyboards.cpp
+    Source/instruments/Synths.cpp
+    Source/instruments/Drums.cpp
+    Source/instruments/Orchestral.cpp)
 
 # The multitrack engine (song model, playback, recording, bounce); no UI.
 set(WOODSHED_DAW_SOURCES
@@ -184,7 +189,7 @@ endif()
 #==============================================================================
 # Offline pedal bench: woodshed-bench list | run [type ...] [--render dir]
 juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
-target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
+target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(WoodshedBench
     PRIVATE
