@@ -1,6 +1,7 @@
 #include "ArrangeLanes.h"
 #include "ArrangeHeader.h"
 #include "ArrangeView.h"
+#include "ChannelStrip.h"
 
 namespace woodshed::app::arrange
 {
@@ -226,6 +227,7 @@ void Lanes::paint (juce::Graphics& g)
     }
 
     drawTakes (g);
+    drawAutomation (g);
 
     // Rubber band.
     if (gesture == Gesture::rubber)
@@ -726,6 +728,9 @@ void Lanes::mouseMove (const juce::MouseEvent& e)
 
 void Lanes::mouseDown (const juce::MouseEvent& e)
 {
+    if (view.studio.isShowingAutomation() && automationMouseDown (e))
+        return;
+
     auto& studio = view.studio;
     const auto hit = regionAt (e.getPosition());
     shiftAtDown = e.mods.isShiftDown();
@@ -794,6 +799,12 @@ void Lanes::mouseDown (const juce::MouseEvent& e)
 
 void Lanes::mouseDrag (const juce::MouseEvent& e)
 {
+    if (gesture == Gesture::automation)
+    {
+        automationDrag (e);
+        return;
+    }
+
     auto& p = view.project();
     const bool snapOn = ! e.mods.isCommandDown();
 
@@ -933,6 +944,36 @@ void Lanes::mouseUp (const juce::MouseEvent& e)
 
 void Lanes::mouseDoubleClick (const juce::MouseEvent& e)
 {
+    // Automation view: double-click a point to delete it.
+    if (view.studio.isShowingAutomation())
+    {
+        const int index = view.trackIndexAtY (e.y);
+        if (index < 0)
+            return;
+        auto& p = view.project();
+        auto track = p.track (index);
+        const auto param = Studio::shownAutomationParam (track);
+        const auto params = daw::Project::automatableParams (track);
+        const auto* spec = findParam (params, param);
+        auto points = daw::Project::getAutomation (track, param);
+        if (spec == nullptr)
+            return;
+        const auto span = autoSpan (index);
+        for (size_t i = 0; i < points.size(); ++i)
+        {
+            const float x = view.xForSample ((double) points[i].time);
+            const float y = span.getEnd() - autoNorm (*spec, points[i].value) * span.getLength();
+            if (juce::Point<float> (x, y).getDistanceFrom (e.position) < 7.0f)
+            {
+                points.erase (points.begin() + (std::ptrdiff_t) i);
+                p.undo.beginNewTransaction ("Delete Automation Point");
+                p.setAutomation (track, param, points);
+                return;
+            }
+        }
+        return;
+    }
+
     const auto hit = regionAt (e.getPosition());
 
     // A MIDI region opens in the piano roll.
@@ -954,6 +995,200 @@ void Lanes::mouseDoubleClick (const juce::MouseEvent& e)
 
     // Double-click below the last track for a new one.
     view.addTrackAfterSelection();
+}
+
+const daw::Project::AutoParam* Lanes::findParam (const std::vector<daw::Project::AutoParam>& params, const juce::String& id)
+{
+    for (auto& p : params)
+        if (p.id == id)
+            return &p;
+    return params.empty() ? nullptr : &params.front();
+}
+
+float Lanes::autoNorm (const daw::Project::AutoParam& spec, float value) const
+{
+    if (spec.id == "volume")
+        return mixer::faderPos ((double) value);
+    if (spec.max <= spec.min)
+        return 0.0f;
+    juce::NormalisableRange<float> range (spec.min, spec.max);
+    range.skew = spec.skew;
+    return range.convertTo0to1 (juce::jlimit (spec.min, spec.max, value));
+}
+
+float Lanes::autoValue (const daw::Project::AutoParam& spec, float norm) const
+{
+    norm = juce::jlimit (0.0f, 1.0f, norm);
+    if (spec.id == "volume")
+        return (float) juce::jmax (-96.0, mixer::faderDb (norm));
+    if (spec.max <= spec.min)
+        return spec.min;
+    juce::NormalisableRange<float> range (spec.min, spec.max);
+    range.skew = spec.skew;
+    return range.convertFrom0to1 (norm);
+}
+
+juce::Range<float> Lanes::autoSpan (int trackIndex) const
+{
+    const float top = (float) view.yForTrack (trackIndex) + 8.0f;
+    return { top, top + (float) ArrangeView::trackHeight - 16.0f };
+}
+
+void Lanes::drawAutomation (juce::Graphics& g)
+{
+    if (! view.studio.isShowingAutomation())
+        return;
+
+    auto& p = view.project();
+    const auto clip = g.getClipBounds();
+    for (int i = 0; i < p.numTracks(); ++i)
+    {
+        const auto row = juce::Rectangle<int> (0, view.yForTrack (i), getWidth(), ArrangeView::trackHeight);
+        if (! row.intersects (clip))
+            continue;
+
+        auto track = p.track (i);
+        const auto params = daw::Project::automatableParams (track);
+        const auto* spec = findParam (params, Studio::shownAutomationParam (track));
+        if (spec == nullptr)
+            continue;
+        const auto points = daw::Project::getAutomation (track, spec->id);
+        const auto span = autoSpan (i);
+        const auto colour = trackColour (track).interpolatedWith (juce::Colours::white, 0.35f);
+
+        // Regions recede so the line reads.
+        g.setColour (juce::Colours::black.withAlpha (0.38f));
+        g.fillRect (row.withTrimmedBottom (1));
+
+        auto yFor = [&] (float value) { return span.getEnd() - autoNorm (*spec, value) * span.getLength(); };
+
+        if (points.empty())
+        {
+            // No line yet: the fixed value, faint and dashed.
+            const float y = yFor (spec->def);
+            const float dashes[] { 4.0f, 4.0f };
+            g.setColour (colour.withAlpha (0.45f));
+            g.drawDashedLine (juce::Line<float> (0.0f, y, (float) getWidth(), y), dashes, 2, 1.0f);
+        }
+        else
+        {
+            juce::Path line;
+            line.startNewSubPath (0.0f, yFor (points.front().value));
+            for (auto& pt : points)
+                line.lineTo (view.xForSample ((double) pt.time), yFor (pt.value));
+            line.lineTo ((float) getWidth(), yFor (points.back().value));
+            g.setColour (colour);
+            g.strokePath (line, juce::PathStrokeType (1.6f));
+            for (size_t k = 0; k < points.size(); ++k)
+            {
+                const float x = view.xForSample ((double) points[k].time);
+                if (x < (float) clip.getX() - 6.0f || x > (float) clip.getRight() + 6.0f)
+                    continue;
+                const bool active = gesture == Gesture::automation && autoTrack == i && autoIndex == (int) k;
+                g.setColour (active ? juce::Colours::white : colour);
+                g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre ({ x, yFor (points[k].value) }));
+            }
+        }
+
+        // The parameter's name and value at the playhead, top left of the lane.
+        const auto now = points.empty() ? spec->def : daw::Project::evaluate (points, view.studio.engine().getPosition());
+        juce::String valueText = spec->id == "volume" ? mixer::dbText ((double) now) + " dB"
+                               : spec->id == "pan" ? (std::abs (now) < 0.01f ? juce::String ("C") : (now < 0 ? "L" : "R") + juce::String (juce::roundToInt (std::abs (now) * 64.0f)))
+                               : juce::String (now, 2) + (spec->unit.isNotEmpty() ? " " + spec->unit : juce::String());
+        g.setFont (theme::font (11.0f, theme::Weight::semibold));
+        const auto label = row.withTrimmedLeft (8).removeFromBottom (17);
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.fillRoundedRectangle (label.withWidth (juce::jmin (label.getWidth(), 12 + juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (11.0f, theme::Weight::semibold), spec->name + "  " + valueText)))).toFloat().reduced (0.0f, 1.0f), 3.0f);
+        g.setColour (colour);
+        g.drawText (spec->name + "  " + valueText, label.withTrimmedLeft (5), juce::Justification::centredLeft, true);
+    }
+}
+
+bool Lanes::automationMouseDown (const juce::MouseEvent& e)
+{
+    const int index = view.trackIndexAtY (e.y);
+    if (index < 0)
+        return false;
+
+    auto& p = view.project();
+    auto track = p.track (index);
+    view.studio.selectTrack ((int) track[ids::id]);
+    const auto params = daw::Project::automatableParams (track);
+    const auto* spec = findParam (params, Studio::shownAutomationParam (track));
+    if (spec == nullptr)
+        return true;
+    auto points = daw::Project::getAutomation (track, spec->id);
+    const auto span = autoSpan (index);
+    const auto paramId = spec->id;
+
+    if (e.mods.isPopupMenu())
+    {
+        juce::PopupMenu m;
+        m.addItem ("Delete " + spec->name + " Automation", ! points.empty(), false, [this, track, paramId]() mutable
+        {
+            auto& pr = view.project();
+            pr.undo.beginNewTransaction ("Delete Automation");
+            pr.setAutomation (track, paramId, {});
+        });
+        m.addItem ("Hide Automation (A)", [this] { view.studio.setShowingAutomation (false); });
+        m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+        return true;
+    }
+
+    // Grab the point under the mouse, or add one there (Logic: click on the line to add).
+    autoIndex = -1;
+    for (size_t i = 0; i < points.size(); ++i)
+    {
+        const float x = view.xForSample ((double) points[i].time);
+        const float y = span.getEnd() - autoNorm (*spec, points[i].value) * span.getLength();
+        if (juce::Point<float> (x, y).getDistanceFrom (e.position) < 7.0f)
+            autoIndex = (int) i;
+    }
+
+    p.undo.beginNewTransaction (autoIndex >= 0 ? "Move Automation Point" : "Add Automation Point");
+    if (autoIndex < 0)
+    {
+        daw::AutoPoint pt;
+        pt.time = view.snap (view.sampleAtX (e.x), ! e.mods.isCommandDown());
+        pt.value = autoValue (*spec, (span.getEnd() - (float) e.y) / span.getLength());
+        // The first point on an empty line keeps the track where it was before it.
+        points.push_back (pt);
+        std::stable_sort (points.begin(), points.end(), [] (auto& a, auto& b) { return a.time < b.time; });
+        p.setAutomation (track, paramId, points);
+        for (size_t i = 0; i < points.size(); ++i)
+            if (points[i] == pt)
+                autoIndex = (int) i;
+    }
+
+    gesture = Gesture::automation;
+    autoTrack = index;
+    autoParamId = paramId;
+    view.setUserGesture (true);
+    repaint();
+    return true;
+}
+
+void Lanes::automationDrag (const juce::MouseEvent& e)
+{
+    auto& p = view.project();
+    if (! juce::isPositiveAndBelow (autoTrack, p.numTracks()))
+        return;
+    auto track = p.track (autoTrack);
+    const auto params = daw::Project::automatableParams (track);
+    const auto* spec = findParam (params, autoParamId);
+    auto points = daw::Project::getAutomation (track, autoParamId);
+    if (spec == nullptr || ! juce::isPositiveAndBelow (autoIndex, (int) points.size()))
+        return;
+
+    // A point stays between its neighbours.
+    const auto span = autoSpan (autoTrack);
+    auto& pt = points[(size_t) autoIndex];
+    auto time = view.snap (view.sampleAtX (e.x), ! e.mods.isCommandDown());
+    const auto low = autoIndex > 0 ? points[(size_t) autoIndex - 1].time : (juce::int64) 0;
+    const auto high = autoIndex + 1 < (int) points.size() ? points[(size_t) autoIndex + 1].time : std::numeric_limits<juce::int64>::max();
+    pt.time = juce::jlimit (low, high, time);
+    pt.value = autoValue (*spec, (span.getEnd() - (float) e.y) / span.getLength());
+    p.setAutomation (track, autoParamId, points);
 }
 
 void Lanes::commitMove (bool copy)

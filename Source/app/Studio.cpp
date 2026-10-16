@@ -66,6 +66,7 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     if (testPane == "editor") pane = Pane::editor;
     else if (testPane == "mixer") pane = Pane::mixer;
     else if (testPane == "none") pane = Pane::none;
+    automationShown = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_AUTOMATION", {}) == "1";
     if (const auto n = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_TRACK", {}).getIntValue(); n > 0)
         if (auto t = currentProject->track (n - 1); t.isValid())
             currentProject->state.setProperty (daw::ids::selectedTrack, t[daw::ids::id], nullptr);

@@ -139,6 +139,13 @@ void ArrangeView::valueTreePropertyChanged (juce::ValueTree& tree, const juce::I
     if (tree.hasType (ids::REGION))
         contentChanged();
     else if (tree.hasType (ids::TRACK))
+    {
+        lanes->repaint();
+        if (property == ids::autoParam)
+            for (auto& h : headers)
+                h->repaint();
+    }
+    else if (tree.hasType (ids::NOTE) || tree.hasType (ids::AUTOMATION))
         lanes->repaint();
 }
 

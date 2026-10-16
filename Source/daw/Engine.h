@@ -120,6 +120,7 @@ struct MidiPlayback
 
 struct InsertPlayback
 {
+    int id = 0;
     std::shared_ptr<Pedal> pedal;
     bool on = true;
     std::array<float, Pedal::maxKnobs> knobs {};
@@ -133,6 +134,15 @@ struct TrackPlayback
     std::array<float, Instrument::maxKnobs> instrumentKnobs {};
     std::vector<MidiPlayback> midi;                                     // in time order, offs first
     std::vector<InsertPlayback> inserts;
+
+    /** An automation line and what it drives. */
+    struct AutoLine
+    {
+        enum Target { volume, pan, instrumentKnob, insertKnob } target = volume;
+        int insert = 0, knob = 0;           // insertKnob: index into `inserts`; knobs: knob index
+        std::vector<AutoPoint> points;      // at least one, in time order
+    };
+    std::vector<AutoLine> automation;
     float gain = 1.0f, pan = 0.0f;
     bool audible = true;            // mute and solo resolved
     bool armed = false, monitor = false, rigOn = true;

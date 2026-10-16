@@ -554,6 +554,38 @@ int runProjectTest()
             rt->inserts.clear();
         }
 
+        // Automation: volume from -6 dB up to 0 dB, then pan hard left.
+        {
+            check (Project::evaluate ({ { 0, 0.0f }, { 100, 1.0f } }, 25) > 0.24f && Project::evaluate ({ { 0, 0.0f }, { 100, 1.0f } }, 25) < 0.26f
+                   && juce::exactlyEqual (Project::evaluate ({ { 10, 0.5f } }, 0), 0.5f) && juce::exactlyEqual (Project::evaluate ({ { 0, 0.0f }, { 100, 1.0f } }, 500), 1.0f),
+                   "an automation line interpolates and holds its ends");
+            check (Project::decodePoints (Project::encodePoints ({ { 5, 0.25f }, { 900000, -3.5f } })) == std::vector<AutoPoint> { { 5, 0.25f }, { 900000, -3.5f } },
+                   "automation points survive encoding");
+
+            project->setAutomation (keys, "volume", { { 48000, -6.0206f }, { 72000, 0.0f } });
+            auto l2 = render (100000);
+            check (std::abs (l2[48000] - 0.5f) < 0.02f && std::abs (l2[72000] - 1.0f) < 0.02f,
+                   "volume automation sets the level at each note (" + juce::String (l2[48000], 3) + ", " + juce::String (l2[72000], 3) + ")");
+
+            project->setAutomation (keys, "pan", { { 0, -1.0f } });
+            auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+            std::vector<float> L (64), R (64);
+            Mixer::Block b;
+            b.position = 72000 - 10;
+            b.numSamples = 64;
+            b.playing = true;
+            b.left = L.data();
+            b.right = R.data();
+            rt->expectedPosition = -1;
+            Mixer::render (*snap, b);
+            check (L[10] > 0.9f && std::abs (R[10]) < 1.0e-4f, "pan automation moves the track hard left");
+
+            check (Project::automatableParams (keys).size() >= 2, "a track lists its automatable parameters");
+            project->setAutomation (keys, "volume", {});
+            project->setAutomation (keys, "pan", {});
+            check (! Project::automationNode (keys, "volume").isValid(), "an emptied line is removed");
+        }
+
         check (Project::decodeValues (Project::encodeValues ({ 1.0f, -0.5f, 2000.0f, 0.125f })) == std::vector<float> { 1.0f, -0.5f, 2000.0f, 0.125f },
                "knob values survive encoding");
 
@@ -730,6 +762,19 @@ int writeMidiDemoProject (const juce::File& folder)
                 if (s % 2 == 0)                  project->addNote (beat, { 42, s % 4 == 0 ? 90 : 65, at, q / 4 });
             }
     }
+
+    // Automation: the chords fade in over two bars; the lead's filter opens up.
+    project->setAutomation (keys, "volume", { { 0, -30.0f }, { bar * 2, 0.0f } });
+    int cutoff = 0;
+    if (auto* t = woodshed::InstrumentRegistry::get().find ("synth.analog"))
+        for (size_t k = 0; k < t->info.knobs.size(); ++k)
+            if (t->info.knobs[k].id == "cutoff")
+                cutoff = (int) k;
+    const auto cutoffParam = "inst:" + juce::String (cutoff);
+    project->setAutomation (lead, cutoffParam, { { bar * 4, 800.0f }, { bar * 6, 6000.0f }, { bar * 8, 2000.0f } });
+    lead.setProperty (ids::autoParam, cutoffParam, nullptr);
+    project->setAutomation (bass, "pan", { { 0, -0.5f }, { bar * 4, 0.5f }, { bar * 8, -0.5f } });
+    bass.setProperty (ids::autoParam, "pan", nullptr);
 
     project->state.setProperty (ids::selectedTrack, keys[ids::id], nullptr);
     if (! project->save())

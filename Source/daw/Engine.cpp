@@ -138,16 +138,20 @@ void collectNoteEvents (const TrackPlayback& track, TrackRuntime& rt, const Mixe
     }
 }
 
-void runInserts (const TrackPlayback& track, float* left, float* right, int n)
+void runInserts (const TrackPlayback& track, float* left, float* right, int n, juce::int64 position)
 {
-    for (auto& fx : track.inserts)
+    for (size_t i = 0; i < track.inserts.size(); ++i)
     {
+        const auto& fx = track.inserts[i];
         if (! fx.on || fx.pedal == nullptr)
             continue;
 
         auto& pedal = *fx.pedal;
         for (int k = 0; k < Pedal::maxKnobs; ++k)
             pedal.setKnob (k, fx.knobs[(size_t) k]);
+        for (auto& line : track.automation)
+            if (line.target == TrackPlayback::AutoLine::insertKnob && line.insert == (int) i && line.knob < Pedal::maxKnobs)
+                pedal.setKnob (line.knob, Project::evaluate (line.points, position));
         pedal.update();
 
         if (pedal.producesStereo())
@@ -183,6 +187,9 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             auto& instrument = *track.instrument;
             for (int k = 0; k < Instrument::maxKnobs; ++k)
                 instrument.setKnob (k, track.instrumentKnobs[(size_t) k]);
+            for (auto& line : track.automation)
+                if (line.target == TrackPlayback::AutoLine::instrumentKnob && line.knob < Instrument::maxKnobs)
+                    instrument.setKnob (line.knob, Project::evaluate (line.points, b.position));
             instrument.update();
             instrument.render (a, c, n, rt.events.data(), (int) rt.events.size());
         }
@@ -229,11 +236,19 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             }
         }
 
-        runInserts (track, a, c, n);
+        runInserts (track, a, c, n, b.position);
+
+        // Volume and pan follow their automation lines, if they have them.
+        float gain = track.gain, pan = track.pan;
+        for (auto& line : track.automation)
+        {
+            if (line.target == TrackPlayback::AutoLine::volume) gain = dbToGain ((double) Project::evaluate (line.points, b.position));
+            else if (line.target == TrackPlayback::AutoLine::pan) pan = Project::evaluate (line.points, b.position);
+        }
 
         // Constant-power pan, unity in the middle.
-        const float angle = (juce::jlimit (-1.0f, 1.0f, track.pan) + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-        const float g = track.audible ? track.gain : 0.0f;
+        const float angle = (juce::jlimit (-1.0f, 1.0f, pan) + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+        const float g = track.audible ? gain : 0.0f;
         rt.gainLeft.setTargetValue (g * std::cos (angle) * juce::MathConstants<float>::sqrt2);
         rt.gainRight.setTargetValue (g * std::sin (angle) * juce::MathConstants<float>::sqrt2);
 
@@ -834,6 +849,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
             if (! node.hasType (ids::FX))
                 continue;
             InsertPlayback ip;
+            ip.id = fx.id;
             ip.pedal = fx.pedal;
             ip.on = (bool) node.getProperty (ids::on, true);
             const auto values = Project::decodeValues (node[ids::knobs].toString());
@@ -853,6 +869,40 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                             if (ip.pedal == rt.inserts[i].pedal)
                                 sorted.push_back (ip);
             tp.inserts = std::move (sorted);
+        }
+
+        for (auto node : t)
+        {
+            if (! node.hasType (ids::AUTOMATION))
+                continue;
+            TrackPlayback::AutoLine line;
+            line.points = Project::decodePoints (node[ids::points].toString());
+            if (line.points.empty())
+                continue;
+            const auto param = node[ids::param].toString();
+            if (param == "volume")            line.target = TrackPlayback::AutoLine::volume;
+            else if (param == "pan")          line.target = TrackPlayback::AutoLine::pan;
+            else if (param.startsWith ("inst:"))
+            {
+                line.target = TrackPlayback::AutoLine::instrumentKnob;
+                line.knob = param.fromFirstOccurrenceOf (":", false, false).getIntValue();
+            }
+            else if (param.startsWith ("fx:"))
+            {
+                const auto rest = param.fromFirstOccurrenceOf (":", false, false);
+                const int fxId = rest.upToFirstOccurrenceOf (":", false, false).getIntValue();
+                line.target = TrackPlayback::AutoLine::insertKnob;
+                line.knob = rest.fromFirstOccurrenceOf (":", false, false).getIntValue();
+                line.insert = -1;
+                for (size_t i = 0; i < tp.inserts.size(); ++i)
+                    if (tp.inserts[i].id == fxId)
+                        line.insert = (int) i;
+                if (line.insert < 0)
+                    continue;
+            }
+            else
+                continue;
+            tp.automation.push_back (std::move (line));
         }
 
         if (Project::isInstrumentTrack (t))

@@ -46,7 +46,7 @@ public:
 
 private:
     enum class Part { none, body, leftEdge, rightEdge, fadeIn, fadeOut };
-    enum class Gesture { none, pendingRegion, move, trimLeft, trimRight, fadeIn, fadeOut, pendingEmpty, rubber };
+    enum class Gesture { none, pendingRegion, move, trimLeft, trimRight, fadeIn, fadeOut, pendingEmpty, rubber, automation };
 
     struct Hit
     {
@@ -76,6 +76,17 @@ private:
     void drawLivePeaks (juce::Graphics&, const daw::LivePeaks&, juce::Rectangle<float> wave, juce::int64 start) const;
     void drawHint (juce::Graphics&, int contentBottom) const;
     void showRegionMenu();
+
+    // Automation view: each lane shows its track's chosen parameter as a line of points.
+    void drawAutomation (juce::Graphics&);
+    bool automationMouseDown (const juce::MouseEvent&);
+    void automationDrag (const juce::MouseEvent&);
+    float autoNorm (const daw::Project::AutoParam&, float value) const;
+    float autoValue (const daw::Project::AutoParam&, float norm) const;
+    juce::Range<float> autoSpan (int trackIndex) const;
+    static const daw::Project::AutoParam* findParam (const std::vector<daw::Project::AutoParam>&, const juce::String& id);
+    int autoTrack = -1, autoIndex = -1;
+    juce::String autoParamId;
 
     juce::int64 fileLengthOf (const juce::ValueTree& region);
     juce::int64 minimumLength() const;

@@ -106,7 +106,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::playStop, cmd::record, cmd::returnToStart, cmd::toggleLoop, cmd::toggleClick, cmd::toggleCountIn,
                   cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
-                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize });
+                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation });
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -200,6 +200,8 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::musicalTyping:   info.setInfo ("Musical Typing", {}, "View", 0); info.addDefaultKeypress ('k', cmdKey);
                                    info.setTicked (typing.isOpen()); break;
         case cmd::quantize:        info.setInfo ("Quantize Notes", {}, "Edit", 0); info.addDefaultKeypress ('q', 0); break;
+        case cmd::showAutomation:  info.setInfo ("Show Automation", {}, "View", 0); info.addDefaultKeypress ('a', 0);
+                                   info.setTicked (studio.isShowingAutomation()); break;
         default: break;
     }
 }
@@ -299,6 +301,7 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::newDrumTrack:    studio.addInstrumentTrack ("drums.kit"); break;
         case cmd::showEditor:      studio.setPane (studio.getPane() == Studio::Pane::editor ? Studio::Pane::none : Studio::Pane::editor); break;
         case cmd::musicalTyping:   typing.isOpen() ? typing.close() : typing.open(); break;
+        case cmd::showAutomation:  studio.setShowingAutomation (! studio.isShowingAutomation()); break;
         case cmd::quantize:
             if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
                 pianoRoll.quantizeSelection();
@@ -397,6 +400,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::showRig);
             m.addCommandItem (cm, cmd::showEditor);
             m.addCommandItem (cm, cmd::showMixer);
+            m.addCommandItem (cm, cmd::showAutomation);
             m.addCommandItem (cm, cmd::hideBottom);
             m.addSeparator();
             m.addCommandItem (cm, cmd::zoomIn);

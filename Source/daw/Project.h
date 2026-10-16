@@ -23,6 +23,10 @@ namespace woodshed::daw
         FX         id, type (pedal Registry id), on (bool), knobs (comma-separated real values in the
                    pedal's knob order); the track's insert effects in signal order, after the rig or
                    instrument
+        AUTOMATION param ("volume" in dB, "pan" -1..1, "inst:<knob index>" or "fx:<FX id>:<knob index>"
+                   in the knob's real units), points ("sample:value;..." in time order). With
+                   points, the parameter follows the line between them (and holds the first and
+                   last values before and after).
         REGION  id (int, unique), name, start (timeline sample), offset, length (samples), gain (dB),
                 fadeIn, fadeOut (samples; equal-power, so overlapping fades cross-fade), mute (bool),
                 and either
@@ -48,6 +52,7 @@ namespace ids
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
     WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
+    WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
 #undef WOODSHED_ID
 }
 
@@ -79,6 +84,14 @@ struct TimeGrid
     double samplesPerTick() const               { return sampleRate * 60.0 / tempo / ticksPerQuarter; }
     double toTicks (double samples) const       { return samples / samplesPerTick(); }
     double fromTicks (double ticks) const       { return ticks * samplesPerTick(); }
+};
+
+/** A point on an automation line. */
+struct AutoPoint
+{
+    juce::int64 time = 0;
+    float value = 0.0f;
+    bool operator== (const AutoPoint& o) const      { return time == o.time && juce::exactlyEqual (value, o.value); }
 };
 
 /** One note of a MIDI region, as stored (ticks from the region's content origin). */
@@ -157,6 +170,20 @@ public:
     juce::ValueTree splitRegion (juce::ValueTree region, juce::int64 at);
     static juce::ValueTree trackOf (const juce::ValueTree& region) { return region.getParent(); }
     juce::ValueTree regionById (int id) const;
+
+    // Automation -----------------------------------------------------------------
+    static juce::ValueTree automationNode (const juce::ValueTree& track, const juce::String& param);
+    static std::vector<AutoPoint> getAutomation (const juce::ValueTree& track, const juce::String& param);
+    /** Replaces the line (an empty list removes it). One undo step if the caller began a transaction. */
+    void setAutomation (juce::ValueTree track, const juce::String& param, std::vector<AutoPoint>);
+    /** The value of a line at `time` (points in time order, at least one). */
+    static float evaluate (const std::vector<AutoPoint>&, juce::int64 time);
+    static juce::String encodePoints (const std::vector<AutoPoint>&);
+    static std::vector<AutoPoint> decodePoints (const juce::String&);
+
+    /** Everything on a track that can be automated: param id, display name, range and default. */
+    struct AutoParam { juce::String id, name; float min = 0.0f, max = 1.0f, def = 0.0f; juce::String unit; float skew = 1.0f; };
+    static std::vector<AutoParam> automatableParams (const juce::ValueTree& track);
 
     // MIDI regions ---------------------------------------------------------------
     /** An empty MIDI region on an instrument track. */

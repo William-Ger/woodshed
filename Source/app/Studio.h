@@ -20,7 +20,7 @@ namespace cmd
         newTrack, deleteTrack, duplicateTrack,
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
-        newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize
+        newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation
     };
 }
 
@@ -120,6 +120,15 @@ public:
     void toggleMuteSelectedRegions();
     void toggleSelectedTrack (const juce::Identifier& property);
 
+    /** Logic's automation view (A): every track shows the line of its chosen parameter. */
+    bool isShowingAutomation() const                        { return automationShown; }
+    void setShowingAutomation (bool on)                     { automationShown = on; sendChangeMessage(); }
+    /** The parameter a track shows in automation view (volume unless chosen otherwise). */
+    static juce::String shownAutomationParam (const juce::ValueTree& track)
+    {
+        return track.getProperty (daw::ids::autoParam, "volume").toString();
+    }
+
     // Panes below the tracks.
     enum class Pane { none, rig, mixer, editor };
     Pane getPane() const                                    { return pane; }
@@ -162,6 +171,7 @@ private:
     juce::ValueTree clipboard;
     Pane pane = Pane::rig;
     int editorRegionId = -1;
+    bool automationShown = false;
     int quantizeTicks = daw::ticksPerQuarter / 4;
     int midiScanTicks = 0;
     struct Audition { int pitch; int ticksLeft; };
