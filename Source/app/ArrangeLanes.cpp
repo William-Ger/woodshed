@@ -929,6 +929,7 @@ void Lanes::mouseUp (const juce::MouseEvent& e)
         case Gesture::none:
         case Gesture::pendingEmpty:
         case Gesture::rubber:
+        case Gesture::automation:
         default: break;
     }
 

@@ -203,13 +203,13 @@ void TrackHeader::paint (juce::Graphics& g)
     {
         const auto chip = automationChip().toFloat();
         theme::drawRaised (g, chip, theme::radiusChip, theme::control);
-        juce::String name = "Volume";
+        juce::String paramName = "Volume";
         for (auto& p : daw::Project::automatableParams (track))
             if (p.id == Studio::shownAutomationParam (track))
-                name = p.name;
+                paramName = p.name;
         g.setColour (theme::text);
         g.setFont (theme::font (10.5f, theme::Weight::medium));
-        g.drawFittedText (name, chip.reduced (5.0f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+        g.drawFittedText (paramName, chip.reduced (5.0f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
     }
     else
     // What kind of track: piano keys for an instrument, a waveform for audio.
