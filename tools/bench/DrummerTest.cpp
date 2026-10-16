@@ -287,15 +287,45 @@ int runDrummerTest (const juce::StringArray& args)
         project->undo.beginNewTransaction ("Drummer");
         Settings s;
         s.bars = 4;
+        region.setProperty (ids::length, bar * 4, &project->undo);
         apply (*project, region, s, &project->undo);
-        check ((juce::int64) region[ids::length] == bar * 4 && region.getNumChildren() > 20 && isDrummerRegion (region),
-               "apply writes 4 bars of notes and the settings");
+        bool inside = true;
+        for (auto& n : regionNotes (region))
+            inside = inside && n.start >= 0 && n.start < (juce::int64) project->grid().toTicks ((double) bar * 4);
+        check ((juce::int64) region[ids::length] == bar * 4 && region.getNumChildren() > 20 && inside && isDrummerRegion (region)
+                   && settingsOf (region).bars == 4, "apply fills the region's 4 bars and stores the settings");
         project->undo.undo();
         check ((juce::int64) region[ids::length] == bar && region.getNumChildren() == 0 && ! isDrummerRegion (region),
                "one undo takes it all back");
 
+        // A split Drummer region: tweaking either half leaves both where they are.
+        {
+            auto whole = project->addMidiRegion (track, bar * 20, bar * 8, "Drummer");
+            apply (*project, whole, s, nullptr);
+            auto right = project->splitRegion (whole, bar * 23);
+            for (auto half : { whole, right })
+            {
+                auto t = settingsOf (half);
+                t.swing = 0.4f;
+                apply (*project, half, t, nullptr);
+            }
+            const auto rightNotes = regionNotes (right);
+            const bool rightCovered = std::any_of (rightNotes.begin(), rightNotes.end(), [&] (const Note& n)
+                                                   { return n.start >= (juce::int64) project->grid().toTicks ((double) bar * 7.5); });
+            check ((juce::int64) whole[ids::length] == bar * 3 && (juce::int64) right[ids::length] == bar * 5 && rightCovered
+                       && settingsOf (whole).bars == 3 && settingsOf (right).bars == 5,
+                   "editing either half of a split Drummer region keeps both halves' lengths");
+
+            StepPattern p;
+            p.rows = { { 36, false, false, std::vector<int> (16, 0) } };
+            p.applyTo (*project, right, nullptr);
+            apply (*project, right, settingsOf (whole), nullptr);
+            check (! right.hasProperty (StepPattern::property), "a Drummer write clears the step pattern");
+        }
+
         // A drag: previews without undo, then one undoable write.
         project->undo.beginNewTransaction ("Drummer");
+        region.setProperty (ids::length, bar * 4, &project->undo);
         apply (*project, region, s, &project->undo);
         const auto before = regionNotes (region).size();
         RegionSnapshot snap;
@@ -430,7 +460,7 @@ int writeDrummerDemoProject (const juce::File& folder)
     for (int pitch : StepPattern::drumRows())
         pattern.rows.push_back ({ pitch, false, false, std::vector<int> (16, 0) });
     pattern.randomize (5, true, 0.6f);
-    pattern.applyTo (*project, project->addMidiRegion (steps, 0, bar * 4, "Pattern"), nullptr);
+    pattern.applyTo (*project, project->addMidiRegion (steps, at, bar * 4, "Pattern"), nullptr);
 
     if (! project->save())
         return 1;

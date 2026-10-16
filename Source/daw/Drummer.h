@@ -94,9 +94,10 @@ namespace drummer
     /** The groove for settings.bars bars from tick 0, in time order. */
     std::vector<Note> generate (const Settings&, const Meter&);
 
-    /** Writes the settings onto a MIDI region: its length becomes settings.bars bars (from its
-        start), the notes are generated from its content origin, and `drummer` holds the JSON.
-        `undo` may be nullptr (drag previews). */
+    /** Writes the settings onto a MIDI region: notes generated from its content origin to its
+        end (its length is left alone, so split and trimmed regions stay put), and `drummer` holds
+        the JSON, with `bars` set to the region's length. Clears any step pattern. `undo` may be
+        nullptr (drag previews). */
     void apply (Project&, juce::ValueTree region, const Settings&, juce::UndoManager* undo);
 
     bool isDrummerRegion (const juce::ValueTree& region);

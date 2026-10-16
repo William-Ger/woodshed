@@ -263,14 +263,23 @@ DrummerEditor::DrummerEditor (Studio& s) : studio (s)
     makeQuiet (timekeeper);
     addAndMakeVisible (timekeeper);
 
-    for (int b = 1; b <= 16; ++b)
+    for (int b : { 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 24, 32, 48, 64 })
         bars.addItem (juce::String (b) + (b == 1 ? " bar" : " bars"), b);
     bars.setTooltip ("How long the region is");
     bars.onChange = [this]
     {
-        auto next = settings;
-        next.bars = juce::jmax (1, bars.getSelectedId());
-        change (next, "Drummer Bars", false);
+        // The one control that resizes the region: its length and its notes, one undo step.
+        if (! isEditing() || bars.getSelectedId() <= 0)
+            return;
+        if (snapshot.isActive())
+            endGesture();
+        auto& project = studio.project();
+        const juce::ScopedValueSetter<bool> guard (writing, true);
+        project.undo.beginNewTransaction ("Drummer Bars");
+        region.setProperty (ids::length, (juce::int64) std::llround (project.grid().samplesPerBar() * bars.getSelectedId()), &project.undo);
+        settings.bars = bars.getSelectedId();
+        dr::apply (project, region, settings, &project.undo);
+        repaint();
     };
     makeQuiet (bars);
     addAndMakeVisible (bars);
@@ -385,7 +394,10 @@ void DrummerEditor::showSettings()
     toms.setToggleState (settings.toms, juce::dontSendNotification);
     percussion.setToggleState (settings.percussion, juce::dontSendNotification);
     timekeeper.setSelectedId ((int) settings.timekeeper + 1, juce::dontSendNotification);
-    bars.setSelectedId (juce::jlimit (1, 16, settings.bars), juce::dontSendNotification);
+    const int barCount = juce::jmax (1, juce::roundToInt ((double) (juce::int64) region[ids::length] / studio.project().grid().samplesPerBar()));
+    if (bars.indexOfItemId (barCount) < 0)
+        bars.addItem (juce::String (barCount) + " bars", barCount);
+    bars.setSelectedId (barCount, juce::dontSendNotification);
 }
 
 //==============================================================================
@@ -444,12 +456,9 @@ void DrummerEditor::makeDrummerRegion()
     auto& project = studio.project();
     if (region.isValid())
     {
-        // Keep the region where it is; its length rounds to whole bars.
+        // Keep the region where it is and as long as it is.
         dr::Settings fresh;
-        fresh.bars = juce::jlimit (1, 16, juce::roundToInt ((double) (juce::int64) region[ids::length] / project.grid().samplesPerBar()));
         fresh.seed = (juce::uint32) juce::Random::getSystemRandom().nextInt (1 << 30) + 1u;
-        if (Studio::isDrumTrack (region.getParent()))
-            fresh.percussion = false;
         project.undo.beginNewTransaction ("Make Drummer Region");
         dr::apply (project, region, fresh, &project.undo);
     }

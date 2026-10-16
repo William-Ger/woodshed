@@ -1,4 +1,5 @@
 #include "Drummer.h"
+#include "StepPattern.h"
 #include <numeric>
 
 namespace woodshed::daw
@@ -745,20 +746,23 @@ void apply (Project& project, juce::ValueTree region, const Settings& s, juce::U
     if (! region.isValid())
         return;
 
+    // The region keeps its length (splits and trims stay put); the groove fills it from the
+    // content origin, and `bars` records how many bars that is.
     const auto grid = project.grid();
     const Meter meter { grid.beatsPerBar, grid.beatUnit };
-    const auto barSamples = grid.samplesPerBar();
-
-    // The region becomes `bars` bars long; its notes start at the content origin.
-    const auto length = (juce::int64) std::llround (barSamples * s.bars);
-    if ((juce::int64) region[ids::length] != length)
-        region.setProperty (ids::length, length, undo);
-
+    const auto length = (juce::int64) region[ids::length];
     const double offsetTicks = grid.toTicks ((double) (juce::int64) region[ids::offset]);
-    auto settings = s;
-    settings.bars = juce::jmax (1, (int) std::ceil ((offsetTicks + grid.toTicks ((double) length)) / (double) meter.barTicks() - 1.0e-6));
-    replaceRegionNotes (region, generate (settings, meter), undo);
-    region.setProperty (property, s.toJson(), undo);
+
+    auto generated = s;
+    generated.bars = juce::jmax (1, (int) std::ceil ((offsetTicks + grid.toTicks ((double) length)) / (double) meter.barTicks() - 1.0e-6));
+    replaceRegionNotes (region, generate (generated, meter), undo);
+
+    auto stored = s;
+    stored.bars = juce::jlimit (1, 64, juce::roundToInt ((double) length / grid.samplesPerBar()));
+    region.setProperty (property, stored.toJson(), undo);
+    // The Drummer writes it now, not the step sequencer.
+    if (region.hasProperty (StepPattern::property))
+        region.removeProperty (StepPattern::property, undo);
 }
 
 } // namespace drummer
