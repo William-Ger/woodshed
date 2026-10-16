@@ -78,7 +78,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         COMPANY_NAME "Gerstung Works"
         BUNDLE_ID com.gerstungworks.woodshed
         PRODUCT_NAME "Woodshed"
-        VERSION 0.2.0
+        VERSION 0.3.0
         ICON_BIG art/icon/woodshed-icon.png
         MICROPHONE_PERMISSION_ENABLED TRUE
         MICROPHONE_PERMISSION_TEXT "Woodshed needs audio input to hear and record your guitar through your interface.")
@@ -128,7 +128,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         JUCE_PLUGINHOST_AU=1
         JUCE_PLUGINHOST_VST3=1
         JUCE_APPLICATION_NAME_STRING="Woodshed"
-        JUCE_APPLICATION_VERSION_STRING="0.2.0")
+        JUCE_APPLICATION_VERSION_STRING="0.3.0")
 
     # macOS ties microphone permission to the code signature, and an ad-hoc signature changes
     # every build, so each rebuild would silently lose audio input. Sign with a stable local

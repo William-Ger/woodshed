@@ -358,7 +358,7 @@ PatchResult testPatch (const InstrumentType& t, const InstrumentInfo::Patch& pat
             s.inst->render (l, r, block, nullptr, 0);
         }
         res.cpu = juce::Time::highResolutionTicksToSeconds (juce::Time::getHighResolutionTicks() - t0) * 1.0e6 / blocks;
-        if (res.cpu > cpuBudgetUs) fail ("CPU " + juce::String (res.cpu, 0) + " us/block");
+        if (res.cpu > cpuBudgetUs * juce::jmax (1.0, juce::SystemStats::getEnvironmentVariable ("WOODSHED_BENCH_CPU_SCALE", "1").getDoubleValue())) fail ("CPU " + juce::String (res.cpu, 0) + " us/block");
     }
 
     if (renderDir != juce::File())

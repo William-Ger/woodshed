@@ -404,7 +404,7 @@ juce::ValueTree Project::addTrack (const juce::String& name, int insertIndex)
     t.setProperty (ids::solo, false, nullptr);
     t.setProperty (ids::arm, false, nullptr);
     t.setProperty (ids::monitor, false, nullptr);
-    t.setProperty (ids::input, 0, nullptr);     // interface input 1, where William's guitar is plugged in
+    t.setProperty (ids::input, 0, nullptr);     // interface input 1
     t.setProperty (ids::rigOn, true, nullptr);
     // Tracks stay ahead of the MASTER node.
     if (insertIndex < 0 || insertIndex > numTracks())
