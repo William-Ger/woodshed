@@ -370,6 +370,90 @@ int runProjectTest()
         check (start == 0 && offset == 200, "a take at the very start trims its first samples instead");
     }
 
+    std::cout << "tempo and meter changes\n";
+    {
+        auto tp = Project::createIn (folder.getChildFile ("tempo"), rate);
+        // 120 bpm for two bars (4/4: 7680 ticks), then 60 bpm; 3/4 from bar 3 (index 2).
+        tp->setTempoChange (7680.0, 60.0);
+        tp->setMeterChange (2, 3, 4);
+        const auto& g = tp->grid();
+        check (std::abs (g.sampleAt (7680.0) - 192000.0) < 0.5 && std::abs (g.sampleAt (7680.0 + 960.0) - 240000.0) < 0.5,
+               "ticks to samples follow the tempo change (a beat at 60 bpm is a second)");
+        check (std::abs (g.tickAt (216000.0) - 8160.0) < 0.01 && std::abs (g.tickAt (g.sampleAt (12345.6)) - 12345.6) < 1.0e-6,
+               "samples to ticks, and the round trip");
+        check (std::abs (g.barStartTick (2) - 7680.0) < 1.0e-9 && std::abs (g.barStartTick (3) - 7680.0 - 2880.0) < 1.0e-9
+               && std::abs (g.barAt (7680.0 + 2880.0 * 1.5) - 3.5) < 1.0e-9,
+               "bars follow the meter change (3/4 bars are 2880 ticks)");
+        check (g.toBarsBeats ((juce::int64) g.sampleAt (7680.0 + 2880.0 + 960.0 * 2)) == "4.3.000", "bar.beat readout across the changes");
+        check (juce::approximatelyEqual (g.tempoAt (100.0), 120.0) && juce::approximatelyEqual (g.tempoAt (200000.0), 60.0), "the tempo where you are");
+
+        // The click lands on every beat through the change.
+        Snapshot snap;
+        snap.grid = g;
+        std::vector<float> l (480000), r (480000);
+        for (int pos = 0; pos < 480000; pos += 512)
+        {
+            Mixer::Block b;
+            b.position = pos;
+            b.numSamples = juce::jmin (512, 480000 - pos);
+            b.left = l.data() + pos;
+            b.right = r.data() + pos;
+            Mixer::addClick (snap, b, 0.5f);
+        }
+        std::vector<int> at;        // each click's onset (the clicks ring for 30 ms)
+        for (int i = 0; i < (int) l.size(); ++i)
+            if (std::abs (l[(size_t) i]) > 0.02f && (at.empty() || i - at.back() > 4000))
+                at.push_back (i);
+        check (at.size() >= 10 && std::abs (at[7] - 168000) < 30 && std::abs (at[8] - 192000) < 30 && std::abs (at[9] - 240000) < 30,
+               "the click follows the tempo change (" + juce::String (at.size() > 9 ? at[9] : -1) + ")");
+
+        // Notes after the change play where the map puts them.
+        auto t = tp->addInstrumentTrack ("Keys", "test.click", {}, {});
+        auto region = tp->addMidiRegion (t, 0, 480000, "Keys");
+        tp->addNote (region, { 60, 127, 7680 + 960, 480 });       // a beat into the slow part: sample 240000
+        AudioPool pool2;
+        std::map<int, std::shared_ptr<TrackRuntime>> rts;
+        auto rt = std::make_shared<TrackRuntime>();
+        rt->id = (int) t[ids::id];
+        rt->work.setSize (2, 64);
+        rt->gainLeft.reset (rate, 0.0);
+        rt->gainRight.reset (rate, 0.0);
+        rt->events.reserve (64);
+        rt->instrument = std::make_shared<ClickInstrument>();
+        rts[rt->id] = rt;
+        auto s2 = Engine::buildSnapshot (*tp, pool2, rts);
+        check (s2->tracks.size() == 1 && s2->tracks[0].midi.size() == 2 && s2->tracks[0].midi[0].time == 240000
+               && s2->tracks[0].midi[1].time == 240000 + 24000,
+               "a note after a tempo change starts and ends on the map's samples");
+
+        // Changing the tempo keeps everything on its bar: a MIDI region at bar 5 stays at bar 5
+        // and still holds its notes; an audio region moves with it, unstretched.
+        {
+            auto laterTrack = tp->addInstrumentTrack ("Later", "test.click", {}, {});
+            const auto bar5 = tp->grid().barStartSample (4);
+            auto later = tp->addMidiRegion (laterTrack, bar5, tp->grid().barStartSample (6) - bar5, "Later");
+            auto audio = tp->addTrack ("Audio");
+            auto clip = tp->addRegion (audio, "Audio/x.wav", bar5, 0, 1000, "x");
+            tp->setTempoChange (0.0, 90.0);
+            const auto& g2 = tp->grid();
+            check ((juce::int64) later[ids::start] == g2.barStartSample (4)
+                   && (juce::int64) later[ids::start] + (juce::int64) later[ids::length] == g2.barStartSample (6)
+                   && (juce::int64) clip[ids::start] == g2.barStartSample (4) && (juce::int64) clip[ids::length] == 1000,
+                   "a tempo change keeps regions on their bars (MIDI lengths follow, audio isn't stretched)");
+            tp->setTempoChange (0.0, 120.0);
+            tp->state.removeChild (laterTrack, nullptr);
+            tp->state.removeChild (audio, nullptr);
+        }
+
+        // Through a MIDI file and back.
+        const auto mid = folder.getChildFile ("tempo.mid");
+        midifile::write (*tp, { region }, mid);
+        midifile::Contents contents;
+        check (midifile::read (mid, contents) && contents.tempoChanges.size() == 1 && std::abs (contents.tempoChanges[0].tick - 7680.0) < 0.5
+               && std::abs (contents.tempoChanges[0].bpm - 60.0) < 0.01 && contents.parts.size() == 1 && contents.parts[0].notes[0].start == 7680 + 960,
+               "MIDI files carry the tempo changes");
+    }
+
     std::cout << "looped regions\n";
     {
         for (int i = project->numTracks(); --i >= 0;)

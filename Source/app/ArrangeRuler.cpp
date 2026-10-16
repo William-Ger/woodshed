@@ -73,31 +73,28 @@ void Ruler::paint (juce::Graphics& g)
     }
 
     // Bar numbers and ticks.
-    const double spb = grid.samplesPerBeat();
     const double step = view.gridStepBeats(), labelStep = view.labelStepBeats();
-    const double firstBeat = std::floor (view.sampleAtX (0.0) / spb / step) * step;
-    const double lastBeat = view.sampleAtX (width) / spb;
     const int bpb = juce::jmax (1, grid.beatsPerBar);
+    const int labelBars = labelStep >= bpb ? juce::jmax (1, juce::roundToInt (labelStep / bpb)) : 0;
     const float base = (float) numbersHeight;
 
     g.setFont (theme::font (11.0f, theme::Weight::medium));
-    for (double beat = juce::jmax (0.0, firstBeat); beat <= lastBeat + step; beat += step)
+    for (auto& line : view.gridLines (view.sampleAtX (-2.0), view.sampleAtX (width + 2.0), step))
     {
-        const float x = std::round (view.xForSample (beat * spb));
-        const double inBar = std::fmod (beat, (double) bpb);
-        const bool isBar = inBar < 1.0e-6 || bpb - inBar < 1.0e-6;
-        const bool isBeat = std::abs (beat - std::round (beat)) < 1.0e-6;
+        const float x = std::round (view.xForSample (line.sample));
+        const bool isBar = line.isBar, isBeat = line.isBeat;
         const float tickTop = isBar ? 5.0f : (isBeat ? base - 5.0f : base - 3.0f);
 
         g.setColour (isBar ? theme::faintText : theme::faintText.withAlpha (isBeat ? 0.55f : 0.35f));
         g.fillRect (x, tickTop, 1.0f, base - tickTop);
 
-        const double labelPhase = std::fmod (beat, labelStep);
-        if (labelPhase > 1.0e-6 && labelStep - labelPhase > 1.0e-6)
+        // Labels: every bar (or every few when zoomed out), beats too when zoomed right in.
+        const bool labelled = labelBars > 0 ? (isBar && (line.bar - 1) % labelBars == 0) : isBeat;
+        if (! labelled)
             continue;
 
-        const int bar = (int) std::floor ((beat + 1.0e-6) / bpb) + 1;
-        const int beatInBar = (int) std::floor (inBar + 1.0e-6) + 1;
+        const int bar = line.bar;
+        const int beatInBar = line.beat;
         if (isBar)
         {
             g.setColour (theme::dimText);
@@ -108,6 +105,31 @@ void Ruler::paint (juce::Graphics& g)
             g.setColour (theme::faintText);
             g.drawText (juce::String (bar) + "." + juce::String (beatInBar),
                         juce::Rectangle<float> (x + 3.0f, 5.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
+        }
+    }
+
+    // Tempo and time signature changes: small tags under the bar numbers.
+    {
+        const auto& map = view.project().grid();
+        g.setFont (theme::font (10.0f, theme::Weight::semibold));
+        for (auto& c : map.tempoChanges)
+        {
+            const float x = view.xForSample (map.sampleAt (c.tick));
+            if (x < -60.0f || x > width)
+                continue;
+            g.setColour (theme::accent);
+            g.fillRect (juce::Rectangle<float> (x, base - 12.0f, 1.0f, 12.0f));
+            g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x99\xa9 ")) + juce::String (c.bpm, 1).trimCharactersAtEnd ("0").trimCharactersAtEnd ("."),
+                        juce::Rectangle<float> (x + 3.0f, base - 13.0f, 60.0f, 12.0f), juce::Justification::centredLeft, false);
+        }
+        for (auto& c : map.meterChanges)
+        {
+            const float x = view.xForSample (map.sampleAt (map.barStartTick (c.bar)));
+            if (x < -60.0f || x > width)
+                continue;
+            g.setColour (theme::mute);
+            g.drawText (juce::String (c.beatsPerBar) + "/" + juce::String (c.beatUnit),
+                        juce::Rectangle<float> (x + 22.0f, 3.0f, 40.0f, 14.0f), juce::Justification::centredLeft, false);
         }
     }
 
@@ -310,6 +332,15 @@ void Ruler::mouseDown (const juce::MouseEvent& e)
     anchor = view.snap (view.sampleAtX (e.x), ! e.mods.isCommandDown());
     view.setUserGesture (true);
 
+    // Right-click on the ruler (not on a marker): tempo and time signature changes here.
+    if (e.mods.isPopupMenu() && mode != Mode::markerDrag)
+    {
+        mode = Mode::none;
+        view.setUserGesture (false);
+        showTempoMenu (e.getPosition());
+        return;
+    }
+
     if (mode == Mode::scrub)
         scrubTo ((float) e.x);
 
@@ -327,6 +358,90 @@ void Ruler::mouseDown (const juce::MouseEvent& e)
         }
         repaint();
     }
+}
+
+void Ruler::showTempoMenu (juce::Point<int> p)
+{
+    auto& project = view.project();
+    const auto& grid = project.grid();
+    const auto at = view.snap (view.sampleAtX (p.x), true);
+    const double tick = grid.tickAt ((double) at);
+    const int bar = juce::jmax (0, (int) std::floor (grid.barAt (tick) + 0.5));
+    const double tempoHere = grid.tempoAt ((double) at);
+    const auto meterHere = grid.meterAt (grid.barStartTick (bar));
+
+    // Changes under the mouse, to edit or remove.
+    double nearTempoTick = -1.0;
+    for (auto& c : grid.tempoChanges)
+        if (std::abs (view.xForSample (grid.sampleAt (c.tick)) - (float) p.x) < 8.0f)
+            nearTempoTick = c.tick;
+    int nearMeterBar = -1;
+    for (auto& c : grid.meterChanges)
+        if (std::abs (view.xForSample (grid.sampleAt (grid.barStartTick (c.bar))) - (float) p.x) < 8.0f)
+            nearMeterBar = c.bar;
+
+    juce::Component::SafePointer<Ruler> safe (this);
+    auto ask = [safe] (const juce::String& title, const juce::String& message, const juce::String& initial,
+                       std::function<void (const juce::String&)> done)
+    {
+        auto* w = new juce::AlertWindow (title, message, juce::MessageBoxIconType::NoIcon);
+        w->addTextEditor ("value", initial);
+        w->addButton ("OK", 1, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        w->enterModalState (true, juce::ModalCallbackFunction::create ([w, done, safe] (int result)
+        {
+            if (result == 1 && safe != nullptr)
+                done (w->getTextEditorContents ("value"));
+        }), true);
+    };
+
+    juce::PopupMenu m;
+    m.addSectionHeader ("Tempo and Time Signature");
+    m.addItem ("Change Tempo Here (" + grid.toBarsBeats (at) + ")...", [this, ask, tick, tempoHere]
+    {
+        ask ("Tempo Change", "New tempo from here on, in bpm:", juce::String (tempoHere, 2).trimCharactersAtEnd ("0").trimCharactersAtEnd ("."),
+             [this, tick] (const juce::String& text)
+             {
+                 const auto bpm = text.getDoubleValue();
+                 if (bpm < 20.0 || bpm > 400.0)
+                     return;
+                 auto& pr = view.project();
+                 pr.undo.beginNewTransaction ("Tempo Change");
+                 pr.setTempoChange (tick, bpm);
+             });
+    });
+    m.addItem ("Change Time Signature at Bar " + juce::String (bar + 1) + "...", [this, ask, bar, meterHere]
+    {
+        ask ("Time Signature", "New time signature from bar " + juce::String (bar + 1) + " on (for example 3/4 or 6/8):",
+             juce::String (meterHere.beatsPerBar) + "/" + juce::String (meterHere.beatUnit),
+             [this, bar] (const juce::String& text)
+             {
+                 const int beats = text.upToFirstOccurrenceOf ("/", false, false).getIntValue();
+                 const int unit = text.fromFirstOccurrenceOf ("/", false, false).getIntValue();
+                 if (beats < 1 || beats > 16 || (unit != 2 && unit != 4 && unit != 8 && unit != 16))
+                     return;
+                 auto& pr = view.project();
+                 pr.undo.beginNewTransaction ("Time Signature Change");
+                 pr.setMeterChange (bar, beats, unit);
+             });
+    });
+    if (nearTempoTick > 0.0 || nearMeterBar > 0)
+        m.addSeparator();
+    if (nearTempoTick > 0.0)
+        m.addItem ("Remove Tempo Change", [this, nearTempoTick]
+        {
+            auto& pr = view.project();
+            pr.undo.beginNewTransaction ("Remove Tempo Change");
+            pr.removeTempoChange (nearTempoTick);
+        });
+    if (nearMeterBar > 0)
+        m.addItem ("Remove Time Signature Change", [this, nearMeterBar]
+        {
+            auto& pr = view.project();
+            pr.undo.beginNewTransaction ("Remove Time Signature Change");
+            pr.removeMeterChange (nearMeterBar);
+        });
+    m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
 void Ruler::mouseDoubleClick (const juce::MouseEvent& e)

@@ -14,6 +14,7 @@ namespace woodshed::daw
     PROJECT  (children: the TRACKs in order, then at most one MASTER, always last)
              name, sampleRate, tempo, beatsPerBar, beatUnit, click (bool), countIn (bool),
              loopOn (bool), loopStart, loopEnd (samples), masterVolume (dB), selectedTrack (id),
+             tempoChanges ("tick:bpm;..." after the start), meterChanges ("bar:beats/unit;..." after bar 1),
              markers (JSON array of { id, name, position }; a property, so the children stay tracks)
       TRACK  id (int, unique), name, colour (ARGB int), volume (dB), pan (-1..1),
              mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool),
@@ -65,7 +66,7 @@ namespace ids
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
     WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
-    WOODSHED_ID (loop) WOODSHED_ID (transpose) WOODSHED_ID (comp) WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
+    WOODSHED_ID (tempoChanges) WOODSHED_ID (meterChanges) WOODSHED_ID (loop) WOODSHED_ID (transpose) WOODSHED_ID (comp) WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
 #undef WOODSHED_ID
 }
@@ -82,25 +83,61 @@ constexpr int loopLimitBars = 8;
 /** MIDI note positions are in ticks: 960 per quarter note. */
 constexpr int ticksPerQuarter = 960;
 
-/** Musical time helpers for a constant tempo and meter. */
+/**
+    Musical time: the song's tempo and meter, with any changes along the way (Logic's tempo and
+    signature tracks). Tempo changes sit at ticks and hold until the next one; meter changes
+    start at bars. Every conversion between samples and musical time goes through here.
+*/
 struct TimeGrid
 {
-    double sampleRate = 48000.0, tempo = 120.0;
-    int beatsPerBar = 4, beatUnit = 4;
+    double sampleRate = 48000.0, tempo = 120.0;     // at the start of the song
+    int beatsPerBar = 4, beatUnit = 4;              // at the start of the song
 
-    double samplesPerBeat() const               { return sampleRate * 60.0 / tempo * 4.0 / beatUnit; }
-    double samplesPerBar() const                { return samplesPerBeat() * beatsPerBar; }
-    double toBeats (juce::int64 samples) const  { return (double) samples / samplesPerBeat(); }
-    juce::int64 fromBeats (double beats) const  { return (juce::int64) std::llround (beats * samplesPerBeat()); }
+    struct TempoChange { double tick = 0.0, bpm = 120.0; };
+    struct MeterChange { int bar = 0, beatsPerBar = 4, beatUnit = 4; };
+    std::vector<TempoChange> tempoChanges;          // after the start, in order (tick > 0)
+    std::vector<MeterChange> meterChanges;          // after the start, in order (bar > 0)
 
-    /** "bar.beat.tick" (1-based bar and beat, ticks out of 960), e.g. "5.2.480". */
+    /** Fills in the lookup tables; call after setting the fields above. */
+    void finalise();
+    bool hasChanges() const                         { return ! tempoChanges.empty() || ! meterChanges.empty(); }
+
+    // Absolute positions (from the start of the song) -----------------------------------
+    double tickAt (double sample) const;
+    double sampleAt (double tick) const;
+    double tempoAt (double sample) const;
+    /** The meter in force at a tick, and where its bar 0 starts. */
+    struct Meter { int firstBar = 0, beatsPerBar = 4, beatUnit = 4; double tick = 0.0;
+                   double ticksPerBeat() const  { return ticksPerQuarterNote * 4.0 / beatUnit; }
+                   double ticksPerBar() const   { return ticksPerBeat() * beatsPerBar; } };
+    Meter meterAt (double tick) const;
+    /** Tick where a bar (0-based) starts; the bar a tick is in (0-based, fractional). */
+    double barStartTick (int bar) const;
+    double barAt (double tick) const;
+    juce::int64 barStartSample (int bar) const      { return (juce::int64) std::llround (sampleAt (barStartTick (bar))); }
+
+    /** "bar.beat.tick" (1-based bar and beat, ticks out of 960 per beat), e.g. "5.2.480". */
     juce::String toBarsBeats (juce::int64 samples) const;
     /** "m:ss.mmm". */
     juce::String toClock (juce::int64 samples) const;
 
-    double samplesPerTick() const               { return sampleRate * 60.0 / tempo / ticksPerQuarter; }
+    // At the start of the song (lengths, where a single figure will do) --------------------
+    double samplesPerBeat() const               { return sampleRate * 60.0 / tempo * 4.0 / beatUnit; }
+    double samplesPerBar() const                { return samplesPerBeat() * beatsPerBar; }
+    double samplesPerTick() const               { return sampleRate * 60.0 / tempo / ticksPerQuarterNote; }
+    /** Durations at the starting tempo; for positions use tickAt / sampleAt. */
     double toTicks (double samples) const       { return samples / samplesPerTick(); }
     double fromTicks (double ticks) const       { return ticks * samplesPerTick(); }
+
+    /** Beats of the starting meter from the start of the song, through the tempo changes. */
+    double toBeats (juce::int64 samples) const  { return tickAt ((double) samples) / (ticksPerQuarterNote * 4.0 / beatUnit); }
+    juce::int64 fromBeats (double beats) const  { return (juce::int64) std::llround (sampleAt (beats * ticksPerQuarterNote * 4.0 / beatUnit)); }
+
+    static constexpr double ticksPerQuarterNote = 960.0;
+
+private:
+    std::vector<double> changeSamples;          // where each tempo change falls
+    std::vector<Meter> meters;                  // the start's meter, then each change
 };
 
 /** A point on an automation line. */
@@ -154,7 +191,20 @@ public:
     /** Copies the project (and its audio) to a new folder and switches to it. */
     bool saveAs (const juce::File& newFolder);
 
-    TimeGrid grid() const;
+    /** The song's tempo and meter map (rebuilt only when they change). Message thread. */
+    const TimeGrid& grid() const;
+
+    // Tempo and meter changes (Logic's tempo and signature tracks) -------------------------
+    /** A tempo change at `tick` (a new one, or the one already there); at tick 0 it's the song tempo. */
+    void setTempoChange (double tick, double bpm);
+    void removeTempoChange (double tick);
+    /** A time signature from bar `bar` (0-based) on; at bar 0 it's the song's. */
+    void setMeterChange (int bar, int beatsPerBar, int beatUnit);
+    void removeMeterChange (int bar);
+    /** After the tempo map changed from `before`: puts every region, marker, automation point
+        and the cycle back on the bar and beat it was on (audio isn't stretched; a MIDI region's
+        notes keep their ticks, so the region's length follows the tempo). */
+    void keepMusicalPositions (const TimeGrid& before);
 
     // Tracks -------------------------------------------------------------------
     int numTracks() const
@@ -284,6 +334,8 @@ public:
 
 private:
     static juce::ValueTree createState (double sampleRate);
+    mutable TimeGrid cachedGrid;
+    mutable juce::String cachedGridKey;
     static juce::Colour trackColour (int index);
     void setMarkers (const std::vector<Marker>&);
 };

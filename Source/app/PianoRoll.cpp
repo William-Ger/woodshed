@@ -39,7 +39,7 @@ PianoRoll::PianoRoll (Studio& s) : studio (s)
     quantizeChoice.onChange = [this]
     {
         const auto& choice = gridChoices[juce::jlimit (0, (int) std::size (gridChoices) - 1, quantizeChoice.getSelectedId() - 1)];
-        const int ticks = choice.ticks > 0 ? choice.ticks : (int) std::llround (studio.project().grid().toTicks (studio.project().grid().samplesPerBar()));
+        const int ticks = choice.ticks > 0 ? choice.ticks : (int) std::llround (studio.project().grid().meterAt (0.0).ticksPerBar());
         studio.setQuantizeTicks (ticks);
         defaultLength = ticks;
     };
@@ -160,9 +160,10 @@ void PianoRoll::focusOnNotes()
     if (! region.isValid())
         return;
 
-    const auto grid = studio.project().grid();
-    const double offsetTicks = grid.toTicks ((double) (juce::int64) region[ids::offset]);
-    const double lengthTicks = grid.toTicks ((double) (juce::int64) region[ids::length]);
+    const auto& grid = studio.project().grid();
+    const double originTick = grid.tickAt ((double) daw::Project::contentOrigin (region));
+    const double offsetTicks = grid.tickAt ((double) (juce::int64) region[ids::start]) - originTick;
+    const double lengthTicks = grid.tickAt ((double) ((juce::int64) region[ids::start] + (juce::int64) region[ids::length])) - originTick - offsetTicks;
 
     // Horizontally: the whole region with a little room either side.
     const auto area = gridArea();
@@ -239,8 +240,8 @@ double PianoRoll::snapTicks (double tick, bool enabled) const
         return std::round (tick);
 
     // The grid belongs to the song, so snap in song time and convert back.
-    const auto grid = studio.project().grid();
-    const double origin = grid.toTicks ((double) daw::Project::contentOrigin (region));
+    const auto& grid = studio.project().grid();
+    const double origin = grid.tickAt ((double) daw::Project::contentOrigin (region));
     const double step = gridTicks();
     return std::round ((origin + tick) / step) * step - origin;
 }
@@ -249,8 +250,8 @@ juce::int64 PianoRoll::playheadTick() const
 {
     if (! region.isValid())
         return 0;
-    const auto grid = studio.project().grid();
-    return (juce::int64) std::llround (grid.toTicks ((double) (studio.engine().getPosition() - daw::Project::contentOrigin (region))));
+    const auto& grid = studio.project().grid();
+    return (juce::int64) std::llround (grid.tickAt ((double) studio.engine().getPosition()) - grid.tickAt ((double) daw::Project::contentOrigin (region)));
 }
 
 juce::Rectangle<float> PianoRoll::noteRect (const daw::Note& n) const
@@ -394,9 +395,9 @@ void PianoRoll::drawGrid (juce::Graphics& g)
     }
 
     // Columns: bars, beats and the snap grid when it's far enough apart.
-    const auto grid = studio.project().grid();
-    const double origin = grid.toTicks ((double) daw::Project::contentOrigin (region));
-    const double beat = grid.toTicks (grid.samplesPerBeat());
+    const auto& grid = studio.project().grid();
+    const double origin = grid.tickAt ((double) daw::Project::contentOrigin (region));
+    const double beat = grid.meterAt (origin + tickAtX ((float) area.getX())).ticksPerBeat();
     const double bar = beat * grid.beatsPerBar;
     const double step = gridTicks() * pixelsPerTick >= 6.0 ? gridTicks() : beat * pixelsPerTick >= 6.0 ? beat : bar;
     const double first = std::floor ((origin + tickAtX ((float) area.getX())) / step) * step - origin;
@@ -410,8 +411,9 @@ void PianoRoll::drawGrid (juce::Graphics& g)
     }
 
     // Outside the region: shaded, since those notes don't play.
-    const auto lengthTicks = grid.toTicks ((double) (juce::int64) region[ids::length]);
-    const auto startTick = grid.toTicks ((double) (juce::int64) region[ids::offset]);
+    const auto originTick = grid.tickAt ((double) daw::Project::contentOrigin (region));
+    const auto startTick = grid.tickAt ((double) (juce::int64) region[ids::start]) - originTick;
+    const auto lengthTicks = grid.tickAt ((double) ((juce::int64) region[ids::start] + (juce::int64) region[ids::length])) - originTick - startTick;
     g.setColour (juce::Colours::black.withAlpha (0.35f));
     const float rx1 = xForTick (startTick), rx2 = xForTick (startTick + lengthTicks);
     if (rx1 > (float) area.getX())
@@ -427,9 +429,10 @@ void PianoRoll::drawNotes (juce::Graphics& g)
     g.reduceClipRegion (area);
 
     const auto colour = arrange::trackColour (region.getParent());
-    const auto grid = studio.project().grid();
-    const auto startTick = grid.toTicks ((double) (juce::int64) region[ids::offset]);
-    const auto endTick = startTick + grid.toTicks ((double) (juce::int64) region[ids::length]);
+    const auto& grid = studio.project().grid();
+    const auto originTick = grid.tickAt ((double) daw::Project::contentOrigin (region));
+    const auto startTick = grid.tickAt ((double) (juce::int64) region[ids::start]) - originTick;
+    const auto endTick = grid.tickAt ((double) ((juce::int64) region[ids::start] + (juce::int64) region[ids::length])) - originTick;
 
     for (auto n : notes())
     {
@@ -473,9 +476,9 @@ void PianoRoll::drawRuler (juce::Graphics& g)
 
     juce::Graphics::ScopedSaveState s (g);
     g.reduceClipRegion (area);
-    const auto grid = studio.project().grid();
-    const double origin = grid.toTicks ((double) daw::Project::contentOrigin (region));
-    const double bar = grid.toTicks (grid.samplesPerBar());
+    const auto& grid = studio.project().grid();
+    const double origin = grid.tickAt ((double) daw::Project::contentOrigin (region));
+    const double bar = grid.meterAt (origin + tickAtX ((float) area.getX())).ticksPerBar();
     const double first = std::floor ((origin + tickAtX ((float) area.getX())) / bar) * bar;
     const int every = juce::jmax (1, (int) std::ceil (40.0 / (bar * pixelsPerTick)));
     g.setFont (theme::readout (10.0f, theme::Weight::medium));
@@ -587,7 +590,7 @@ juce::ValueTree PianoRoll::addNoteAt (juce::Point<int> p)
     // Snap to the cell the click is in (not the nearest line).
     {
         const auto grid = project.grid();
-        const double origin = grid.toTicks ((double) daw::Project::contentOrigin (region));
+        const double origin = grid.tickAt ((double) daw::Project::contentOrigin (region));
         const double step = gridTicks();
         note.start = juce::jmax ((juce::int64) 0, (juce::int64) std::llround (std::floor ((origin + tickAtX ((float) p.x)) / step) * step - origin));
     }

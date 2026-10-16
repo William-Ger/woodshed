@@ -116,10 +116,11 @@ juce::int64 TakesEditor::snapped (juce::int64 fromOrigin, bool enabled) const
     if (! enabled)
         return fromOrigin;
     // To the nearest 1/16 note of the song.
-    const auto grid = studio.project().grid();
-    const double step = grid.samplesPerBeat() * grid.beatUnit / 16.0;
+    const auto& grid = studio.project().grid();
+    const double step = daw::TimeGrid::ticksPerQuarterNote / 4.0;      // a 16th note
     const auto origin = (double) daw::Project::contentOrigin (folder);
-    return (juce::int64) std::llround (std::round ((origin + (double) fromOrigin) / step) * step - origin);
+    const double tick = std::round (grid.tickAt (origin + (double) fromOrigin) / step) * step;
+    return (juce::int64) std::llround (grid.sampleAt (tick) - origin);
 }
 
 void TakesEditor::resized()

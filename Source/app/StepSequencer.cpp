@@ -374,7 +374,8 @@ int StepSequencer::playingStep() const
     const auto start = (juce::int64) region[ids::start];
     if (pos < start || pos >= start + (juce::int64) region[ids::length])
         return -1;
-    const auto tick = (juce::int64) studio.project().grid().toTicks ((double) (pos - daw::Project::contentOrigin (region)));
+    const auto& grid = studio.project().grid();
+    const auto tick = (juce::int64) (grid.tickAt ((double) pos) - grid.tickAt ((double) daw::Project::contentOrigin (region)));
     return (int) ((tick % pattern.lengthTicks()) / pattern.stepTicks);
 }
 

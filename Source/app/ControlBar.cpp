@@ -205,7 +205,10 @@ void ControlBar::Readout::paint (juce::Graphics& g)
 void ControlBar::Readout::projectChanged()
 {
     const auto& s = owner.studio.project().state;
-    const auto t = formatTempo ((double) s.getProperty (tempo, 120.0));
+    // The tempo where the playhead is (the song's tempo unless it changes along the way).
+    const auto& songGrid = owner.studio.project().grid();
+    const auto t = formatTempo (songGrid.hasChanges() ? songGrid.tempoAt ((double) owner.studio.engine().getPosition())
+                                                      : (double) s.getProperty (tempo, 120.0));
     const auto sig = juce::String ((int) s.getProperty (daw::ids::beatsPerBar, 4)) + "/"
                    + juce::String ((int) s.getProperty (daw::ids::beatUnit, 4));
 
@@ -307,7 +310,7 @@ void ControlBar::Readout::mouseDrag (const juce::MouseEvent& e)
         project.undo.beginNewTransaction ("Change Tempo");
         tempoTransactionStarted = true;
     }
-    project.state.setProperty (tempo, bpm, &project.undo);
+    project.setTempoChange (0.0, bpm);
 }
 
 void ControlBar::Readout::mouseUp (const juce::MouseEvent&)
@@ -360,7 +363,7 @@ void ControlBar::Readout::editTempo()
                 && std::abs (bpm - (double) project.state.getProperty (tempo, 120.0)) > 1.0e-6)
             {
                 project.undo.beginNewTransaction ("Set Tempo");
-                project.state.setProperty (tempo, bpm, &project.undo);
+                project.setTempoChange (0.0, bpm);
             }
         }
 
@@ -739,9 +742,8 @@ void ControlBar::invoke (juce::CommandID id)
 void ControlBar::moveByBars (int bars)
 {
     auto& e = studio.engine();
-    const auto grid = studio.project().grid();
-    const double barLength = grid.samplesPerBar();
-    const double here = (double) e.getPosition() / barLength;
+    const auto& grid = studio.project().grid();
+    const double here = grid.barAt (grid.tickAt ((double) e.getPosition()));
     double target = std::floor (here + 1.0e-6);
 
     if (bars < 0)
@@ -756,7 +758,7 @@ void ControlBar::moveByBars (int bars)
         target += 1.0;
     }
 
-    e.setPosition ((juce::int64) std::llround (juce::jmax (0.0, target) * barLength));
+    e.setPosition (grid.barStartSample ((int) juce::jmax (0.0, target)));
 }
 
 void ControlBar::attachToProject()

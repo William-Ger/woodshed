@@ -743,6 +743,8 @@ int Studio::importMidiFile (const juce::File& file, juce::int64 at)
     {
         if (contents.tempo > 0.0)
             p.state.setProperty (daw::ids::tempo, std::round (contents.tempo * 100.0) / 100.0, &p.undo);
+        for (auto& c : contents.tempoChanges)
+            p.setTempoChange (c.tick, std::round (c.bpm * 100.0) / 100.0);
         if (contents.beatsPerBar > 0 && contents.beatUnit > 0)
         {
             p.state.setProperty (daw::ids::beatsPerBar, contents.beatsPerBar, &p.undo);
@@ -986,9 +988,10 @@ juce::ValueTree Studio::createDrummerRegion (juce::ValueTree track, juce::int64 
     if (! daw::Project::isInstrumentTrack (track))
         return {};
     auto& p = *currentProject;
-    const auto bar = p.grid().samplesPerBar();
-    const auto start = (juce::int64) (std::floor ((double) juce::jmax ((juce::int64) 0, at) / bar) * bar);
-    auto r = p.addMidiRegion (track, start, (juce::int64) std::llround (bar * bars), "Drummer");
+    const auto& grid = p.grid();
+    const int firstBar = (int) std::floor (grid.barAt (grid.tickAt ((double) juce::jmax ((juce::int64) 0, at))) + 1.0e-9);
+    const auto start = grid.barStartSample (firstBar);
+    auto r = p.addMidiRegion (track, start, grid.barStartSample (firstBar + bars) - start, "Drummer");
     daw::drummer::Settings settings;
     settings.bars = bars;
     settings.seed = (juce::uint32) juce::Random::getSystemRandom().nextInt (1 << 30) + 1u;
@@ -1015,10 +1018,11 @@ juce::ValueTree Studio::createMidiRegion (juce::ValueTree track, juce::int64 at)
     if (! daw::Project::isInstrumentTrack (track))
         return {};
     auto& p = *currentProject;
-    const auto bar = p.grid().samplesPerBar();
-    const auto start = (juce::int64) (std::floor ((double) juce::jmax ((juce::int64) 0, at) / bar) * bar);
+    const auto& grid = p.grid();
+    const int firstBar = (int) std::floor (grid.barAt (grid.tickAt ((double) juce::jmax ((juce::int64) 0, at))) + 1.0e-9);
+    const auto start = grid.barStartSample (firstBar);
     p.undo.beginNewTransaction ("Create MIDI Region");
-    auto r = p.addMidiRegion (track, start, (juce::int64) std::llround (bar), track[daw::ids::name].toString());
+    auto r = p.addMidiRegion (track, start, grid.barStartSample (firstBar + 1) - start, track[daw::ids::name].toString());
     setSelectedRegions ({ (int) r[daw::ids::id] });
     return r;
 }
@@ -1037,7 +1041,7 @@ void Studio::quantizeNotes (juce::ValueTree region, const juce::Array<juce::Valu
     // Snap each note's start relative to the bar grid of the song, not of the region.
     auto& p = *currentProject;
     const auto grid = p.grid();
-    const double originTicks = grid.toTicks ((double) daw::Project::contentOrigin (region));
+    const double originTicks = grid.tickAt ((double) daw::Project::contentOrigin (region));
     p.undo.beginNewTransaction ("Quantize");
     for (auto& n : targets)
     {

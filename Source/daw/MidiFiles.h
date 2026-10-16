@@ -22,6 +22,7 @@ namespace midifile
     {
         std::vector<Part> parts;
         double tempo = 0.0;                 // the first tempo, or 0 if the file has none
+        std::vector<TimeGrid::TempoChange> tempoChanges;    // later ones (ticks, 960 per quarter)
         int beatsPerBar = 0, beatUnit = 0;  // the first time signature, or 0
     };
 

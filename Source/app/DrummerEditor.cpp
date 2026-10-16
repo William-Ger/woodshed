@@ -276,7 +276,12 @@ DrummerEditor::DrummerEditor (Studio& s) : studio (s)
         auto& project = studio.project();
         const juce::ScopedValueSetter<bool> guard (writing, true);
         project.undo.beginNewTransaction ("Drummer Bars");
-        region.setProperty (ids::length, (juce::int64) std::llround (project.grid().samplesPerBar() * bars.getSelectedId()), &project.undo);
+        {
+            const auto& grid = project.grid();
+            const auto start = (juce::int64) region[ids::start];
+            const int firstBar = (int) std::floor (grid.barAt (grid.tickAt ((double) start)) + 1.0e-9);
+            region.setProperty (ids::length, grid.barStartSample (firstBar + bars.getSelectedId()) - start, &project.undo);
+        }
         settings.bars = bars.getSelectedId();
         dr::apply (project, region, settings, &project.undo);
         repaint();
@@ -394,7 +399,10 @@ void DrummerEditor::showSettings()
     toms.setToggleState (settings.toms, juce::dontSendNotification);
     percussion.setToggleState (settings.percussion, juce::dontSendNotification);
     timekeeper.setSelectedId ((int) settings.timekeeper + 1, juce::dontSendNotification);
-    const int barCount = juce::jmax (1, juce::roundToInt ((double) (juce::int64) region[ids::length] / studio.project().grid().samplesPerBar()));
+    const auto& grid = studio.project().grid();
+    const auto regionStart = (juce::int64) region[ids::start];
+    const int barCount = juce::jmax (1, juce::roundToInt (grid.barAt (grid.tickAt ((double) (regionStart + (juce::int64) region[ids::length])))
+                                                          - grid.barAt (grid.tickAt ((double) regionStart))));
     if (bars.indexOfItemId (barCount) < 0)
         bars.addItem (juce::String (barCount) + " bars", barCount);
     bars.setSelectedId (barCount, juce::dontSendNotification);

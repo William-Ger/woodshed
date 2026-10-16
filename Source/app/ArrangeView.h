@@ -53,6 +53,12 @@ public:
     /** To the nearest beat, unless snapping is off (Cmd held). Never below zero. */
     juce::int64 snap (double sample, bool enabled = true) const;
 
+    /** One line of the timeline grid: where it is and what it marks (bar and beat 1-based). */
+    struct GridLine { double sample = 0.0; bool isBar = false, isBeat = false; int bar = 1, beat = 1; };
+    /** The grid lines from one sample to another, every `stepBeats` (a fraction of a beat, or a
+        whole number of bars' worth of beats), following tempo and meter changes. */
+    std::vector<GridLine> gridLines (double fromSample, double toSample, double stepBeats) const;
+
     /** Grid spacing for the current zoom, in beats. */
     double gridStepBeats() const;
     double labelStepBeats() const;

@@ -332,25 +332,40 @@ void Mixer::render (const Snapshot& snap, const Block& b)
 
 void Mixer::addClick (const Snapshot& snap, const Block& b, float level)
 {
-    // A short pitched blip on every beat, higher on the downbeat. Stateless, so it works for
-    // negative positions (the count-in) and right after a jump.
-    const double spb = snap.grid.samplesPerBeat();
-    const double sr = snap.grid.sampleRate;
-    const int clickLength = (int) (sr * 0.03);
+    // A short pitched blip on every beat of the meter in force, higher on the downbeat. It
+    // follows the tempo map; stateless, so it works for negative positions (the count-in) and
+    // right after a jump.
+    const auto& grid = snap.grid;
+    const double sr = grid.sampleRate;
+    const double clickLength = sr * 0.03;
+    const double blockEnd = (double) (b.position + b.numSamples);
 
-    for (int i = 0; i < b.numSamples; ++i)
+    // Start from the beat that may still be ringing at the block's start.
+    const double firstTick = grid.tickAt ((double) b.position - clickLength);
+    auto meter = grid.meterAt (firstTick);
+    double beatTick = meter.tick + std::floor ((firstTick - meter.tick) / meter.ticksPerBeat()) * meter.ticksPerBeat();
+
+    for (int guard = 0; guard < 256; ++guard)
     {
-        const double t = (double) (b.position + i);
-        const double beat = std::floor (t / spb);
-        const double since = t - beat * spb;
-        if (since >= clickLength)
-            continue;
+        meter = grid.meterAt (beatTick);
+        const double beatSample = grid.sampleAt (beatTick);
+        if (beatSample >= blockEnd)
+            break;
 
-        const bool downbeat = ((juce::int64) beat % snap.grid.beatsPerBar + snap.grid.beatsPerBar) % snap.grid.beatsPerBar == 0;
+        const auto beatInMeter = (juce::int64) std::llround ((beatTick - meter.tick) / meter.ticksPerBeat());
+        const bool downbeat = (beatInMeter % meter.beatsPerBar + meter.beatsPerBar) % meter.beatsPerBar == 0;
         const double hz = downbeat ? 1660.0 : 1100.0;
-        const float v = level * (float) (std::sin (juce::MathConstants<double>::twoPi * hz * since / sr) * std::exp (-since / (sr * 0.007)));
-        b.left[i] += v;
-        b.right[i] += v;
+
+        const auto from = juce::jmax ((juce::int64) b.position, (juce::int64) std::ceil (beatSample));
+        const auto to = juce::jmin ((juce::int64) blockEnd, (juce::int64) std::ceil (beatSample + clickLength));
+        for (auto t = from; t < to; ++t)
+        {
+            const double since = (double) t - beatSample;
+            const float v = level * (float) (std::sin (juce::MathConstants<double>::twoPi * hz * since / sr) * std::exp (-since / (sr * 0.007)));
+            b.left[t - b.position] += v;
+            b.right[t - b.position] += v;
+        }
+        beatTick += meter.ticksPerBeat();
     }
 }
 
@@ -551,7 +566,7 @@ void Engine::record()
             midiRecordTrack = t.trackId;
     recordedSamples = 0;
 
-    const auto grid = project->grid();
+    const auto& grid = project->grid();
     auto from = getPosition();
 
     // Cycle recording: with the cycle on, recording loops it, a take per pass. It starts at the
@@ -575,7 +590,7 @@ void Engine::record()
     // Recording from a stop gets a bar of count-in (when it's on); punching in while playing doesn't.
     if (! isPlaying() && (bool) project->state[ids::countIn])
     {
-        const auto preroll = from - (juce::int64) grid.samplesPerBar();
+        const auto preroll = (juce::int64) std::llround (grid.sampleAt (grid.tickAt ((double) from) - grid.meterAt (grid.tickAt ((double) from)).ticksPerBar()));
         requestedPosition = preroll;
         position = preroll;
     }
@@ -707,7 +722,7 @@ std::vector<Engine::Pass> Engine::cyclePasses (juce::int64 recordStart, juce::in
 void Engine::finishMidiTake (int trackId, juce::int64 stopAt)
 {
     auto track = project->trackById (trackId);
-    const auto grid = project->grid();
+    const auto& grid = project->grid();
 
     // Notes still held when recording stopped end there; everything moves back by the output
     // latency, since you played along with what you heard.
@@ -724,18 +739,21 @@ void Engine::finishMidiTake (int trackId, juce::int64 stopAt)
 
     // Like Logic, the region runs from the bar the recording started in to the end of the bar
     // it stopped in.
-    const auto bar = grid.samplesPerBar();
-    const auto from = (juce::int64) (std::floor ((double) juce::jmax ((juce::int64) 0, recordStart.load()) / bar) * bar);
-    const auto to = (juce::int64) (std::ceil ((double) last / bar) * bar);
+    const int firstBar = (int) std::floor (grid.barAt (grid.tickAt ((double) juce::jmax ((juce::int64) 0, recordStart.load()))) + 1.0e-9);
+    const int lastBar = juce::jmax (firstBar + 1, (int) std::ceil (grid.barAt (grid.tickAt ((double) last)) - 1.0e-9));
+    const auto from = grid.barStartSample (firstBar);
+    const auto to = grid.barStartSample (lastBar);
+    const double fromTick = grid.barStartTick (firstBar);
 
-    auto region = project->addMidiRegion (track, from, juce::jmax ((juce::int64) bar, to - from), track[ids::name].toString());
+    auto region = project->addMidiRegion (track, from, to - from, track[ids::name].toString());
     for (auto& n : notes)
     {
         Note note;
         note.pitch = n.pitch;
         note.velocity = n.velocity;
-        note.start = std::llround (grid.toTicks ((double) (n.start - from)));
-        note.length = juce::jmax ((juce::int64) 1, (juce::int64) std::llround (grid.toTicks ((double) (n.end - n.start))));
+        const double on = grid.tickAt ((double) n.start), off = grid.tickAt ((double) n.end);
+        note.start = std::llround (on - fromTick);
+        note.length = juce::jmax ((juce::int64) 1, (juce::int64) std::llround (off - on));
         project->addNote (region, note);
     }
 }
@@ -1188,7 +1206,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
             for (size_t k = 0; k < values.size() && k < tp.instrumentKnobs.size(); ++k)
                 tp.instrumentKnobs[k] = values[k];
 
-            const auto grid = project.grid();
+            const auto& grid = project.grid();
             for (auto r : t)
             {
                 if (! r.hasType (ids::REGION) || ! Project::isMidiRegion (r) || (bool) r[ids::mute])
@@ -1206,6 +1224,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                     const auto start = regionStart + shift;
                     const auto end = juce::jmin (start + length, loopsTo);
                     const auto origin = Project::contentOrigin (r) + shift;
+                    const double originTick = grid.tickAt ((double) origin);
                     for (auto note : r)
                     {
                         if (! note.hasType (ids::NOTE))
@@ -1214,10 +1233,10 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                         const int pitch = n.pitch + transpose;
                         if (pitch < 0 || pitch > 127)
                             continue;
-                        const auto on = origin + (juce::int64) std::llround (grid.fromTicks ((double) n.start));
+                        const auto on = (juce::int64) std::llround (grid.sampleAt (originTick + (double) n.start));
                         if (on < start || on >= end)
                             continue;
-                        const auto off = juce::jmin (end, origin + (juce::int64) std::llround (grid.fromTicks ((double) (n.start + n.length))));
+                        const auto off = juce::jmin (end, (juce::int64) std::llround (grid.sampleAt (originTick + (double) (n.start + n.length))));
                         tp.midi.push_back ({ on, true, (std::uint8_t) pitch, (float) juce::jlimit (1, 127, n.velocity + velocityShift) / 127.0f });
                         tp.midi.push_back ({ juce::jmax (on + 1, off), false, (std::uint8_t) pitch, 0.0f });
                     }

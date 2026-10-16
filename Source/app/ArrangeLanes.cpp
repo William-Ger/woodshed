@@ -271,22 +271,13 @@ void Lanes::paint (juce::Graphics& g)
 
 void Lanes::drawGrid (juce::Graphics& g, int contentBottom) const
 {
-    const auto grid = view.project().grid();
-    const double spb = grid.samplesPerBeat();
-    const double step = view.gridStepBeats();
-    const int bpb = juce::jmax (1, grid.beatsPerBar);
     const auto clip = g.getClipBounds();
-
-    const double firstBeat = std::floor (view.sampleAtX ((double) clip.getX()) / spb / step) * step;
-    const double lastBeat = view.sampleAtX ((double) clip.getRight()) / spb;
     const float bottom = (float) juce::jmax (0, juce::jmin (getHeight(), contentBottom));
 
-    for (double beat = juce::jmax (0.0, firstBeat); beat <= lastBeat + step; beat += step)
+    for (auto& line : view.gridLines (view.sampleAtX ((double) clip.getX() - 2.0), view.sampleAtX ((double) clip.getRight() + 2.0), view.gridStepBeats()))
     {
-        const float x = std::round (view.xForSample (beat * spb));
-        const double inBar = std::fmod (beat, (double) bpb);
-        const bool isBar = inBar < 1.0e-6 || bpb - inBar < 1.0e-6;
-        const bool isBeat = std::abs (beat - std::round (beat)) < 1.0e-6;
+        const float x = std::round (view.xForSample (line.sample));
+        const bool isBar = line.isBar, isBeat = line.isBeat;
 
         g.setColour (isBar ? theme::gridBar : (isBeat ? theme::gridBeat : theme::gridBeat.withAlpha (0.55f)));
         g.fillRect (x, 0.0f, 1.0f, bottom);
@@ -507,8 +498,8 @@ void Lanes::drawNotes (juce::Graphics& g, const juce::ValueTree& region, juce::R
         high = low + 12;
     }
 
-    const auto grid = view.project().grid();
-    const double origin = (double) (look.start - look.offset);
+    const auto& grid = view.project().grid();
+    const double originTick = grid.tickAt ((double) (look.start - look.offset));
     const double regionEnd = (double) (look.start + look.length);
     const float rowHeight = juce::jlimit (1.5f, 5.0f, area.getHeight() / (float) (high - low + 1));
     const float span = area.getHeight() - rowHeight;
@@ -523,10 +514,10 @@ void Lanes::drawNotes (juce::Graphics& g, const juce::ValueTree& region, juce::R
         if (! n.hasType (ids::NOTE))
             continue;
         const auto note = daw::Project::noteFrom (n);
-        const double on = origin + grid.fromTicks ((double) note.start);
+        const double on = grid.sampleAt (originTick + (double) note.start);
         if (on < (double) look.start || on >= regionEnd)
             continue;
-        const double off = juce::jmin (regionEnd, origin + grid.fromTicks ((double) (note.start + note.length)));
+        const double off = juce::jmin (regionEnd, grid.sampleAt (originTick + (double) (note.start + note.length)));
         const float x1 = view.xForSample (on), x2 = view.xForSample (off);
         if (x2 < clip.getX() || x1 > clip.getRight())
             continue;

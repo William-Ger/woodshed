@@ -209,12 +209,12 @@ void ScoreView::setRegionProperty (const juce::Identifier& id, const juce::var& 
 
 double ScoreView::originTicks() const
 {
-    return region.isValid() ? studio.project().grid().toTicks ((double) daw::Project::contentOrigin (region)) : 0.0;
+    return region.isValid() ? studio.project().grid().tickAt ((double) daw::Project::contentOrigin (region)) : 0.0;
 }
 
 double ScoreView::playheadTick() const
 {
-    return studio.project().grid().toTicks ((double) studio.engine().getPosition());
+    return studio.project().grid().tickAt ((double) studio.engine().getPosition());
 }
 
 void ScoreView::rebuild()
@@ -246,8 +246,8 @@ void ScoreView::rebuild()
     o.staff = (score::StaffMode) juce::jlimit (0, 3, (int) region.getProperty (scoreStaff, 0));
     o.interpret = region.getProperty (scoreInterpret, true);
     const auto start = (juce::int64) region[ids::start];
-    o.from = (juce::int64) std::llround (grid.toTicks ((double) start));
-    o.to = juce::jmax (o.from + 1, (juce::int64) std::llround (grid.toTicks ((double) (start + (juce::int64) region[ids::length]))));
+    o.from = (juce::int64) std::llround (grid.tickAt ((double) start));
+    o.to = juce::jmax (o.from + 1, (juce::int64) std::llround (grid.tickAt ((double) (start + (juce::int64) region[ids::length]))));
 
     const float sp = baseStaffSpace * zoom;
     const double ppt = juce::jlimit (0.05, 0.5, 2.9 * (double) sp / (double) juce::jmin (o.resolution, 480));
@@ -358,8 +358,8 @@ void ScoreView::paint (juce::Graphics& g)
     // Outside the region (those notes don't play): shaded.
     const auto grid = studio.project().grid();
     const auto start = (juce::int64) region[ids::start];
-    const float rx1 = toLocalX (renderer.xForTick (grid.toTicks ((double) start)));
-    const float rx2 = toLocalX (renderer.xForTick (grid.toTicks ((double) (start + (juce::int64) region[ids::length]))));
+    const float rx1 = toLocalX (renderer.xForTick (grid.tickAt ((double) start)));
+    const float rx2 = toLocalX (renderer.xForTick (grid.tickAt ((double) (start + (juce::int64) region[ids::length]))));
     g.setColour (juce::Colour (0x10000000));
     const auto& bars = renderer.getLayout().bars;
     const float firstX = bars.empty() ? rx1 : toLocalX (renderer.xForTick ((double) bars.front().start));

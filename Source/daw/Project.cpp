@@ -5,14 +5,99 @@
 namespace woodshed::daw
 {
 
+void TimeGrid::finalise()
+{
+    std::sort (tempoChanges.begin(), tempoChanges.end(), [] (auto& x, auto& y) { return x.tick < y.tick; });
+    std::sort (meterChanges.begin(), meterChanges.end(), [] (auto& x, auto& y) { return x.bar < y.bar; });
+
+    changeSamples.clear();
+    double sample = 0.0, tick = 0.0, bpm = tempo;
+    for (auto& c : tempoChanges)
+    {
+        sample += (c.tick - tick) * sampleRate * 60.0 / bpm / ticksPerQuarterNote;
+        changeSamples.push_back (sample);
+        tick = c.tick;
+        bpm = c.bpm;
+    }
+
+    meters.clear();
+    meters.push_back ({ 0, beatsPerBar, beatUnit, 0.0 });
+    for (auto& c : meterChanges)
+    {
+        const auto& last = meters.back();
+        if (c.bar <= last.firstBar)
+            continue;
+        meters.push_back ({ c.bar, c.beatsPerBar, c.beatUnit, last.tick + (c.bar - last.firstBar) * last.ticksPerBar() });
+    }
+}
+
+double TimeGrid::tickAt (double sample) const
+{
+    // The last tempo change at or before the sample (before the song: the starting tempo).
+    size_t i = 0;
+    while (i < changeSamples.size() && changeSamples[i] <= sample)
+        ++i;
+    const double fromTick = i == 0 ? 0.0 : tempoChanges[i - 1].tick;
+    const double fromSample = i == 0 ? 0.0 : changeSamples[i - 1];
+    const double bpm = i == 0 ? tempo : tempoChanges[i - 1].bpm;
+    return fromTick + (sample - fromSample) * bpm * ticksPerQuarterNote / (sampleRate * 60.0);
+}
+
+double TimeGrid::sampleAt (double tick) const
+{
+    size_t i = 0;
+    while (i < tempoChanges.size() && tempoChanges[i].tick <= tick)
+        ++i;
+    const double fromTick = i == 0 ? 0.0 : tempoChanges[i - 1].tick;
+    const double fromSample = i == 0 ? 0.0 : changeSamples[i - 1];
+    const double bpm = i == 0 ? tempo : tempoChanges[i - 1].bpm;
+    return fromSample + (tick - fromTick) * sampleRate * 60.0 / bpm / ticksPerQuarterNote;
+}
+
+double TimeGrid::tempoAt (double sample) const
+{
+    double bpm = tempo;
+    for (size_t i = 0; i < changeSamples.size() && changeSamples[i] <= sample; ++i)
+        bpm = tempoChanges[i].bpm;
+    return bpm;
+}
+
+TimeGrid::Meter TimeGrid::meterAt (double tick) const
+{
+    if (meters.empty())
+        return { 0, beatsPerBar, beatUnit, 0.0 };
+    size_t i = 0;
+    while (i + 1 < meters.size() && meters[i + 1].tick <= tick)
+        ++i;
+    return meters[i];
+}
+
+double TimeGrid::barStartTick (int bar) const
+{
+    if (meters.empty())
+        return bar * Meter { 0, beatsPerBar, beatUnit, 0.0 }.ticksPerBar();
+    size_t i = 0;
+    while (i + 1 < meters.size() && meters[i + 1].firstBar <= bar)
+        ++i;
+    return meters[i].tick + (bar - meters[i].firstBar) * meters[i].ticksPerBar();
+}
+
+double TimeGrid::barAt (double tick) const
+{
+    const auto m = meterAt (tick);
+    return m.firstBar + (tick - m.tick) / m.ticksPerBar();
+}
+
 juce::String TimeGrid::toBarsBeats (juce::int64 samples) const
 {
-    const double beats = juce::jmax (0.0, toBeats (samples));
-    const int bar = (int) (beats / beatsPerBar);
-    const double inBar = beats - bar * beatsPerBar;
-    const int beat = (int) inBar;
-    const int tick = juce::jlimit (0, 959, (int) ((inBar - beat) * 960.0));
-    return juce::String (bar + 1) + "." + juce::String (beat + 1) + "." + juce::String (tick).paddedLeft ('0', 3);
+    const double tick = juce::jmax (0.0, tickAt ((double) samples));
+    const auto m = meterAt (tick);
+    const double inMeter = tick - m.tick;
+    const int barInMeter = (int) std::floor (inMeter / m.ticksPerBar());
+    const double inBar = inMeter - barInMeter * m.ticksPerBar();
+    const int beat = juce::jlimit (0, m.beatsPerBar - 1, (int) (inBar / m.ticksPerBeat()));
+    const int t = juce::jlimit (0, 959, (int) ((inBar - beat * m.ticksPerBeat()) / m.ticksPerBeat() * 960.0));
+    return juce::String (m.firstBar + barInMeter + 1) + "." + juce::String (beat + 1) + "." + juce::String (t).paddedLeft ('0', 3);
 }
 
 juce::String TimeGrid::toClock (juce::int64 samples) const
@@ -129,14 +214,155 @@ bool Project::saveAs (const juce::File& newFolder)
     return save();
 }
 
-TimeGrid Project::grid() const
+const TimeGrid& Project::grid() const
 {
+    const auto key = state[ids::sampleRate].toString() + "|" + state[ids::tempo].toString() + "|" + state[ids::beatsPerBar].toString()
+                   + "|" + state[ids::beatUnit].toString() + "|" + state[ids::tempoChanges].toString() + "|" + state[ids::meterChanges].toString();
+    if (key == cachedGridKey)
+        return cachedGrid;
+
     TimeGrid g;
     g.sampleRate = (double) state.getProperty (ids::sampleRate, 48000.0);
     g.tempo = juce::jlimit (20.0, 400.0, (double) state.getProperty (ids::tempo, 120.0));
     g.beatsPerBar = juce::jlimit (1, 16, (int) state.getProperty (ids::beatsPerBar, 4));
     g.beatUnit = juce::jlimit (1, 16, (int) state.getProperty (ids::beatUnit, 4));
-    return g;
+    for (auto& part : juce::StringArray::fromTokens (state[ids::tempoChanges].toString(), ";", {}))
+        if (part.containsChar (':'))
+        {
+            const auto tick = part.upToFirstOccurrenceOf (":", false, false).getDoubleValue();
+            if (tick > 0.0)
+                g.tempoChanges.push_back ({ tick, juce::jlimit (20.0, 400.0, part.fromFirstOccurrenceOf (":", false, false).getDoubleValue()) });
+        }
+    for (auto& part : juce::StringArray::fromTokens (state[ids::meterChanges].toString(), ";", {}))
+        if (part.containsChar (':') && part.containsChar ('/'))
+        {
+            const int bar = part.upToFirstOccurrenceOf (":", false, false).getIntValue();
+            const auto sig = part.fromFirstOccurrenceOf (":", false, false);
+            if (bar > 0)
+                g.meterChanges.push_back ({ bar, juce::jlimit (1, 16, sig.upToFirstOccurrenceOf ("/", false, false).getIntValue()),
+                                            juce::jlimit (1, 16, sig.fromFirstOccurrenceOf ("/", false, false).getIntValue()) });
+        }
+    g.finalise();
+    cachedGrid = g;
+    cachedGridKey = key;
+    return cachedGrid;
+}
+
+void Project::keepMusicalPositions (const TimeGrid& before)
+{
+    const auto& after = grid();
+    auto move = [&] (juce::int64 sample) { return (juce::int64) std::llround (after.sampleAt (before.tickAt ((double) sample))); };
+
+    for (auto t : state)
+    {
+        if (! t.hasType (ids::TRACK))
+            continue;
+        for (auto r : t)
+        {
+            if (r.hasType (ids::REGION))
+            {
+                const auto start = (juce::int64) r[ids::start];
+                const auto length = (juce::int64) r[ids::length];
+                const auto newStart = move (start);
+                if (isMidiRegion (r))
+                {
+                    const auto origin = start - (juce::int64) r[ids::offset];
+                    r.setProperty (ids::length, juce::jmax ((juce::int64) 1, move (start + length) - newStart), &undo);
+                    r.setProperty (ids::offset, newStart - move (origin), &undo);
+                }
+                if (newStart != start)
+                    r.setProperty (ids::start, newStart, &undo);
+            }
+            else if (r.hasType (ids::AUTOMATION))
+            {
+                auto points = decodePoints (r[ids::points].toString());
+                for (auto& pt : points)
+                    pt.time = move (pt.time);
+                r.setProperty (ids::points, encodePoints (points), &undo);
+            }
+        }
+    }
+
+    auto markers = getMarkers();
+    for (auto& m : markers)
+        m.position = move (m.position);
+    if (! markers.empty())
+        setMarkers (markers);
+
+    for (auto& id : { ids::loopStart, ids::loopEnd })
+        if (state.hasProperty (id))
+            state.setProperty (id, move ((juce::int64) state[id]), &undo);
+}
+
+void Project::setTempoChange (double tick, double bpm)
+{
+    bpm = juce::jlimit (20.0, 400.0, bpm);
+    const auto before = grid();
+    if (tick <= 0.0)
+    {
+        state.setProperty (ids::tempo, bpm, &undo);
+        keepMusicalPositions (before);
+        return;
+    }
+    auto changes = grid().tempoChanges;
+    changes.erase (std::remove_if (changes.begin(), changes.end(), [tick] (auto& c) { return std::abs (c.tick - tick) < 0.5; }), changes.end());
+    changes.push_back ({ tick, bpm });
+    std::sort (changes.begin(), changes.end(), [] (auto& a, auto& b) { return a.tick < b.tick; });
+    juce::StringArray parts;
+    for (auto& c : changes)
+        parts.add (juce::String (c.tick, 3).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") + ":" + juce::String (c.bpm, 3).trimCharactersAtEnd ("0").trimCharactersAtEnd ("."));
+    state.setProperty (ids::tempoChanges, parts.joinIntoString (";"), &undo);
+    keepMusicalPositions (before);
+}
+
+void Project::removeTempoChange (double tick)
+{
+    const auto mapBefore = grid();
+    auto changes = grid().tempoChanges;
+    const auto before = changes.size();
+    changes.erase (std::remove_if (changes.begin(), changes.end(), [tick] (auto& c) { return std::abs (c.tick - tick) < 0.5; }), changes.end());
+    if (changes.size() == before)
+        return;
+    juce::StringArray parts;
+    for (auto& c : changes)
+        parts.add (juce::String (c.tick, 3).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") + ":" + juce::String (c.bpm, 3).trimCharactersAtEnd ("0").trimCharactersAtEnd ("."));
+    if (parts.isEmpty()) state.removeProperty (ids::tempoChanges, &undo);
+    else                 state.setProperty (ids::tempoChanges, parts.joinIntoString (";"), &undo);
+    keepMusicalPositions (mapBefore);
+}
+
+void Project::setMeterChange (int bar, int beats, int unit)
+{
+    beats = juce::jlimit (1, 16, beats);
+    unit = juce::jlimit (1, 16, unit);
+    if (bar <= 0)
+    {
+        state.setProperty (ids::beatsPerBar, beats, &undo);
+        state.setProperty (ids::beatUnit, unit, &undo);
+        return;
+    }
+    auto changes = grid().meterChanges;
+    changes.erase (std::remove_if (changes.begin(), changes.end(), [bar] (auto& c) { return c.bar == bar; }), changes.end());
+    changes.push_back ({ bar, beats, unit });
+    std::sort (changes.begin(), changes.end(), [] (auto& a, auto& b) { return a.bar < b.bar; });
+    juce::StringArray parts;
+    for (auto& c : changes)
+        parts.add (juce::String (c.bar) + ":" + juce::String (c.beatsPerBar) + "/" + juce::String (c.beatUnit));
+    state.setProperty (ids::meterChanges, parts.joinIntoString (";"), &undo);
+}
+
+void Project::removeMeterChange (int bar)
+{
+    auto changes = grid().meterChanges;
+    const auto before = changes.size();
+    changes.erase (std::remove_if (changes.begin(), changes.end(), [bar] (auto& c) { return c.bar == bar; }), changes.end());
+    if (changes.size() == before)
+        return;
+    juce::StringArray parts;
+    for (auto& c : changes)
+        parts.add (juce::String (c.bar) + ":" + juce::String (c.beatsPerBar) + "/" + juce::String (c.beatUnit));
+    if (parts.isEmpty()) state.removeProperty (ids::meterChanges, &undo);
+    else                 state.setProperty (ids::meterChanges, parts.joinIntoString (";"), &undo);
 }
 
 int Project::nextId()

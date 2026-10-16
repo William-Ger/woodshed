@@ -289,10 +289,43 @@ juce::int64 ArrangeView::snap (double sample, bool enabled) const
     if (! enabled)
         return (juce::int64) std::llround (juce::jmax (0.0, sample));
 
-    const auto grid = project().grid();
-    // Snap to beats; when zoomed far out, to the visible grid, up to a bar.
-    const double step = juce::jlimit (1.0, (double) juce::jmax (1, grid.beatsPerBar), gridStepBeats()) * grid.samplesPerBeat();
-    return (juce::int64) std::llround (juce::jmax (0.0, std::round (sample / step) * step));
+    const auto& grid = project().grid();
+    // Snap to beats; when zoomed far out, to the visible grid, up to a bar. In musical time, so
+    // it follows tempo and meter changes.
+    const double tick = grid.tickAt (juce::jmax (0.0, sample));
+    const auto meter = grid.meterAt (tick);
+    const double unit = juce::jlimit (1.0, (double) meter.beatsPerBar, gridStepBeats()) * meter.ticksPerBeat();
+    const double snapped = meter.tick + std::round ((tick - meter.tick) / unit) * unit;
+    return (juce::int64) std::llround (juce::jmax (0.0, grid.sampleAt (snapped)));
+}
+
+std::vector<ArrangeView::GridLine> ArrangeView::gridLines (double fromSample, double toSample, double stepBeats) const
+{
+    std::vector<GridLine> lines;
+    const auto& grid = project().grid();
+    const int stepBars = stepBeats >= (double) juce::jmax (1, grid.beatsPerBar) ? juce::jmax (1, juce::roundToInt (stepBeats / juce::jmax (1, grid.beatsPerBar))) : 0;
+    const int firstBar = juce::jmax (0, (int) std::floor (grid.barAt (grid.tickAt (juce::jmax (0.0, fromSample)))));
+    const int lastBar = (int) std::ceil (grid.barAt (grid.tickAt (juce::jmax (0.0, toSample)))) + 1;
+
+    for (int bar = firstBar; bar <= lastBar && lines.size() < 20000; ++bar)
+    {
+        const double barTick = grid.barStartTick (bar);
+        if (stepBars > 0)
+        {
+            if (bar % stepBars == 0)
+                lines.push_back ({ grid.sampleAt (barTick), true, true, bar + 1, 1 });
+            continue;
+        }
+        const auto meter = grid.meterAt (barTick);
+        const double subdivisions = std::round ((double) meter.beatsPerBar / stepBeats);
+        for (int k = 0; k < (int) subdivisions; ++k)
+        {
+            const double beat = k * stepBeats;
+            const bool isBeat = std::abs (beat - std::round (beat)) < 1.0e-6;
+            lines.push_back ({ grid.sampleAt (barTick + beat * meter.ticksPerBeat()), k == 0, isBeat, bar + 1, (int) std::floor (beat + 1.0e-6) + 1 });
+        }
+    }
+    return lines;
 }
 
 double ArrangeView::gridStepBeats() const

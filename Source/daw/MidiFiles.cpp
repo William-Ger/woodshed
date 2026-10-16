@@ -25,8 +25,13 @@ bool read (const juce::File& file, Contents& out)
             const auto& m = seq->getEventPointer (i)->message;
             const auto when = (juce::int64) std::llround (m.getTimeStamp() * scale);
 
-            if (m.isTempoMetaEvent() && out.tempo <= 0.0)
-                out.tempo = 60.0 / m.getTempoSecondsPerQuarterNote();
+            if (m.isTempoMetaEvent())
+            {
+                if (out.tempo <= 0.0 && when <= 0)
+                    out.tempo = 60.0 / m.getTempoSecondsPerQuarterNote();
+                else if (when > 0)
+                    out.tempoChanges.push_back ({ (double) when, 60.0 / m.getTempoSecondsPerQuarterNote() });
+            }
             else if (m.isTimeSignatureMetaEvent() && out.beatsPerBar == 0)
                 m.getTimeSignatureInfo (out.beatsPerBar, out.beatUnit);
             else if (m.isTrackNameEvent())
@@ -71,6 +76,10 @@ bool write (const Project& project, const juce::Array<juce::ValueTree>& regions,
     juce::MidiMessageSequence conductor;
     conductor.addEvent (juce::MidiMessage::tempoMetaEvent ((int) std::llround (60000000.0 / grid.tempo)), 0.0);
     conductor.addEvent (juce::MidiMessage::timeSignatureMetaEvent (grid.beatsPerBar, grid.beatUnit), 0.0);
+    for (auto& c : grid.tempoChanges)
+        conductor.addEvent (juce::MidiMessage::tempoMetaEvent ((int) std::llround (60000000.0 / c.bpm)), c.tick);
+    for (auto& c : grid.meterChanges)
+        conductor.addEvent (juce::MidiMessage::timeSignatureMetaEvent (c.beatsPerBar, c.beatUnit), grid.barStartTick (c.bar));
     midi.addTrack (conductor);
 
     int channel = 1;
@@ -80,9 +89,9 @@ bool write (const Project& project, const juce::Array<juce::ValueTree>& regions,
             continue;
         const auto start = (juce::int64) region[ids::start];
         const auto end = start + (juce::int64) region[ids::length];
-        const double originTicks = grid.toTicks ((double) Project::contentOrigin (region));
-        const auto endTicks = grid.toTicks ((double) end);
-        const auto startTicks = grid.toTicks ((double) start);
+        const double originTicks = grid.tickAt ((double) Project::contentOrigin (region));
+        const auto endTicks = grid.tickAt ((double) end);
+        const auto startTicks = grid.tickAt ((double) start);
         const bool drums = region.getParent().getChildWithName (ids::INSTRUMENT)[ids::type].toString().startsWith ("drums");
         const int ch = drums ? 10 : channel;
 
@@ -114,10 +123,13 @@ bool write (const Project& project, const juce::Array<juce::ValueTree>& regions,
 
 juce::ValueTree addPart (Project& project, juce::ValueTree track, const Part& part, juce::int64 at)
 {
-    const auto grid = project.grid();
-    const auto bar = grid.samplesPerBar();
-    const auto lengthSamples = (juce::int64) std::ceil (grid.fromTicks ((double) part.endTicks) / bar) * (juce::int64) std::llround (bar);
-    auto region = project.addMidiRegion (track, at, juce::jmax ((juce::int64) std::llround (bar), lengthSamples), part.name);
+    // Whole bars from `at`, through the tempo map.
+    const auto& grid = project.grid();
+    const double startTick = grid.tickAt ((double) at);
+    const double startBar = grid.barAt (startTick);
+    const int endBar = juce::jmax ((int) std::floor (startBar + 1.0e-9) + 1, (int) std::ceil (grid.barAt (startTick + (double) part.endTicks) - 1.0e-9));
+    const auto end = (juce::int64) std::llround (grid.sampleAt (startTick + (grid.barStartTick (endBar) - grid.barStartTick ((int) std::floor (startBar + 1.0e-9)))));
+    auto region = project.addMidiRegion (track, at, juce::jmax ((juce::int64) 1, end - at), part.name);
     for (auto& n : part.notes)
         project.addNote (region, n);
     return region;

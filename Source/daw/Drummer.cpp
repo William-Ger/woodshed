@@ -751,14 +751,16 @@ void apply (Project& project, juce::ValueTree region, const Settings& s, juce::U
     const auto grid = project.grid();
     const Meter meter { grid.beatsPerBar, grid.beatUnit };
     const auto length = (juce::int64) region[ids::length];
-    const double offsetTicks = grid.toTicks ((double) (juce::int64) region[ids::offset]);
+    const double originTick = grid.tickAt ((double) Project::contentOrigin (region));
+    const double startTick = grid.tickAt ((double) (juce::int64) region[ids::start]);
+    const double endTick = grid.tickAt ((double) ((juce::int64) region[ids::start] + length));
 
     auto generated = s;
-    generated.bars = juce::jmax (1, (int) std::ceil ((offsetTicks + grid.toTicks ((double) length)) / (double) meter.barTicks() - 1.0e-6));
+    generated.bars = juce::jmax (1, (int) std::ceil ((endTick - originTick) / (double) meter.barTicks() - 1.0e-6));
     replaceRegionNotes (region, generate (generated, meter), undo);
 
     auto stored = s;
-    stored.bars = juce::jlimit (1, 64, juce::roundToInt ((double) length / grid.samplesPerBar()));
+    stored.bars = juce::jlimit (1, 64, juce::roundToInt (grid.barAt (endTick) - grid.barAt (startTick)));
     region.setProperty (property, stored.toJson(), undo);
     // The Drummer writes it now, not the step sequencer.
     if (region.hasProperty (StepPattern::property))

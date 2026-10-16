@@ -362,7 +362,8 @@ void StepPattern::applyTo (Project& project, juce::ValueTree region, juce::UndoM
     if (! region.isValid())
         return;
     const auto grid = project.grid();
-    const auto end = (juce::int64) std::llround (grid.toTicks ((double) ((juce::int64) region[ids::offset] + (juce::int64) region[ids::length])));
+    const auto end = (juce::int64) std::llround (grid.tickAt ((double) ((juce::int64) region[ids::start] + (juce::int64) region[ids::length]))
+                                                 - grid.tickAt ((double) Project::contentOrigin (region)));
     replaceRegionNotes (region, toNotes (end), undo);
     region.setProperty (property, toJson(), undo);
 }

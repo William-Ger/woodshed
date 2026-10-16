@@ -45,6 +45,8 @@ private:
     /** The marker whose tag is under `p`, or 0. */
     int markerAt (juce::Point<int>) const;
     void drawMarkers (juce::Graphics&, juce::Rectangle<float> lane) const;
+    /** Right-click: change the tempo or time signature here, or remove a change. */
+    void showTempoMenu (juce::Point<int>);
     void showMarkerMenu (int markerId);
     void startRename (int markerId);
     void finishRename (bool commit);
