@@ -668,10 +668,12 @@ void ControlBar::resized()
     const int w = getWidth(), h = getHeight(), midY = h / 2;
     constexpr int ctl = 28, margin = 12;
 
-    auto place = [midY] (juce::Component& c, int x, int width, int height = ctl)
+    // (No default argument: GCC and MSVC don't allow a local in one.)
+    auto placeSized = [midY] (juce::Component& c, int x, int width, int height)
     {
         c.setBounds (x, midY - height / 2, width, height);
     };
+    auto place = [&placeSized] (juce::Component& c, int x, int width) { placeSized (c, x, width, ctl); };
 
     // Right, from the edge inwards: master level and meter, settings, tuner, the pane switch.
     int right = w - margin - 4;
