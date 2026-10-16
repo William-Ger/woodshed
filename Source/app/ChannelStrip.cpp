@@ -1,4 +1,5 @@
 #include "ChannelStrip.h"
+#include "InstrumentPanel.h"
 #include "Icons.h"
 
 namespace woodshed::app
@@ -512,6 +513,26 @@ void InputSelector::mouseDown (const juce::MouseEvent&)
 }
 
 //==============================================================================
+void SlotButton::paint (juce::Graphics& g)
+{
+    const auto b = getLocalBounds().toFloat();
+    const bool hover = isMouseOver();
+    drawChip (g, b, hover, isMouseButtonDown());
+    const bool on = lit != nullptr && lit();
+    g.setFont (theme::font (11.0f, theme::Weight::medium));
+    g.setColour (on ? theme::accent : hover ? theme::text : theme::text.withAlpha (0.85f));
+    g.drawFittedText (text != nullptr ? text() : juce::String(), b.reduced (6.0f, 0.0f).toNearestInt(),
+                      juce::Justification::centred, 1, 0.75f);
+}
+
+void SlotButton::mouseUp (const juce::MouseEvent& e)
+{
+    repaint();
+    if (onClick != nullptr && getLocalBounds().contains (e.getPosition()))
+        onClick();
+}
+
+//==============================================================================
 void IconButton::paint (juce::Graphics& g)
 {
     const auto b = getLocalBounds().toFloat();
@@ -643,7 +664,7 @@ namespace
         /** Everything above the fader (identical on the master so the faders line up). */
         int controlsHeight() const
         {
-            const int io = tall ? chipH * 2 + 4 : chipH;
+            const int io = tall ? chipH * 3 + 8 : chipH;
             const int buttons = tall ? buttonH * 2 + 4 : buttonH;
             return io + gap + panH + gap + buttons;
         }
@@ -682,9 +703,36 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
             studio.setPane (Studio::Pane::rig);
         };
 
-        for (auto* c : std::initializer_list<juce::Component*> { input.get(), rig.get(), mute.get(), solo.get(), arm.get(),
-                                                                 monitor.get(), openRig.get(), pan.get() })
-            addAndMakeVisible (c);
+        // Instrument tracks show their instrument where audio tracks show their input and rig.
+        instrumentTrack = daw::Project::isInstrumentTrack (tree);
+        instrumentSlot = std::make_unique<mixer::SlotButton>();
+        instrumentSlot->setTooltip ("This track's instrument: click to edit its sound");
+        instrumentSlot->text = [this]
+        {
+            const auto inst = tree.getChildWithName (ids::INSTRUMENT);
+            if (auto* type = InstrumentRegistry::get().find (inst[ids::type].toString()))
+                return type->info.name;
+            return juce::String ("Instrument");
+        };
+        instrumentSlot->onClick = [this] { select(); studio.setPane (Studio::Pane::rig); };
+
+        fxSlot = std::make_unique<mixer::SlotButton>();
+        fxSlot->setTooltip ("Audio FX: effects after the " + juce::String (instrumentTrack ? "instrument" : "rig") + ". Click to edit.");
+        fxSlot->text = [this]
+        {
+            const auto n = daw::Project::inserts (tree).size();
+            return n == 0 ? juce::String ("Audio FX") : juce::String (n) + (n == 1 ? " effect" : " effects");
+        };
+        fxSlot->lit = [this] { return ! daw::Project::inserts (tree).isEmpty(); };
+        fxSlot->onClick = [this] { showInserts(); };
+
+        if (instrumentTrack)
+            for (auto* c : std::initializer_list<juce::Component*> { instrumentSlot.get(), fxSlot.get(), mute.get(), solo.get(), arm.get(), pan.get() })
+                addAndMakeVisible (c);
+        else
+            for (auto* c : std::initializer_list<juce::Component*> { input.get(), rig.get(), mute.get(), solo.get(), arm.get(),
+                                                                     monitor.get(), openRig.get(), pan.get(), fxSlot.get() })
+                addAndMakeVisible (c);
     }
 
     // Any click on the strip selects its track.
@@ -699,6 +747,20 @@ ChannelStrip::~ChannelStrip()
 juce::Colour ChannelStrip::trackColour() const
 {
     return master ? theme::accent : juce::Colour ((juce::uint32) (int) tree.getProperty (ids::colour, (int) 0xff8d857a));
+}
+
+void ChannelStrip::showInserts()
+{
+    select();
+    if (instrumentTrack)
+    {
+        studio.setPane (Studio::Pane::rig);     // the instrument panel has the effects beside it
+        return;
+    }
+    auto editor = std::make_unique<InsertsEditor> (studio);
+    editor->setTrack (tree);
+    editor->setSize (320, 380);
+    juce::CallOutBox::launchAsynchronously (std::move (editor), fxSlot->getScreenBounds(), nullptr);
 }
 
 void ChannelStrip::select()
@@ -845,7 +907,23 @@ void ChannelStrip::resized()
     if (! master)
     {
         auto c = topArea;
-        if (m.tall)
+        if (instrumentTrack)
+        {
+            if (m.tall)
+            {
+                instrumentSlot->setBounds (c.removeFromTop (m.chipH));
+                c.removeFromTop (4);
+                fxSlot->setBounds (c.removeFromTop (m.chipH));
+            }
+            else
+            {
+                auto row = c.removeFromTop (m.chipH);
+                fxSlot->setBounds (row.removeFromRight (row.getWidth() / 3));
+                row.removeFromRight (3);
+                instrumentSlot->setBounds (row);
+            }
+        }
+        else if (m.tall)
         {
             input->setBounds (c.removeFromTop (m.chipH));
             c.removeFromTop (4);
@@ -853,6 +931,8 @@ void ChannelStrip::resized()
             openRig->setBounds (row.removeFromRight (m.chipH + 2));
             row.removeFromRight (4);
             rig->setBounds (row);
+            c.removeFromTop (4);
+            fxSlot->setBounds (c.removeFromTop (m.chipH));
         }
         else
         {
@@ -862,13 +942,24 @@ void ChannelStrip::resized()
             rig->setBounds (row.removeFromRight (m.chipH + 2));
             row.removeFromRight (3);
             input->setBounds (row);
+            fxSlot->setBounds ({});
         }
         c.removeFromTop (m.gap);
         pan->setBounds (c.removeFromTop (m.panH));
         c.removeFromTop (m.gap);
 
         mixer::Toggle* buttons[] { mute.get(), solo.get(), arm.get(), monitor.get() };
-        if (m.tall)
+        if (instrumentTrack)
+        {
+            auto line = c.removeFromTop (m.buttonH);
+            const int w = (line.getWidth() - 6) / 3;
+            for (int i = 0; i < 3; ++i)
+            {
+                buttons[i]->setBounds (i < 2 ? line.removeFromLeft (w) : line);
+                line.removeFromLeft (3);
+            }
+        }
+        else if (m.tall)
         {
             for (int row = 0; row < 2; ++row)
             {

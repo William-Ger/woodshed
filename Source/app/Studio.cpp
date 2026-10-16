@@ -30,7 +30,14 @@ juce::String findInterface (juce::AudioDeviceManager& dm)
 
 Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
 {
-    engineInstance = std::make_unique<daw::Engine> (deviceManager, [] { return std::make_unique<WoodshedProcessor>(); });
+    engineInstance = std::make_unique<daw::Engine> (deviceManager,
+        [] { return std::make_unique<WoodshedProcessor>(); },
+        [] (const juce::String& type) -> std::unique_ptr<Instrument>
+        {
+            if (auto* t = InstrumentRegistry::get().find (type))
+                return t->create();
+            return nullptr;
+        });
     engineInstance->settleRig = [] (juce::AudioProcessor& rig)
     {
         if (auto* w = dynamic_cast<WoodshedProcessor*> (&rig))
@@ -53,6 +60,16 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     if (last.exists())
         p = daw::Project::load (last);
     adopt (p != nullptr ? std::move (p) : daw::Project::createNew (preferredSampleRate));
+
+    // Test launches can open a pane (rig, mixer, editor) and select a track by number.
+    const auto testPane = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_PANE", {});
+    if (testPane == "editor") pane = Pane::editor;
+    else if (testPane == "mixer") pane = Pane::mixer;
+    else if (testPane == "none") pane = Pane::none;
+    automationShown = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_AUTOMATION", {}) == "1";
+    if (const auto n = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_TRACK", {}).getIntValue(); n > 0)
+        if (auto t = currentProject->track (n - 1); t.isValid())
+            currentProject->state.setProperty (daw::ids::selectedTrack, t[daw::ids::id], nullptr);
 
     startTimerHz (10);
 }
@@ -463,6 +480,176 @@ juce::ValueTree Studio::addTrack()
     return t;
 }
 
+juce::ValueTree Studio::addInstrumentTrack (const juce::String& type, int patchIndex)
+{
+    auto* it = InstrumentRegistry::get().find (type);
+    if (it == nullptr)
+        return {};
+
+    auto& p = *currentProject;
+    const auto& info = it->info;
+    const auto* patch = juce::isPositiveAndBelow (patchIndex, (int) info.patches.size()) ? &info.patches[(size_t) patchIndex] : nullptr;
+    const auto selected = getSelectedTrack();
+    const int index = selected.isValid() ? p.state.indexOf (selected) + 1 : -1;
+    const auto name = patch != nullptr ? patch->name : info.name;
+
+    auto t = p.addInstrumentTrack (name, type, patch != nullptr ? patch->name : juce::String(), patchValues (info, patch), index);
+    p.undo.setCurrentTransactionName ("New Instrument Track");
+    selectTrack ((int) t[daw::ids::id]);
+    return t;
+}
+
+void Studio::setInstrument (juce::ValueTree track, const juce::String& type, int patchIndex)
+{
+    auto* it = InstrumentRegistry::get().find (type);
+    if (it == nullptr || ! daw::Project::isInstrumentTrack (track))
+        return;
+
+    auto& p = *currentProject;
+    const auto& info = it->info;
+    const auto* patch = juce::isPositiveAndBelow (patchIndex, (int) info.patches.size()) ? &info.patches[(size_t) patchIndex] : nullptr;
+    auto inst = track.getOrCreateChildWithName (daw::ids::INSTRUMENT, &p.undo);
+
+    // A track still named after its old sound takes the new one's name.
+    const auto oldPatch = inst[daw::ids::patch].toString();
+    const auto* oldType = InstrumentRegistry::get().find (inst[daw::ids::type].toString());
+    const auto trackName = track[daw::ids::name].toString();
+    const bool autoNamed = trackName == oldPatch || (oldType != nullptr && trackName == oldType->info.name);
+
+    p.undo.beginNewTransaction (patch != nullptr ? "Choose " + patch->name : "Choose " + info.name);
+    inst.setProperty (daw::ids::type, type, &p.undo);
+    inst.setProperty (daw::ids::patch, patch != nullptr ? patch->name : juce::String(), &p.undo);
+    inst.setProperty (daw::ids::knobs, daw::Project::encodeValues (patchValues (info, patch)), &p.undo);
+    if (autoNamed)
+        track.setProperty (daw::ids::name, patch != nullptr ? patch->name : info.name, &p.undo);
+}
+
+void Studio::showNewTrackMenu()
+{
+    juce::PopupMenu m;
+    m.addSectionHeader ("New Track");
+    m.addItem ("Audio  (microphone, guitar or line in)", [this] { addTrack(); });
+
+    // Software instruments, by library section; each instrument's sounds in a submenu.
+    juce::PopupMenu instruments;
+    for (auto& category : InstrumentRegistry::categories())
+    {
+        bool header = false;
+        for (auto& t : InstrumentRegistry::get().all())
+        {
+            if (t.info.category != category)
+                continue;
+            if (! header)
+            {
+                instruments.addSectionHeader (category);
+                header = true;
+            }
+            juce::PopupMenu sounds;
+            const auto type = t.info.type;
+            for (int i = 0; i < (int) t.info.patches.size(); ++i)
+                sounds.addItem (t.info.patches[(size_t) i].name, [this, type, i] { addInstrumentTrack (type, i); });
+            if (sounds.getNumItems() > 0)
+                instruments.addSubMenu (t.info.name, sounds);
+            else
+                instruments.addItem (t.info.name, [this, type] { addInstrumentTrack (type); });
+        }
+    }
+    m.addSubMenu ("Software Instrument", instruments, instruments.getNumItems() > 0);
+    m.addItem ("Drums  (a drum kit to program or play)", InstrumentRegistry::get().find ("drums.kit") != nullptr,
+               false, [this] { addInstrumentTrack ("drums.kit"); });
+    m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+}
+
+juce::ValueTree Studio::getEditorRegion() const
+{
+    if (auto r = findRegion (editorRegionId); r.isValid() && daw::Project::isMidiRegion (r))
+        return r;
+
+    for (int id : selectedRegions)
+        if (auto r = findRegion (id); r.isValid() && daw::Project::isMidiRegion (r))
+            return r;
+
+    auto track = getSelectedTrack();
+    if (! daw::Project::isInstrumentTrack (track))
+        return {};
+
+    const auto at = engineInstance->getPosition();
+    juce::ValueTree best;
+    for (auto r : track)
+    {
+        if (! r.hasType (daw::ids::REGION) || ! daw::Project::isMidiRegion (r))
+            continue;
+        const auto start = (juce::int64) r[daw::ids::start];
+        if (start <= at && at < start + (juce::int64) r[daw::ids::length])
+            return r;
+        if (start <= at && (! best.isValid() || start > (juce::int64) best[daw::ids::start]))
+            best = r;
+    }
+    if (best.isValid())
+        return best;
+    for (auto r : track)
+        if (r.hasType (daw::ids::REGION) && daw::Project::isMidiRegion (r))
+            return r;
+    return {};
+}
+
+void Studio::openInEditor (int regionId)
+{
+    editorRegionId = regionId;
+    if (auto r = findRegion (regionId); r.isValid())
+        selectTrack ((int) r.getParent()[daw::ids::id]);
+    pane = Pane::editor;
+    sendChangeMessage();
+}
+
+juce::ValueTree Studio::createMidiRegion (juce::ValueTree track, juce::int64 at)
+{
+    if (! daw::Project::isInstrumentTrack (track))
+        return {};
+    auto& p = *currentProject;
+    const auto bar = p.grid().samplesPerBar();
+    const auto start = (juce::int64) (std::floor ((double) juce::jmax ((juce::int64) 0, at) / bar) * bar);
+    p.undo.beginNewTransaction ("Create MIDI Region");
+    auto r = p.addMidiRegion (track, start, (juce::int64) std::llround (bar), track[daw::ids::name].toString());
+    setSelectedRegions ({ (int) r[daw::ids::id] });
+    return r;
+}
+
+void Studio::quantizeNotes (juce::ValueTree region, const juce::Array<juce::ValueTree>& notes, int gridTicks, float strength)
+{
+    if (! region.isValid() || gridTicks <= 0)
+        return;
+
+    juce::Array<juce::ValueTree> targets (notes);
+    if (targets.isEmpty())
+        for (auto n : region)
+            if (n.hasType (daw::ids::NOTE))
+                targets.add (n);
+
+    // Snap each note's start relative to the bar grid of the song, not of the region.
+    auto& p = *currentProject;
+    const auto grid = p.grid();
+    const double originTicks = grid.toTicks ((double) daw::Project::contentOrigin (region));
+    p.undo.beginNewTransaction ("Quantize");
+    for (auto& n : targets)
+    {
+        auto note = daw::Project::noteFrom (n);
+        const double absolute = originTicks + (double) note.start;
+        const double snapped = std::round (absolute / gridTicks) * gridTicks;
+        note.start = (juce::int64) std::llround ((double) note.start + (snapped - absolute) * strength);
+        p.setNote (n, note);
+    }
+}
+
+void Studio::auditionNote (int pitch, int velocity)
+{
+    if (! daw::Project::isInstrumentTrack (getSelectedTrack()))
+        return;
+    engineInstance->setMidiTarget (getSelectedTrackId());
+    engineInstance->sendLiveMidi (juce::MidiMessage::noteOn (1, pitch, (juce::uint8) juce::jlimit (1, 127, velocity)));
+    auditions.push_back ({ pitch, 3 });
+}
+
 void Studio::deleteSelectedTrack()
 {
     auto t = getSelectedTrack();
@@ -637,6 +824,27 @@ void Studio::timerCallback()
 {
     checkAudioAlive();
     checkFeedbackRisk();
+
+    // Live MIDI plays the selected track when it's an instrument; new keyboards are picked up.
+    {
+        auto selected = getSelectedTrack();
+        engineInstance->setMidiTarget (daw::Project::isInstrumentTrack (selected) ? (int) selected[daw::ids::id] : -1);
+        if (--midiScanTicks <= 0)
+        {
+            midiScanTicks = 20;
+            engineInstance->enableMidiInputs();
+        }
+        for (auto it = auditions.begin(); it != auditions.end();)
+        {
+            if (--it->ticksLeft <= 0)
+            {
+                engineInstance->sendLiveMidi (juce::MidiMessage::noteOff (1, it->pitch));
+                it = auditions.erase (it);
+            }
+            else
+                ++it;
+        }
+    }
 
     if (flashTicks > 0 && --flashTicks == 0)
     {

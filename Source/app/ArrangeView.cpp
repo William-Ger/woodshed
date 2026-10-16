@@ -139,6 +139,13 @@ void ArrangeView::valueTreePropertyChanged (juce::ValueTree& tree, const juce::I
     if (tree.hasType (ids::REGION))
         contentChanged();
     else if (tree.hasType (ids::TRACK))
+    {
+        lanes->repaint();
+        if (property == ids::autoParam)
+            for (auto& h : headers)
+                h->repaint();
+    }
+    else if (tree.hasType (ids::NOTE) || tree.hasType (ids::AUTOMATION))
         lanes->repaint();
 }
 
@@ -529,7 +536,7 @@ void ArrangeView::dragTrackTo (const juce::ValueTree& track, int yInView)
 
 void ArrangeView::addTrackAfterSelection()
 {
-    studio.addTrack();
+    studio.showNewTrackMenu();
 }
 
 void ArrangeView::showTrackMenu (juce::ValueTree track)
@@ -611,7 +618,7 @@ void ArrangeView::showTrackMenu (juce::ValueTree track)
     m.addItem ("New Track", withTrack ([] (ArrangeView& v, juce::ValueTree t)
     {
         v.studio.selectTrack ((int) t[ids::id]);
-        v.studio.addTrack();
+        v.studio.showNewTrackMenu();
     }));
 
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());

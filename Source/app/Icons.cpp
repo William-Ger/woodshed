@@ -240,6 +240,42 @@ Icon speaker()
     return filled (p);
 }
 
+Icon keyboard()
+{
+    juce::Path p;
+    p.addRoundedRectangle (3.0f, 5.0f, 18.0f, 14.0f, 2.0f);
+    for (float x : { 7.5f, 12.0f, 16.5f })
+    {
+        p.startNewSubPath (x, 11.5f);
+        p.lineTo (x, 19.0f);
+    }
+    for (float x : { 6.2f, 10.7f, 15.2f })
+        p.addRectangle (x, 5.0f, 2.6f, 6.5f);
+    return outline (p);
+}
+
+Icon waveform()
+{
+    juce::Path p;
+    const float heights[] { 3.0f, 8.0f, 14.0f, 6.0f, 11.0f, 16.0f, 9.0f, 4.0f };
+    for (int i = 0; i < 8; ++i)
+    {
+        const float x = 4.0f + (float) i * 2.3f;
+        p.startNewSubPath (x, 12.0f - heights[i] * 0.5f);
+        p.lineTo (x, 12.0f + heights[i] * 0.5f);
+    }
+    return outline (p);
+}
+
+Icon pianoRoll()
+{
+    juce::Path p;
+    p.addRoundedRectangle (4.0f, 6.0f, 7.0f, 3.0f, 1.0f);
+    p.addRoundedRectangle (10.0f, 11.0f, 9.0f, 3.0f, 1.0f);
+    p.addRoundedRectangle (6.0f, 16.0f, 6.0f, 3.0f, 1.0f);
+    return filled (p);
+}
+
 void draw (juce::Graphics& g, const Icon& icon, juce::Rectangle<float> area, juce::Colour colour, float strokeWidth)
 {
     const float side = juce::jmin (area.getWidth(), area.getHeight());

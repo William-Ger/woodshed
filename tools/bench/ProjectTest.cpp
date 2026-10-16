@@ -3,6 +3,7 @@
 // the live callback, and every click must land on exactly the sample the timeline says.
 
 #include "../../Source/daw/Engine.h"
+#include "../../Source/instruments/Instrument.h"
 #include <iostream>
 
 using namespace woodshed::daw;
@@ -41,6 +42,25 @@ void writeClicks (const juce::File& file)
     auto writer = wav.createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (rate).withNumChannels (1).withBitsPerSample (24));
     writer->writeFromAudioSampleBuffer (buf, 0, buf.getNumSamples());
 }
+
+/** A test instrument: a click of the note's velocity on every note-on, a negative one on every
+    note-off, and nothing else, so the timing of every event is visible in the output. */
+class ClickInstrument final : public woodshed::Instrument
+{
+public:
+    void reset() override               { ++resets; }
+    void render (float* left, float* right, int, const woodshed::NoteEvent* events, int numEvents) override
+    {
+        for (int i = 0; i < numEvents; ++i)
+        {
+            const auto& e = events[i];
+            if (e.kind == woodshed::NoteEvent::noteOn)       { left[e.offset] += e.value; right[e.offset] += e.value; lastNote = e.note; }
+            else if (e.kind == woodshed::NoteEvent::noteOff) { left[e.offset] -= 0.25f; right[e.offset] -= 0.25f; }
+            else if (e.kind == woodshed::NoteEvent::allNotesOff) ++allOffs;
+        }
+    }
+    int resets = 0, allOffs = 0, lastNote = -1;
+};
 
 struct Render { std::vector<float> left, right; };
 
@@ -431,6 +451,190 @@ int runProjectTest()
         a.setProperty (ids::monitor, false, nullptr);
     }
 
+    std::cout << "instrument tracks and MIDI regions\n";
+    {
+        for (int i = project->numTracks(); --i >= 0;)
+            project->track (i).setProperty (ids::mute, true, nullptr);
+
+        auto keys = project->addInstrumentTrack ("Keys", "test.click", "Default", {});
+        keys.setProperty (ids::mute, false, nullptr);
+        check (Project::isInstrumentTrack (keys) && keys.getChildWithName (ids::INSTRUMENT)[ids::type] == "test.click",
+               "an instrument track remembers its instrument");
+
+        // At 120 bpm a quarter note (960 ticks) is 24000 samples.
+        auto region = project->addMidiRegion (keys, 48000, 96000, "Keys");
+        project->addNote (region, { 64, 127, 960, 480 });       // 72000 .. 84000
+        project->addNote (region, { 60, 127, 0, 480 });         // 48000 .. 60000, sorted first
+        check ((int) region.getChild (0)[ids::pitch] == 60, "notes stay in time order");
+
+        std::map<int, std::shared_ptr<TrackRuntime>> runtimes;
+        auto rt = std::make_shared<TrackRuntime>();
+        rt->id = (int) keys[ids::id];
+        rt->work.setSize (2, 64);
+        rt->gainLeft.reset (rate, 0.0);
+        rt->gainRight.reset (rate, 0.0);
+        rt->events.reserve (256);
+        auto inst = std::make_shared<ClickInstrument>();
+        rt->instrument = inst;
+        runtimes[rt->id] = rt;
+
+        auto render = [&] (juce::int64 length)
+        {
+            auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+            std::vector<float> l ((size_t) length), r ((size_t) length);
+            rt->expectedPosition = -1;
+            for (juce::int64 pos = 0; pos < length; pos += 64)
+            {
+                Mixer::Block b;
+                b.position = pos;
+                b.numSamples = 64;
+                b.playing = true;
+                b.left = l.data() + pos;
+                b.right = r.data() + pos;
+                Mixer::render (*snap, b);
+            }
+            return l;
+        };
+
+        auto l = render (144000);
+        check (clicks (l.data(), (int) l.size()) == std::vector<int> { 48000, 60000, 72000, 84000 },
+               "notes start and stop on their exact samples");
+
+        region.setProperty (ids::offset, 24000, nullptr);       // trim the start: the first note is cut away
+        region.setProperty (ids::start, 72000, nullptr);
+        region.setProperty (ids::length, 24000, nullptr);
+        l = render (144000);
+        check (clicks (l.data(), (int) l.size()) == std::vector<int> { 72000, 84000 }, "a trimmed region hides the notes outside it");
+
+        region.setProperty (ids::length, 6000, nullptr);
+        l = render (144000);
+        check (clicks (l.data(), (int) l.size()) == std::vector<int> { 72000, 78000 }, "a note running past the region end stops at it");
+
+        region.setProperty (ids::offset, 0, nullptr);
+        region.setProperty (ids::start, 48000, nullptr);
+        region.setProperty (ids::length, 96000, nullptr);
+        auto right = project->splitRegion (region, 66000);
+        l = render (144000);
+        check (right.isValid() && Project::isMidiRegion (right) && right.getNumChildren() == 2
+               && clicks (l.data(), (int) l.size()) == std::vector<int> { 48000, 60000, 72000, 84000 },
+               "a split MIDI region plays every note once");
+
+        // A jump mid-song silences held notes.
+        {
+            auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+            std::vector<float> buf (64);
+            rt->expectedPosition = -1;
+            rt->notesSounding = false;
+            const auto before = inst->allOffs;
+            for (juce::int64 pos : { (juce::int64) 47990, (juce::int64) 48054, (juce::int64) 10000 })
+            {
+                Mixer::Block b;
+                b.position = pos;
+                b.numSamples = 64;
+                b.playing = true;
+                b.left = buf.data();
+                b.right = buf.data();
+                Mixer::render (*snap, b);
+            }
+            check (inst->allOffs == before + 1, "jumping away while notes sound sends all-notes-off once");
+        }
+
+        // Inserts: a LIFT boost at +20 dB, then switched off.
+        {
+            auto fx = project->addInsert (keys, "dyn.boost", { 20.0f, 0.0f, 0.0f });
+            rt->inserts.push_back ({ (int) fx[ids::id], "dyn.boost", woodshed::Registry::get().find ("dyn.boost")->create() });
+            rt->inserts.back().pedal->prepare (rate, 64);
+            l = render (60000);
+            // The boost's tone filters smear a one-sample click, so its peak grows less than 10x.
+            check (l[48000] > 2.0f, "an insert processes the instrument (+20 dB: peak " + juce::String (l[48000], 2) + ")");
+            fx.setProperty (ids::on, false, nullptr);
+            l = render (60000);
+            check (std::abs (l[48000] - 1.0f) < 0.01f, "a switched-off insert is bypassed");
+            project->state.getChildWithProperty (ids::id, keys[ids::id]).removeChild (fx, nullptr);
+            rt->inserts.clear();
+        }
+
+        // Automation: volume from -6 dB up to 0 dB, then pan hard left.
+        {
+            check (Project::evaluate ({ { 0, 0.0f }, { 100, 1.0f } }, 25) > 0.24f && Project::evaluate ({ { 0, 0.0f }, { 100, 1.0f } }, 25) < 0.26f
+                   && juce::exactlyEqual (Project::evaluate ({ { 10, 0.5f } }, 0), 0.5f) && juce::exactlyEqual (Project::evaluate ({ { 0, 0.0f }, { 100, 1.0f } }, 500), 1.0f),
+                   "an automation line interpolates and holds its ends");
+            check (Project::decodePoints (Project::encodePoints ({ { 5, 0.25f }, { 900000, -3.5f } })) == std::vector<AutoPoint> { { 5, 0.25f }, { 900000, -3.5f } },
+                   "automation points survive encoding");
+
+            project->setAutomation (keys, "volume", { { 48000, -6.0206f }, { 72000, 0.0f } });
+            auto l2 = render (100000);
+            check (std::abs (l2[48000] - 0.5f) < 0.02f && std::abs (l2[72000] - 1.0f) < 0.02f,
+                   "volume automation sets the level at each note (" + juce::String (l2[48000], 3) + ", " + juce::String (l2[72000], 3) + ")");
+
+            project->setAutomation (keys, "pan", { { 0, -1.0f } });
+            auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+            std::vector<float> L (64), R (64);
+            Mixer::Block b;
+            b.position = 72000 - 10;
+            b.numSamples = 64;
+            b.playing = true;
+            b.left = L.data();
+            b.right = R.data();
+            rt->expectedPosition = -1;
+            Mixer::render (*snap, b);
+            check (L[10] > 0.9f && std::abs (R[10]) < 1.0e-4f, "pan automation moves the track hard left");
+
+            check (Project::automatableParams (keys).size() >= 2, "a track lists its automatable parameters");
+            project->setAutomation (keys, "volume", {});
+            project->setAutomation (keys, "pan", {});
+            check (! Project::automationNode (keys, "volume").isValid(), "an emptied line is removed");
+        }
+
+        check (Project::decodeValues (Project::encodeValues ({ 1.0f, -0.5f, 2000.0f, 0.125f })) == std::vector<float> { 1.0f, -0.5f, 2000.0f, 0.125f },
+               "knob values survive encoding");
+
+        // Live notes through the engine, recorded into a new MIDI region.
+        {
+            juce::AudioDeviceManager devices;
+            auto made = std::make_shared<int> (0);
+            Engine engine (devices, {}, [made] (const juce::String& type) -> std::unique_ptr<woodshed::Instrument>
+                           {
+                               ++*made;
+                               return type == "test.click" ? std::make_unique<ClickInstrument>() : nullptr;
+                           });
+            project->state.setProperty (ids::click, false, nullptr);
+            project->state.setProperty (ids::countIn, false, nullptr);
+            project->state.setProperty (ids::loopOn, false, nullptr);
+            engine.prepare (rate, 64);
+            engine.setProject (project.get());
+            check (*made == 1 && engine.getInstrument ((int) keys[ids::id]) != nullptr, "the engine makes the track's instrument");
+
+            engine.setMidiTarget ((int) keys[ids::id]);
+            keys.setProperty (ids::arm, true, nullptr);
+            engine.setPosition (96000 * 2);
+            engine.record();
+
+            std::vector<float> l2 (64), r2 (64);
+            auto tick = [&] (int blocks) { for (int i = 0; i < blocks; ++i) { float* outs[] { l2.data(), r2.data() };
+                                                                               engine.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, 64, {}); } };
+            tick (10);
+            engine.sendLiveMidi (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100));
+            tick (10);
+            engine.sendLiveMidi (juce::MidiMessage::noteOff (1, 67));
+            tick (10);
+            engine.stop();
+            tick (4);
+            engine.service();
+
+            juce::ValueTree recorded;
+            for (auto r : keys)
+                if (r.hasType (ids::REGION) && (juce::int64) r[ids::start] >= 96000 * 2)
+                    recorded = r;
+            check (recorded.isValid() && Project::isMidiRegion (recorded) && recorded.getNumChildren() == 1
+                   && (int) recorded.getChild (0)[ids::pitch] == 67 && (int) recorded.getChild (0)[ids::velocity] == 100,
+                   "recording a live note makes a MIDI region holding it");
+            check (recorded.isValid() && (juce::int64) recorded[ids::start] == 192000 && (juce::int64) recorded[ids::length] == 96000,
+                   "the recorded region spans whole bars");
+            engine.setProject (nullptr);
+        }
+    }
+
     folder.deleteRecursively();
     std::cout << (failures == 0 ? "all project checks passed\n" : juce::String (failures) + " project checks failed\n");
     return failures == 0 ? 0 : 1;
@@ -487,4 +691,168 @@ int writeDemoProject (const juce::File& folder, const juce::File& di)
     const bool ok = project->save();
     std::cout << (ok ? "wrote " : "couldn't write ") << project->projectFile().getFullPathName() << "\n";
     return ok ? 0 : 1;
+}
+
+/** woodshed-bench demo-midi <folder>: a short song on software instruments, for screenshots and UI work. */
+int writeMidiDemoProject (const juce::File& folder);
+int writeMidiDemoProject (const juce::File& folder)
+{
+    juce::ScopedJuceInitialiser_GUI init;
+    folder.deleteRecursively();
+    auto project = Project::createIn (folder, rate);
+    project->state.setProperty (ids::name, "Instrument Demo", nullptr);
+    project->state.setProperty (ids::tempo, 100.0, nullptr);
+    const auto grid = project->grid();
+    const auto bar = (juce::int64) std::llround (grid.samplesPerBar());
+    constexpr int q = ticksPerQuarter;
+
+    auto addInstrument = [&] (const juce::String& name, const juce::String& type, const juce::String& patchName)
+    {
+        auto* t = woodshed::InstrumentRegistry::get().find (type);
+        const woodshed::InstrumentInfo::Patch* patch = nullptr;
+        if (t != nullptr)
+            for (auto& p : t->info.patches)
+                if (p.name == patchName)
+                    patch = &p;
+        return project->addInstrumentTrack (name, type, patch != nullptr ? patch->name : juce::String(),
+                                            t != nullptr ? woodshed::patchValues (t->info, patch) : std::vector<float>());
+    };
+
+    // C - Am - F - G, twice.
+    const int roots[] { 48, 45, 41, 43 };
+    const std::vector<std::vector<int>> chords { { 60, 64, 67 }, { 57, 60, 64 }, { 53, 57, 60 }, { 55, 59, 62 } };
+
+    auto keys = addInstrument ("Keys", "synth.analog", "Classic Poly");
+    auto keysRegion = project->addMidiRegion (keys, 0, bar * 8, "Chords");
+    for (int b = 0; b < 8; ++b)
+        for (int beat = 0; beat < 4; beat += 2)
+            for (int pitch : chords[(size_t) (b % 4)])
+                project->addNote (keysRegion, { pitch, beat == 0 ? 96 : 76, (juce::int64) (b * 4 + beat) * q, (juce::int64) q * 2 - 40 });
+
+    auto bass = addInstrument ("Bass", "synth.analog", "Sub Bass");
+    auto bassRegion = project->addMidiRegion (bass, 0, bar * 8, "Bass");
+    for (int b = 0; b < 8; ++b)
+        for (int eighth = 0; eighth < 8; ++eighth)
+            project->addNote (bassRegion, { roots[b % 4] - 12 + (eighth == 6 ? 12 : 0), eighth % 2 == 0 ? 110 : 80,
+                                            (juce::int64) (b * 8 + eighth) * q / 2, (juce::int64) q / 2 - 60 });
+
+    auto lead = addInstrument ("Lead", "synth.analog", "Saw Lead");
+    auto leadRegion = project->addMidiRegion (lead, bar * 4, bar * 4, "Melody");
+    const int melody[] { 72, 74, 76, 79, 76, 74, 72, 69, 72, 76, 77, 76, 74, 71, 74, 79 };
+    for (int i = 0; i < 16; ++i)
+        project->addNote (leadRegion, { melody[i], 100, (juce::int64) i * q, (juce::int64) q - 60 });
+    if (auto* reverb = woodshed::Registry::get().find ("reverb.hall"))
+    {
+        std::vector<float> defaults;
+        for (auto& k : reverb->info.knobs)
+            defaults.push_back (k.def);
+        project->addInsert (lead, "reverb.hall", defaults);
+    }
+
+    if (woodshed::InstrumentRegistry::get().find ("drums.kit") != nullptr)
+    {
+        auto drums = addInstrument ("Drums", "drums.kit", {});
+        auto beat = project->addMidiRegion (drums, 0, bar * 8, "Beat");
+        for (int b = 0; b < 8; ++b)
+            for (int s = 0; s < 16; ++s)
+            {
+                const auto at = (juce::int64) (b * 16 + s) * q / 4;
+                if (s == 0 || s == 8 || s == 10) project->addNote (beat, { 36, 115, at, q / 4 });
+                if (s == 4 || s == 12)           project->addNote (beat, { 38, 110, at, q / 4 });
+                if (s % 2 == 0)                  project->addNote (beat, { 42, s % 4 == 0 ? 90 : 65, at, q / 4 });
+            }
+    }
+
+    // Automation: the chords fade in over two bars; the lead's filter opens up.
+    project->setAutomation (keys, "volume", { { 0, -30.0f }, { bar * 2, 0.0f } });
+    int cutoff = 0;
+    if (auto* t = woodshed::InstrumentRegistry::get().find ("synth.analog"))
+        for (size_t k = 0; k < t->info.knobs.size(); ++k)
+            if (t->info.knobs[k].id == "cutoff")
+                cutoff = (int) k;
+    const auto cutoffParam = "inst:" + juce::String (cutoff);
+    project->setAutomation (lead, cutoffParam, { { bar * 4, 800.0f }, { bar * 6, 6000.0f }, { bar * 8, 2000.0f } });
+    lead.setProperty (ids::autoParam, cutoffParam, nullptr);
+    project->setAutomation (bass, "pan", { { 0, -0.5f }, { bar * 4, 0.5f }, { bar * 8, -0.5f } });
+    bass.setProperty (ids::autoParam, "pan", nullptr);
+
+    project->state.setProperty (ids::selectedTrack, keys[ids::id], nullptr);
+    if (! project->save())
+        return 1;
+    std::cout << "wrote " << project->projectFile().getFullPathName() << "\n";
+    return 0;
+}
+
+/** woodshed-bench render-project <folder> <out.wav>: the whole song, offline, through each
+    track's instrument and inserts (audio tracks play dry: the guitar rig is the app's). */
+int renderProject (const juce::File& folder, const juce::File& out);
+int renderProject (const juce::File& folder, const juce::File& out)
+{
+    juce::ScopedJuceInitialiser_GUI init;
+    auto project = Project::load (folder);
+    if (project == nullptr)
+    {
+        std::cerr << "can't open " << folder.getFullPathName() << "\n";
+        return 1;
+    }
+
+    constexpr int block = 512;
+    AudioPool pool;
+    std::map<int, std::shared_ptr<TrackRuntime>> runtimes;
+    for (auto t : project->state)
+    {
+        if (! t.hasType (ids::TRACK)) continue;
+        auto rt = std::make_shared<TrackRuntime>();
+        rt->id = (int) t[ids::id];
+        rt->work.setSize (2, block);
+        rt->gainLeft.reset (rate, 0.03);
+        rt->gainRight.reset (rate, 0.03);
+        rt->events.reserve (4096);
+        if (Project::isInstrumentTrack (t))
+            if (auto* type = woodshed::InstrumentRegistry::get().find (t.getChildWithName (ids::INSTRUMENT)[ids::type].toString()))
+            {
+                rt->instrument = type->create();
+                rt->instrument->prepare (rate, block);
+            }
+        for (auto fx : Project::inserts (t))
+            if (auto* type = woodshed::Registry::get().find (fx[ids::type].toString()))
+            {
+                std::shared_ptr<woodshed::Pedal> pedal = type->create();
+                pedal->prepare (rate, block);
+                rt->inserts.push_back ({ (int) fx[ids::id], fx[ids::type].toString(), pedal });
+            }
+        runtimes[rt->id] = rt;
+    }
+
+    auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+    for (auto& t : snap->tracks)
+    {
+        t.runtime->gainLeft.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
+        t.runtime->gainRight.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
+    }
+
+    const auto length = project->contentEnd() + (juce::int64) (rate * 3.0);
+    juce::AudioBuffer<float> buf (2, (int) length);
+    buf.clear();
+    for (juce::int64 pos = 0; pos < length; pos += block)
+    {
+        Mixer::Block b;
+        b.position = pos;
+        b.numSamples = (int) juce::jmin ((juce::int64) block, length - pos);
+        b.playing = true;
+        b.left = buf.getWritePointer (0, (int) pos);
+        b.right = buf.getWritePointer (1, (int) pos);
+        Mixer::render (*snap, b);
+    }
+    buf.applyGain (snap->masterGain);
+
+    out.deleteFile();
+    std::unique_ptr<juce::OutputStream> stream (out.createOutputStream());
+    juce::WavAudioFormat wav;
+    auto writer = wav.createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (rate).withNumChannels (2).withBitsPerSample (24));
+    if (writer == nullptr || ! writer->writeFromAudioSampleBuffer (buf, 0, buf.getNumSamples()))
+        return 1;
+    std::cout << "wrote " << out.getFullPathName() << "  peak " << juce::Decibels::gainToDecibels (buf.getMagnitude (0, buf.getNumSamples()))
+              << " dBFS, rms " << juce::Decibels::gainToDecibels (buf.getRMSLevel (0, 0, buf.getNumSamples())) << " dBFS\n";
+    return 0;
 }

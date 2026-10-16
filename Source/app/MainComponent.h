@@ -4,6 +4,9 @@
 #include "ControlBar.h"
 #include "MixerView.h"
 #include "RigPanel.h"
+#include "InstrumentPanel.h"
+#include "PianoRoll.h"
+#include "MusicalTyping.h"
 
 namespace woodshed::app
 {
@@ -40,6 +43,14 @@ private:
     ArrangeView arrange;
     MixerView mixer;
     RigPanel rig;
+    InstrumentPanel instrument;
+    PianoRoll pianoRoll;
+    MusicalTyping typing;
+
+    /** The component for the current pane: the rig, or an instrument track's sound in its place. */
+    juce::Component* paneComponent();
+    void showPaneComponents();
+    bool shownInstrument = false;
     juce::TooltipWindow tooltips { this, 600 };
 
     juce::StretchableLayoutManager layout;

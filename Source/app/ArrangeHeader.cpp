@@ -99,6 +99,8 @@ TrackHeader::TrackHeader (ArrangeView& v, juce::ValueTree t)
     monitor.setTooltip ("Hear the input through the rig");
     for (auto* c : { &mute, &solo, &arm, &monitor })
         addAndMakeVisible (*c);
+    // An instrument has no input to monitor: what you play always sounds.
+    monitor.setVisible (! daw::Project::isInstrumentTrack (track));
 
     name.setText (track[ids::name].toString(), juce::dontSendNotification);
     name.setFont (theme::font (13.0f, theme::Weight::medium));
@@ -195,6 +197,28 @@ void TrackHeader::paint (juce::Graphics& g)
     g.drawText (juce::String (index + 1), juce::Rectangle<int> (8, name.getY(), 18, name.getHeight()),
                 juce::Justification::centred);
 
+    // Automation view: which parameter the lane shows (click to choose).
+    if (view.studio.isShowingAutomation())
+    {
+        const auto chip = automationChip().toFloat();
+        theme::drawRaised (g, chip, theme::radiusChip, theme::control);
+        juce::String name = "Volume";
+        for (auto& p : daw::Project::automatableParams (track))
+            if (p.id == Studio::shownAutomationParam (track))
+                name = p.name;
+        g.setColour (theme::text);
+        g.setFont (theme::font (10.5f, theme::Weight::medium));
+        g.drawFittedText (name, chip.reduced (5.0f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+    }
+    else
+    // What kind of track: piano keys for an instrument, a waveform for audio.
+    {
+        const bool instrument = daw::Project::isInstrumentTrack (track);
+        const auto box = juce::Rectangle<float> ((float) getWidth() - 32.0f, (float) mute.getY(), 20.0f, 20.0f);
+        icons::draw (g, instrument ? icons::keyboard() : icons::waveform(), box.reduced (1.0f),
+                     selected ? theme::dimText : theme::faintText, 1.4f);
+    }
+
     g.setColour (theme::separator);
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 }
@@ -212,8 +236,35 @@ void TrackHeader::resized()
     }
 }
 
+juce::Rectangle<int> TrackHeader::automationChip() const
+{
+    const int left = arm.getRight() + (monitor.isVisible() ? 28 : 6);
+    return { left, mute.getY(), juce::jmax (20, getWidth() - 8 - left), mute.getHeight() };
+}
+
+void TrackHeader::showAutomationMenu()
+{
+    juce::PopupMenu m;
+    const auto current = Studio::shownAutomationParam (track);
+    for (auto& p : daw::Project::automatableParams (track))
+    {
+        const bool hasLine = ! daw::Project::getAutomation (track, p.id).empty();
+        juce::PopupMenu::Item item (p.name + (hasLine ? juce::String (juce::CharPointer_UTF8 ("  \xe2\x80\xa2")) : juce::String()));
+        item.isTicked = p.id == current;
+        item.action = [t = track, id = p.id]() mutable { t.setProperty (ids::autoParam, id, nullptr); };
+        m.addItem (std::move (item));
+    }
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (automationChip())));
+}
+
 void TrackHeader::mouseDown (const juce::MouseEvent& e)
 {
+    if (view.studio.isShowingAutomation() && automationChip().contains (e.getPosition()))
+    {
+        view.studio.selectTrack ((int) track[ids::id]);
+        showAutomationMenu();
+        return;
+    }
     dragging = false;
     view.studio.selectTrack ((int) track[ids::id]);
 

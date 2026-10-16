@@ -19,7 +19,8 @@ namespace cmd
         createMarker, nextMarker, previousMarker,
         newTrack, deleteTrack, duplicateTrack,
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
-        showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner
+        showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
+        newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation
     };
 }
 
@@ -82,6 +83,26 @@ public:
 
     // Edits that several views trigger.
     juce::ValueTree addTrack();
+    /** A software instrument track after the selected one, playing `type` with its patch `patchIndex`. */
+    juce::ValueTree addInstrumentTrack (const juce::String& type, int patchIndex = 0);
+    /** Logic's New Track choice: Audio, Software Instrument (by category) or Drums, at the mouse. */
+    void showNewTrackMenu();
+    /** Switches an instrument track to another instrument or patch (one undo step). */
+    void setInstrument (juce::ValueTree track, const juce::String& type, int patchIndex);
+
+    // The MIDI region the piano roll edits: the one opened explicitly, else the first selected
+    // MIDI region, else the selected track's region under (or nearest before) the playhead.
+    juce::ValueTree getEditorRegion() const;
+    void openInEditor (int regionId);
+    /** A new empty MIDI region of one bar on an instrument track at `at` (snapped to the bar). */
+    juce::ValueTree createMidiRegion (juce::ValueTree track, juce::int64 at);
+    /** Snaps the notes (the selected ones, or all) of the editor's region to `gridTicks`. */
+    void quantizeNotes (juce::ValueTree region, const juce::Array<juce::ValueTree>& notes, int gridTicks, float strength = 1.0f);
+    int getQuantizeTicks() const                            { return quantizeTicks; }
+    void setQuantizeTicks (int t)                           { quantizeTicks = t; sendChangeMessage(); }
+
+    /** Plays a short note on the MIDI target (auditioning from the piano roll). */
+    void auditionNote (int pitch, int velocity = 100);
     void deleteSelectedTrack();
     void duplicateSelectedTrack();
     void deleteSelectedRegions();
@@ -99,8 +120,17 @@ public:
     void toggleMuteSelectedRegions();
     void toggleSelectedTrack (const juce::Identifier& property);
 
+    /** Logic's automation view (A): every track shows the line of its chosen parameter. */
+    bool isShowingAutomation() const                        { return automationShown; }
+    void setShowingAutomation (bool on)                     { automationShown = on; sendChangeMessage(); }
+    /** The parameter a track shows in automation view (volume unless chosen otherwise). */
+    static juce::String shownAutomationParam (const juce::ValueTree& track)
+    {
+        return track.getProperty (daw::ids::autoParam, "volume").toString();
+    }
+
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer };
+    enum class Pane { none, rig, mixer, editor };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
 
@@ -140,6 +170,12 @@ private:
     juce::Array<int> selectedRegions;
     juce::ValueTree clipboard;
     Pane pane = Pane::rig;
+    int editorRegionId = -1;
+    bool automationShown = false;
+    int quantizeTicks = daw::ticksPerQuarter / 4;
+    int midiScanTicks = 0;
+    struct Audition { int pitch; int ticksLeft; };
+    std::vector<Audition> auditions;
     bool dirty = false;
     juce::String flashText;
     int flashTicks = 0, autosaveTicks = 0;

@@ -57,6 +57,9 @@ private:
     };
 
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
+    juce::Rectangle<int> automationChip() const;
+    void showAutomationMenu();
+
     /** Name weight and colour follow selection and mute. */
     void updateNameStyle (bool selected);
 

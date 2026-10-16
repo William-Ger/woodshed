@@ -1,4 +1,6 @@
 #include "Project.h"
+#include "../instruments/Instrument.h"
+#include "../engine/Registry.h"
 
 namespace woodshed::daw
 {
@@ -182,6 +184,65 @@ juce::ValueTree Project::addTrack (const juce::String& name, int insertIndex)
     return t;
 }
 
+juce::ValueTree Project::addInstrumentTrack (const juce::String& name, const juce::String& instrumentType,
+                                             const juce::String& patchName, const std::vector<float>& knobs, int insertIndex)
+{
+    undo.beginNewTransaction();
+    auto t = addTrack (name, insertIndex);
+    t.setProperty (ids::kind, kinds::instrument, &undo);
+    t.setProperty (ids::rigOn, false, &undo);
+    juce::ValueTree inst (ids::INSTRUMENT);
+    inst.setProperty (ids::type, instrumentType, nullptr);
+    inst.setProperty (ids::patch, patchName, nullptr);
+    inst.setProperty (ids::knobs, encodeValues (knobs), nullptr);
+    t.addChild (inst, -1, &undo);
+    return t;
+}
+
+juce::ValueTree Project::addInsert (juce::ValueTree track, const juce::String& pedalType, const std::vector<float>& knobs, int index)
+{
+    juce::ValueTree fx (ids::FX);
+    fx.setProperty (ids::id, nextId(), nullptr);
+    fx.setProperty (ids::type, pedalType, nullptr);
+    fx.setProperty (ids::on, true, nullptr);
+    fx.setProperty (ids::knobs, encodeValues (knobs), nullptr);
+
+    // `index` counts inserts; place it among the track's children accordingly.
+    const auto existing = inserts (track);
+    const int at = juce::isPositiveAndBelow (index, existing.size()) ? track.indexOf (existing[index]) : -1;
+    track.addChild (fx, at, &undo);
+    return fx;
+}
+
+juce::Array<juce::ValueTree> Project::inserts (const juce::ValueTree& track)
+{
+    juce::Array<juce::ValueTree> list;
+    for (auto c : track)
+        if (c.hasType (ids::FX))
+            list.add (c);
+    return list;
+}
+
+juce::String Project::encodeValues (const std::vector<float>& values)
+{
+    juce::StringArray parts;
+    for (auto v : values)
+        parts.add (juce::String (v, 6).trimCharactersAtEnd ("0").trimCharactersAtEnd ("."));
+    for (auto& p : parts)
+        if (p.isEmpty() || p == "-")
+            p = "0";
+    return parts.joinIntoString (",");
+}
+
+std::vector<float> Project::decodeValues (const juce::String& text)
+{
+    std::vector<float> values;
+    for (auto& part : juce::StringArray::fromTokens (text, ",", {}))
+        if (part.trim().isNotEmpty())
+            values.push_back (part.getFloatValue());
+    return values;
+}
+
 void Project::removeTrack (const juce::ValueTree& track)
 {
     state.removeChild (track, &undo);
@@ -231,6 +292,166 @@ juce::ValueTree Project::regionById (int id) const
     return {};
 }
 
+juce::ValueTree Project::automationNode (const juce::ValueTree& track, const juce::String& param)
+{
+    for (auto c : track)
+        if (c.hasType (ids::AUTOMATION) && c[ids::param].toString() == param)
+            return c;
+    return {};
+}
+
+std::vector<AutoPoint> Project::getAutomation (const juce::ValueTree& track, const juce::String& param)
+{
+    return decodePoints (automationNode (track, param)[ids::points].toString());
+}
+
+void Project::setAutomation (juce::ValueTree track, const juce::String& param, std::vector<AutoPoint> points)
+{
+    std::stable_sort (points.begin(), points.end(), [] (auto& a, auto& b) { return a.time < b.time; });
+    auto node = automationNode (track, param);
+    if (points.empty())
+    {
+        if (node.isValid())
+            track.removeChild (node, &undo);
+        return;
+    }
+    if (! node.isValid())
+    {
+        node = juce::ValueTree (ids::AUTOMATION);
+        node.setProperty (ids::param, param, nullptr);
+        node.setProperty (ids::points, encodePoints (points), nullptr);
+        track.addChild (node, -1, &undo);
+        return;
+    }
+    node.setProperty (ids::points, encodePoints (points), &undo);
+}
+
+float Project::evaluate (const std::vector<AutoPoint>& points, juce::int64 time)
+{
+    jassert (! points.empty());
+    if (time <= points.front().time) return points.front().value;
+    if (time >= points.back().time)  return points.back().value;
+    auto next = std::upper_bound (points.begin(), points.end(), time, [] (juce::int64 t, const AutoPoint& p) { return t < p.time; });
+    auto prev = next - 1;
+    const auto span = (double) (next->time - prev->time);
+    const float x = span > 0.0 ? (float) ((double) (time - prev->time) / span) : 1.0f;
+    return prev->value + (next->value - prev->value) * x;
+}
+
+juce::String Project::encodePoints (const std::vector<AutoPoint>& points)
+{
+    juce::StringArray parts;
+    for (auto& p : points)
+        parts.add (juce::String (p.time) + ":" + juce::String (p.value, 5));
+    return parts.joinIntoString (";");
+}
+
+std::vector<AutoPoint> Project::decodePoints (const juce::String& text)
+{
+    std::vector<AutoPoint> points;
+    for (auto& part : juce::StringArray::fromTokens (text, ";", {}))
+        if (part.containsChar (':'))
+            points.push_back ({ part.upToFirstOccurrenceOf (":", false, false).getLargeIntValue(),
+                                part.fromFirstOccurrenceOf (":", false, false).getFloatValue() });
+    std::stable_sort (points.begin(), points.end(), [] (auto& a, auto& b) { return a.time < b.time; });
+    return points;
+}
+
+std::vector<Project::AutoParam> Project::automatableParams (const juce::ValueTree& track)
+{
+    std::vector<AutoParam> list;
+    list.push_back ({ "volume", "Volume", -60.0f, 6.0f, (float) (double) track.getProperty (ids::volume, 0.0), "dB" });
+    list.push_back ({ "pan", "Pan", -1.0f, 1.0f, (float) (double) track.getProperty (ids::pan, 0.0), {} });
+
+    if (isInstrumentTrack (track))
+    {
+        const auto inst = track.getChildWithName (ids::INSTRUMENT);
+        if (auto* type = woodshed::InstrumentRegistry::get().find (inst[ids::type].toString()))
+        {
+            const auto values = decodeValues (inst[ids::knobs].toString());
+            for (size_t k = 0; k < type->info.knobs.size(); ++k)
+            {
+                const auto& spec = type->info.knobs[k];
+                list.push_back ({ "inst:" + juce::String ((int) k), type->info.name + " " + spec.label, spec.min, spec.max,
+                                  k < values.size() ? values[k] : spec.def, spec.unit, spec.skew });
+            }
+        }
+    }
+
+    for (auto fx : inserts (track))
+        if (auto* type = woodshed::Registry::get().find (fx[ids::type].toString()))
+        {
+            const auto values = decodeValues (fx[ids::knobs].toString());
+            for (size_t k = 0; k < type->info.knobs.size(); ++k)
+            {
+                const auto& spec = type->info.knobs[k];
+                list.push_back ({ "fx:" + fx[ids::id].toString() + ":" + juce::String ((int) k), type->info.name + " " + spec.label,
+                                  spec.min, spec.max, k < values.size() ? values[k] : spec.def, spec.unit, spec.skew });
+            }
+        }
+    return list;
+}
+
+juce::ValueTree Project::addMidiRegion (juce::ValueTree track, juce::int64 start, juce::int64 length, const juce::String& name)
+{
+    juce::ValueTree r (ids::REGION);
+    r.setProperty (ids::id, nextId(), nullptr);
+    r.setProperty (ids::name, name, nullptr);
+    r.setProperty (ids::kind, kinds::midi, nullptr);
+    r.setProperty (ids::start, start, nullptr);
+    r.setProperty (ids::offset, 0, nullptr);
+    r.setProperty (ids::length, juce::jmax ((juce::int64) 1, length), nullptr);
+    r.setProperty (ids::gain, 0.0, nullptr);
+    track.addChild (r, -1, &undo);
+    return r;
+}
+
+juce::ValueTree Project::addNote (juce::ValueTree region, const Note& n)
+{
+    juce::ValueTree note (ids::NOTE);
+    note.setProperty (ids::pitch, juce::jlimit (0, 127, n.pitch), nullptr);
+    note.setProperty (ids::velocity, juce::jlimit (1, 127, n.velocity), nullptr);
+    note.setProperty (ids::start, n.start, nullptr);
+    note.setProperty (ids::length, juce::jmax ((juce::int64) 1, n.length), nullptr);
+
+    // Keep notes in time order so playback and drawing can walk them in one pass.
+    int at = region.getNumChildren();
+    while (at > 0 && (juce::int64) region.getChild (at - 1)[ids::start] > n.start)
+        --at;
+    region.addChild (note, at, &undo);
+    return note;
+}
+
+Note Project::noteFrom (const juce::ValueTree& v)
+{
+    return { (int) v[ids::pitch], (int) v.getProperty (ids::velocity, 100),
+             (juce::int64) v[ids::start], (juce::int64) v.getProperty (ids::length, ticksPerQuarter) };
+}
+
+void Project::setNote (juce::ValueTree note, const Note& n)
+{
+    note.setProperty (ids::pitch, juce::jlimit (0, 127, n.pitch), &undo);
+    note.setProperty (ids::velocity, juce::jlimit (1, 127, n.velocity), &undo);
+    note.setProperty (ids::length, juce::jmax ((juce::int64) 1, n.length), &undo);
+
+    if ((juce::int64) note[ids::start] != n.start)
+    {
+        note.setProperty (ids::start, n.start, &undo);
+
+        // Move it back into time order.
+        auto region = note.getParent();
+        if (region.isValid())
+        {
+            const int from = region.indexOf (note);
+            int to = from;
+            while (to > 0 && (juce::int64) region.getChild (to - 1)[ids::start] > n.start) --to;
+            while (to < region.getNumChildren() - 1 && (juce::int64) region.getChild (to + 1)[ids::start] < n.start) ++to;
+            if (to != from)
+                region.moveChild (from, to, &undo);
+        }
+    }
+}
+
 juce::ValueTree Project::copyRegions (const juce::Array<int>& regionIds) const
 {
     juce::ValueTree clip (ids::CLIPBOARD);
@@ -272,7 +493,7 @@ juce::Array<int> Project::pasteRegions (const juce::ValueTree& clipboard, juce::
     for (auto c : clipboard)
     {
         auto r = c.createCopy();
-        if (foreign)
+        if (foreign && r.hasProperty (ids::file))
         {
             const auto relative = r[ids::file].toString();
             auto it = imported.find (relative);
