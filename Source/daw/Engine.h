@@ -28,6 +28,16 @@ private:
     std::map<juce::String, Audio> cache;
 };
 
+/** How to bounce: the file format ("wav", "aiff" or "flac"), bits (16, 24, or 32 for float),
+    normalizing the peak to -0.1 dBFS, and stems (a file per track instead of the mix). */
+struct BounceOptions
+{
+    juce::String format { "wav" };
+    int bits = 24;
+    bool normalize = false;
+    bool stems = false;
+};
+
 /** Makes the guitar rig that sits on every audio track (the pedalboard, amp and cab). */
 using RigFactory = std::function<std::unique_ptr<juce::AudioProcessor>()>;
 /** Makes a software instrument by type id (InstrumentRegistry), or null if unknown. */
@@ -290,8 +300,10 @@ public:
     juce::uint64 getCallbackCount() const                   { return callbackCount.load(); }
 
     // Bounce: renders [start, end) plus a tail with fresh copies of every rig, on a background
-    // thread. `done` is called on the message thread.
-    void startBounce (const juce::File& wav, juce::int64 start, juce::int64 end, std::function<void (bool ok)> done);
+    // thread. `done` is called on the message thread. `target` is the file, or for stems the
+    // folder that gets a file per track.
+    void startBounce (const juce::File& target, juce::int64 start, juce::int64 end, const BounceOptions&,
+                      std::function<void (bool ok)> done);
     bool isBouncing() const                                 { return bounceThread != nullptr; }
     float getBounceProgress() const                         { return bounceProgress.load(); }
 
@@ -342,6 +354,8 @@ private:
     void prepareRig (TrackRuntime&);
     /** Brings a runtime's instrument and inserts in line with its track (message thread). */
     void syncTrackDevices (TrackRuntime&, const juce::ValueTree& track, double rate, int block);
+    /** A snapshot of the song with private rigs and plug-ins for a bounce: everything, or one track. */
+    std::unique_ptr<Snapshot> makeBounceSnapshot (int onlyTrackId, bool withMasterEffects);
     void drainRecordedMidi();
     void finishMidiTake (int trackId, juce::int64 stopAt);
     void publish();

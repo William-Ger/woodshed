@@ -1556,21 +1556,69 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
 //==============================================================================
 namespace
 {
+std::unique_ptr<juce::AudioFormatWriter> makeWriter (const juce::File& file, const BounceOptions& options, double rate)
+{
+    std::unique_ptr<juce::AudioFormat> format;
+    if (options.format == "aiff")       format = std::make_unique<juce::AiffAudioFormat>();
+    else if (options.format == "flac")  format = std::make_unique<juce::FlacAudioFormat>();
+    else                                format = std::make_unique<juce::WavAudioFormat>();
+
+    int bits = options.bits;
+    if (options.format == "flac")
+        bits = juce::jmin (bits, 24);
+
+    file.deleteFile();
+    std::unique_ptr<juce::OutputStream> stream (file.createOutputStream());
+    if (stream == nullptr)
+        return nullptr;
+    return format->createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (rate).withNumChannels (2)
+                                                                             .withBitsPerSample (bits)
+                                                                             .withSampleFormat (bits == 32 ? juce::AudioFormatWriterOptions::SampleFormat::floatingPoint
+                                                                                                           : juce::AudioFormatWriterOptions::SampleFormat::integral));
+}
+
+/** Renders each job's snapshot to its file in turn, on a background thread. */
 class BounceThread final : public juce::Thread
 {
 public:
-    BounceThread (std::unique_ptr<Snapshot> s, std::unique_ptr<juce::AudioFormatWriter> w,
-                  juce::int64 from, juce::int64 to, std::atomic<float>& p, std::function<void (bool)> finished)
-        : juce::Thread ("Woodshed bounce"), snap (std::move (s)), writer (std::move (w)),
-          start (from), end (to), progress (p), onFinished (std::move (finished)) {}
+    struct Job { std::unique_ptr<Snapshot> snap; juce::File file; };
+
+    BounceThread (std::vector<Job> j, BounceOptions o, juce::int64 from, juce::int64 to, double rate,
+                  std::atomic<float>& p, std::function<void (bool)> finished)
+        : juce::Thread ("Woodshed bounce"), jobs (std::move (j)), options (std::move (o)),
+          start (from), end (to), sampleRate (rate), progress (p), onFinished (std::move (finished)) {}
 
     void run() override
     {
-        juce::AudioBuffer<float> out (2, bounceBlock);
-        const auto tail = (juce::int64) (snap->grid.sampleRate * bounceTailSeconds);
-        const auto total = juce::jmax ((juce::int64) 1, end + tail - start);
         bool ok = true;
+        for (size_t i = 0; i < jobs.size() && ok && ! threadShouldExit(); ++i)
+            ok = render (jobs[i], (float) i / (float) jobs.size(), 1.0f / (float) jobs.size());
 
+        progress = 1.0f;
+        ok = ok && ! threadShouldExit();
+        auto done = onFinished;
+        juce::MessageManager::callAsync ([done, ok] { done (ok); });
+    }
+
+    std::vector<Job> jobs;     // own the bounce's private rigs and plug-ins through their runtimes
+
+private:
+    bool render (Job& job, float progressFrom, float progressSpan)
+    {
+        const auto tail = (juce::int64) (sampleRate * bounceTailSeconds);
+        const auto total = juce::jmax ((juce::int64) 1, end + tail - start);
+        juce::AudioBuffer<float> out (2, bounceBlock);
+
+        // Normalising needs the whole thing first; otherwise it streams to the file.
+        juce::AudioBuffer<float> whole;
+        if (options.normalize)
+            whole.setSize (2, (int) juce::jmin (total, (juce::int64) std::numeric_limits<int>::max() / 2));
+
+        auto writer = makeWriter (job.file, options, sampleRate);
+        if (writer == nullptr)
+            return false;
+
+        bool ok = true;
         for (auto pos = start; pos < end + tail && ! threadShouldExit(); pos += bounceBlock)
         {
             const int n = (int) juce::jmin ((juce::int64) bounceBlock, end + tail - pos);
@@ -1580,40 +1628,41 @@ public:
             b.playing = true;
             b.left = out.getWritePointer (0);
             b.right = out.getWritePointer (1);
-            Mixer::render (*snap, b);
-            out.applyGain (0, n, snap->masterGain);
-            ok = ok && writer->writeFromAudioSampleBuffer (out, 0, n);
-            progress = (float) (pos - start) / (float) total;
+            Mixer::render (*job.snap, b);
+            out.applyGain (0, n, job.snap->masterGain);
+            if (options.normalize)
+            {
+                const auto at = (int) (pos - start);
+                if (at + n <= whole.getNumSamples())
+                    for (int ch = 0; ch < 2; ++ch)
+                        whole.copyFrom (ch, at, out, ch, 0, n);
+            }
+            else
+                ok = ok && writer->writeFromAudioSampleBuffer (out, 0, n);
+            progress = progressFrom + progressSpan * (float) (pos - start) / (float) total;
         }
 
-        writer.reset();
-        progress = 1.0f;
-        ok = ok && ! threadShouldExit();
-        auto done = onFinished;
-        juce::MessageManager::callAsync ([done, ok] { done (ok); });
+        if (options.normalize && ! threadShouldExit())
+        {
+            const auto peak = whole.getMagnitude (0, whole.getNumSamples());
+            if (peak > 0.0f)
+                whole.applyGain (juce::Decibels::decibelsToGain (-0.1f) / peak);
+            ok = writer->writeFromAudioSampleBuffer (whole, 0, whole.getNumSamples());
+        }
+        return ok;
     }
 
-    std::unique_ptr<Snapshot> snap;    // owns the bounce's private rigs through its runtimes
-
-private:
-    std::unique_ptr<juce::AudioFormatWriter> writer;
+    BounceOptions options;
     juce::int64 start, end;
+    double sampleRate;
     std::atomic<float>& progress;
     std::function<void (bool)> onFinished;
 };
 }
 
-void Engine::startBounce (const juce::File& wav, juce::int64 start, juce::int64 end, std::function<void (bool)> done)
+std::unique_ptr<Snapshot> Engine::makeBounceSnapshot (int onlyTrackId, bool withMasterEffects)
 {
-    if (project == nullptr || bounceThread != nullptr || end <= start)
-    {
-        if (done) done (false);
-        return;
-    }
-
-    syncRigStates();
-
-    // Private copies of every rig, so the bounce doesn't fight the live tracks for them.
+    // Private copies of every rig and plug-in, so the bounce doesn't fight the live tracks for them.
     std::map<int, std::shared_ptr<TrackRuntime>> fresh;
     for (auto t : project->state)
     {
@@ -1650,31 +1699,51 @@ void Engine::startBounce (const juce::File& wav, juce::int64 start, juce::int64 
     }
 
     TrackRuntime freshMaster;
-    syncTrackDevices (freshMaster, project->state.getChildWithName (ids::MASTER), sampleRate, bounceBlock);
-    auto snap = buildSnapshot (*project, pool, fresh, &freshMaster);
+    if (withMasterEffects)
+        syncTrackDevices (freshMaster, project->state.getChildWithName (ids::MASTER), sampleRate, bounceBlock);
+    auto snap = buildSnapshot (*project, pool, fresh, withMasterEffects ? &freshMaster : nullptr);
     for (auto& t : snap->tracks)
     {
         t.armed = t.monitor = false;      // a bounce plays the song, never the live input
+        if (onlyTrackId >= 0 && t.runtime->id != onlyTrackId)
+            t.audible = false;            // a stem: just this track (its sends go nowhere)
         t.runtime->gainLeft.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
         t.runtime->gainRight.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
     }
+    return snap;
+}
 
-    wav.deleteFile();
-    std::unique_ptr<juce::OutputStream> stream (wav.createOutputStream());
-    juce::WavAudioFormat format;
-    const auto options = juce::AudioFormatWriterOptions{}.withSampleRate (sampleRate).withNumChannels (2).withBitsPerSample (24);
-    std::unique_ptr<juce::AudioFormatWriter> writer;
-    if (stream != nullptr)
-        writer = format.createWriterFor (stream, options);
-
-    if (writer == nullptr)
+void Engine::startBounce (const juce::File& target, juce::int64 start, juce::int64 end, const BounceOptions& options,
+                          std::function<void (bool)> done)
+{
+    if (project == nullptr || bounceThread != nullptr || end <= start)
     {
         if (done) done (false);
         return;
     }
 
+    syncRigStates();
+    const auto extension = options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
+
+    std::vector<BounceThread::Job> jobs;
+    if (options.stems)
+    {
+        // One file per track (and aux), named after it, in the target folder.
+        target.createDirectory();
+        for (auto t : project->state)
+        {
+            if (! t.hasType (ids::TRACK))
+                continue;
+            const auto index = project->state.indexOf (t) + 1;
+            auto name = juce::String (index).paddedLeft ('0', 2) + " " + juce::File::createLegalFileName (t[ids::name].toString());
+            jobs.push_back ({ makeBounceSnapshot ((int) t[ids::id], false), target.getChildFile (name + extension) });
+        }
+    }
+    else
+        jobs.push_back ({ makeBounceSnapshot (-1, true), target.withFileExtension (extension) });
+
     bounceProgress = 0.0f;
-    bounceThread = std::make_unique<BounceThread> (std::move (snap), std::move (writer), start, end, bounceProgress,
+    bounceThread = std::make_unique<BounceThread> (std::move (jobs), options, start, end, sampleRate, bounceProgress,
                                                    [this, done] (bool ok)
                                                    {
                                                        if (bounceThread != nullptr)

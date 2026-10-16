@@ -454,6 +454,60 @@ int runProjectTest()
         engine.setProject (nullptr);
     }
 
+    std::cout << "bounce: formats, normalize, stems\n";
+    {
+        juce::AudioDeviceManager devices;
+        Engine engine (devices, {});
+        engine.prepare (rate, 512);
+        engine.setProject (project.get());
+        auto waitForBounce = [&engine]
+        {
+            for (int i = 0; i < 2000 && engine.getBounceProgress() < 1.0f; ++i)
+                juce::Thread::sleep (5);
+            juce::Thread::sleep (50);
+        };
+        auto read = [] (const juce::File& f, juce::AudioBuffer<float>& buf, double& sr) -> bool
+        {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (f));
+            if (reader == nullptr) return false;
+            sr = reader->sampleRate;
+            buf.setSize ((int) reader->numChannels, (int) reader->lengthInSamples);
+            return reader->read (&buf, 0, buf.getNumSamples(), 0, true, true);
+        };
+
+        BounceOptions o;
+        o.format = "flac";
+        o.bits = 32;                // FLAC tops out at 24
+        o.normalize = true;
+        const auto mixFile = folder.getChildFile ("mix.flac");
+        engine.startBounce (mixFile, 20000, 26000, o, {});
+        waitForBounce();
+        juce::AudioBuffer<float> buf;
+        double sr = 0;
+        check (read (mixFile, buf, sr) && juce::approximatelyEqual (sr, rate)
+               && std::abs (buf.getMagnitude (0, buf.getNumSamples()) - juce::Decibels::decibelsToGain (-0.1f)) < 0.01f,
+               "a normalised FLAC bounce peaks at -0.1 dB");
+
+        engine.setProject (nullptr);
+
+        // A fresh engine: the first one's bounce finishes on a message loop the bench doesn't run.
+        Engine stemsEngine (devices, {});
+        stemsEngine.prepare (rate, 512);
+        stemsEngine.setProject (project.get());
+        o = {};
+        o.stems = true;
+        const auto stemsFolder = folder.getChildFile ("stems");
+        stemsEngine.startBounce (stemsFolder, 0, 40000, o, {});
+        for (int i = 0; i < 2000 && stemsEngine.getBounceProgress() < 1.0f; ++i)
+            juce::Thread::sleep (5);
+        juce::Thread::sleep (50);
+        const auto files = stemsFolder.findChildFiles (juce::File::findFiles, false, "*.wav");
+        check (files.size() == project->numTracks(), "stems: a file per track (" + juce::String (files.size()) + ")");
+        stemsEngine.setProject (nullptr);
+    }
+
     std::cout << "armed track monitoring\n";
     {
         a.setProperty (ids::arm, true, nullptr);

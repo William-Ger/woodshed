@@ -127,7 +127,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::openProject:     info.setInfo ("Open...", {}, "File", 0); info.addDefaultKeypress ('o', cmdKey); break;
         case cmd::saveProject:     info.setInfo ("Save", {}, "File", 0); info.addDefaultKeypress ('s', cmdKey); break;
         case cmd::saveProjectAs:   info.setInfo ("Save As...", {}, "File", 0); info.addDefaultKeypress ('s', cmdKey | shift); break;
-        case cmd::bounce:          info.setInfo ("Bounce to WAV...", {}, "File", 0); info.addDefaultKeypress ('b', cmdKey);
+        case cmd::bounce:          info.setInfo ("Bounce...", {}, "File", 0); info.addDefaultKeypress ('b', cmdKey);
                                    info.setActive (! studio.engine().isBouncing()); break;
         case cmd::audioSettings:   info.setInfo ("Settings...", {}, "File", 0); info.addDefaultKeypress (',', cmdKey); break;
 

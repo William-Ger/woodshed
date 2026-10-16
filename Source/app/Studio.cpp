@@ -1,4 +1,5 @@
 #include "Studio.h"
+#include "Theme.h"
 #include "SettingsWindow.h"
 #include "PluginHost.h"
 #include "../PluginProcessor.h"
@@ -392,6 +393,84 @@ void Studio::saveProjectAsDialog()
                           });
 }
 
+namespace
+{
+/** Logic's Bounce window, cut down: what to bounce and how. */
+class BounceSettings final : public juce::Component
+{
+public:
+    BounceSettings (juce::PropertiesFile& p, bool cycleOn, std::function<void (daw::BounceOptions, bool cycle)> go)
+        : props (p), onBounce (std::move (go))
+    {
+        format.addItemList ({ "WAV", "AIFF", "FLAC" }, 1);
+        bits.addItemList ({ "16-bit", "24-bit", "32-bit float" }, 1);
+        range.addItemList ({ "Whole song", "Cycle (loop) range" }, 1);
+        const auto f = props.getValue ("bounceFormat", "wav");
+        format.setSelectedId (f == "aiff" ? 2 : f == "flac" ? 3 : 1, juce::dontSendNotification);
+        const int b = props.getIntValue ("bounceBits", 24);
+        bits.setSelectedId (b == 16 ? 1 : b == 32 ? 3 : 2, juce::dontSendNotification);
+        range.setSelectedId (cycleOn ? 2 : 1, juce::dontSendNotification);
+        normalize.setToggleState (props.getBoolValue ("bounceNormalize", false), juce::dontSendNotification);
+        stems.setToggleState (false, juce::dontSendNotification);
+        format.onChange = [this] { if (format.getSelectedId() == 3 && bits.getSelectedId() == 3) bits.setSelectedId (2); };
+
+        for (auto* c : std::initializer_list<juce::Component*> { &format, &bits, &range, &normalize, &stems, &bounce, &cancel })
+            addAndMakeVisible (c);
+        for (auto* l : { &formatLabel, &bitsLabel, &rangeLabel })
+        {
+            l->setFont (theme::font (12.0f, theme::Weight::medium));
+            l->setColour (juce::Label::textColourId, theme::dimText);
+            l->setJustificationType (juce::Justification::centredRight);
+            addAndMakeVisible (l);
+        }
+        bounce.getProperties().set ("primary", true);
+        bounce.onClick = [this]
+        {
+            daw::BounceOptions o;
+            o.format = format.getSelectedId() == 2 ? "aiff" : format.getSelectedId() == 3 ? "flac" : "wav";
+            o.bits = bits.getSelectedId() == 1 ? 16 : bits.getSelectedId() == 3 ? 32 : 24;
+            o.normalize = normalize.getToggleState();
+            o.stems = stems.getToggleState();
+            props.setValue ("bounceFormat", o.format);
+            props.setValue ("bounceBits", o.bits);
+            props.setValue ("bounceNormalize", o.normalize);
+            const bool cycle = range.getSelectedId() == 2;
+            auto callback = onBounce;
+            if (auto* w = findParentComponentOfClass<juce::DialogWindow>())
+                w->exitModalState (0);
+            callback (o, cycle);
+        };
+        cancel.onClick = [this] { if (auto* w = findParentComponentOfClass<juce::DialogWindow>()) w->exitModalState (0); };
+        setSize (380, 250);
+    }
+
+    void paint (juce::Graphics& g) override { g.fillAll (theme::panel); }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (20, 18);
+        auto row = [&r] { auto x = r.removeFromTop (28); r.removeFromTop (8); return x; };
+        auto line = row(); formatLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); format.setBounds (line);
+        line = row(); bitsLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); bits.setBounds (line);
+        line = row(); rangeLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); range.setBounds (line);
+        line = r.removeFromTop (24); line.removeFromLeft (100); normalize.setBounds (line);
+        line = r.removeFromTop (24); line.removeFromLeft (100); stems.setBounds (line);
+        auto buttons = getLocalBounds().reduced (20, 16).removeFromBottom (30);
+        bounce.setBounds (buttons.removeFromRight (100));
+        buttons.removeFromRight (10);
+        cancel.setBounds (buttons.removeFromRight (90));
+    }
+
+private:
+    juce::PropertiesFile& props;
+    std::function<void (daw::BounceOptions, bool)> onBounce;
+    juce::ComboBox format, bits, range;
+    juce::Label formatLabel { {}, "Format" }, bitsLabel { {}, "Resolution" }, rangeLabel { {}, "Range" };
+    juce::ToggleButton normalize { "Normalize (peak at -0.1 dB)" }, stems { "All tracks as separate files (stems)" };
+    juce::TextButton bounce { "Bounce" }, cancel { "Cancel" };
+};
+}
+
 void Studio::bounceDialog()
 {
     const auto end = currentProject->contentEnd();
@@ -401,30 +480,45 @@ void Studio::bounceDialog()
         return;
     }
 
-    auto suggested = juce::File::getSpecialLocation (juce::File::userMusicDirectory)
-                         .getChildFile (currentProject->folder.getFileName() + ".wav");
-    chooser = std::make_unique<juce::FileChooser> ("Bounce the song to a WAV file", suggested, "*.wav");
-    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, end] (const juce::FileChooser& fc)
-                          {
-                              auto file = fc.getResult();
-                              if (file == juce::File())
-                                  return;
+    auto& s = currentProject->state;
+    auto settings = std::make_unique<BounceSettings> (*appSettings.getUserSettings(), (bool) s[daw::ids::loopOn],
+        [this, end] (daw::BounceOptions options, bool cycle)
+        {
+            auto& st = currentProject->state;
+            const auto from = cycle ? (juce::int64) st[daw::ids::loopStart] : (juce::int64) 0;
+            const auto to = cycle ? (juce::int64) st[daw::ids::loopEnd] : end;
+            const auto extension = options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
+            const auto name = currentProject->folder.getFileName();
+            auto suggested = juce::File::getSpecialLocation (juce::File::userMusicDirectory)
+                                 .getChildFile (options.stems ? name + " stems" : name + extension);
+            chooser = std::make_unique<juce::FileChooser> (options.stems ? "Choose a folder for the stems" : "Bounce the song to a file", suggested,
+                                                           options.stems ? juce::String() : "*" + juce::String (extension));
+            const auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
+                             | (options.stems ? juce::FileBrowserComponent::canSelectDirectories : juce::FileBrowserComponent::canSelectFiles);
+            chooser->launchAsync (flags, [this, options, from, to, extension] (const juce::FileChooser& fc)
+            {
+                auto target = fc.getResult();
+                if (target == juce::File())
+                    return;
+                if (! options.stems)
+                    target = target.withFileExtension (extension);
+                engineInstance->startBounce (target, from, to, options, [this, target, options] (bool ok)
+                {
+                    flash (ok ? (options.stems ? "Bounced stems to " : "Bounced ") + target.getFileName() : juce::String ("Bounce failed"));
+                    if (ok)
+                        target.revealToUser();
+                });
+            });
+        });
 
-                              // With the loop on, bounce just the loop; otherwise the whole song.
-                              auto& s = currentProject->state;
-                              const bool loop = (bool) s[daw::ids::loopOn];
-                              const auto from = loop ? (juce::int64) s[daw::ids::loopStart] : (juce::int64) 0;
-                              const auto to = loop ? (juce::int64) s[daw::ids::loopEnd] : end;
-
-                              file = file.withFileExtension ("wav");
-                              engineInstance->startBounce (file, from, to, [this, file] (bool ok)
-                              {
-                                  flash (ok ? "Bounced " + file.getFileName() : "Bounce failed");
-                                  if (ok)
-                                      file.revealToUser();
-                              });
-                          });
+    juce::DialogWindow::LaunchOptions o;
+    o.content.setOwned (settings.release());
+    o.dialogTitle = "Bounce";
+    o.dialogBackgroundColour = theme::panel;
+    o.escapeKeyTriggersCloseButton = true;
+    o.useNativeTitleBar = true;
+    o.resizable = false;
+    o.launchAsync();
 }
 
 //==============================================================================
