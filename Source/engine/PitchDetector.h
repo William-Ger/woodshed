@@ -9,7 +9,12 @@ namespace woodshed
     Monophonic pitch detection with the McLeod Pitch Method: a normalised
     square-difference function computed from an FFT autocorrelation, then the
     first "key maximum" above a fraction of the highest one, refined with a
-    parabola. Runs on the message thread (it allocates in the constructor only).
+    parabola. It allocates in the constructor only, so an instance owned by a
+    pedal can analyse on the audio thread.
+
+    The default window (4096 samples, 85 ms at 48 kHz) suits a tuner: slow but
+    precise down to the lowest bass string. A real-time tracker passes a smaller
+    maximum and analyses shorter windows for less lag.
 */
 class PitchDetector
 {
@@ -23,31 +28,42 @@ public:
         float level = 0.0f;       // RMS of the window
     };
 
-    PitchDetector() : fft (fftOrder), work ((size_t) fftSize * 2), nsdf ((size_t) windowSize) {}
+    explicit PitchDetector (int maxWindowSize = windowSize)
+        : maxWindow (juce::jmax (64, maxWindowSize)),
+          fftOrder (orderFor (maxWindow)),
+          fftSize (1 << fftOrder),
+          fft (fftOrder), work ((size_t) fftSize * 2), nsdf ((size_t) maxWindow) {}
 
-    /** `samples` must hold windowSize floats, oldest first. */
+    /** `samples` must hold windowSize floats (or the maximum given to the constructor), oldest first. */
     Result analyse (const float* samples, double sampleRate, float minHz = 27.0f, float maxHz = 1400.0f)
     {
+        return analyse (samples, maxWindow, sampleRate, minHz, maxHz);
+    }
+
+    /** Analyses the `numSamples` (at most the constructor's maximum) floats at `samples`, oldest first. */
+    Result analyse (const float* samples, int numSamples, double sampleRate, float minHz, float maxHz)
+    {
         Result r;
+        const int len = juce::jlimit (8, maxWindow, numSamples);
 
         double mean = 0.0;
-        for (int i = 0; i < windowSize; ++i) mean += samples[i];
-        mean /= windowSize;
+        for (int i = 0; i < len; ++i) mean += samples[i];
+        mean /= len;
 
         double energy = 0.0;
-        for (int i = 0; i < windowSize; ++i)
+        for (int i = 0; i < len; ++i)
         {
             const float v = samples[i] - (float) mean;
             work[(size_t) i] = v;
             energy += (double) v * v;
         }
 
-        r.level = (float) std::sqrt (energy / windowSize);
+        r.level = (float) std::sqrt (energy / len);
         if (r.level < 1.0e-4f)
             return r;
 
         // Autocorrelation via the power spectrum of the zero-padded window.
-        std::fill (work.begin() + windowSize, work.end(), 0.0f);
+        std::fill (work.begin() + len, work.end(), 0.0f);
         fft.performRealOnlyForwardTransform (work.data());
         for (int k = 0; k <= fftSize / 2; ++k)
         {
@@ -57,16 +73,16 @@ public:
         }
         fft.performRealOnlyInverseTransform (work.data());
 
-        const int maxLag = juce::jmin (windowSize - 2, (int) (sampleRate / minHz));
+        const int maxLag = juce::jmin (len - 2, (int) (sampleRate / minHz));
         const int minLag = juce::jmax (2, (int) (sampleRate / maxHz));
 
         // m(tau) = sum of x[j]^2 + x[j+tau]^2 over the overlap, updated incrementally.
         double m = 2.0 * energy;
-        for (int tau = 0; tau < maxLag; ++tau)
+        for (int tau = 0; tau <= maxLag; ++tau)   // one past the search range, for the parabola
         {
             if (tau > 0)
             {
-                const double a = samples[tau - 1] - mean, b = samples[windowSize - tau] - mean;
+                const double a = samples[tau - 1] - mean, b = samples[len - tau] - mean;
                 m -= a * a + b * b;
             }
 
@@ -121,7 +137,15 @@ public:
     }
 
 private:
-    static constexpr int fftOrder = 13, fftSize = 1 << fftOrder;   // 8192 >= 2 * windowSize
+    /** Smallest FFT order whose size is at least twice the window (zero padding for a linear correlation). */
+    static int orderFor (int window)
+    {
+        int order = 1;
+        while ((1 << order) < 2 * window) ++order;
+        return order;
+    }
+
+    int maxWindow, fftOrder, fftSize;
     juce::dsp::FFT fft;
     std::vector<float> work, nsdf;
 };

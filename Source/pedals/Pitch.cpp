@@ -1,4 +1,5 @@
 #include "../engine/Registry.h"
+#include "../engine/PitchDetector.h"
 
 namespace woodshed
 {
@@ -905,6 +906,486 @@ private:
     bool fresh = true;
 };
 
+//==============================================================================
+// PLUMB: vocal pitch correction. A short-window pitch tracker finds the note,
+// and a pitch-synchronous overlap-add voice re-spaces the singer's own glottal
+// periods to land on the nearest note of the key. Each grain is two periods of
+// the real voice, so formants stay where the throat put them and small
+// corrections never chipmunk.
+//==============================================================================
+struct CorrectionScale { const char* name; unsigned mask; };   // bit i: i semitones above the key
+
+constexpr unsigned scaleMask (std::initializer_list<int> degrees)
+{
+    unsigned m = 0;
+    for (int d : degrees) m |= 1u << d;
+    return m;
+}
+
+const CorrectionScale correctionScales[] {
+    { "Chromatic",  0xfffu },
+    { "Major",      scaleMask ({ 0, 2, 4, 5, 7, 9, 11 }) },
+    { "Minor",      scaleMask ({ 0, 2, 3, 5, 7, 8, 10 }) },
+    { "Harm Minor", scaleMask ({ 0, 2, 3, 5, 7, 8, 11 }) },
+    { "Pent Major", scaleMask ({ 0, 2, 4, 7, 9 }) },
+    { "Pent Minor", scaleMask ({ 0, 3, 5, 7, 10 }) },
+    { "Blues",      scaleMask ({ 0, 3, 5, 6, 7, 10 }) },
+    { "Dorian",     scaleMask ({ 0, 2, 3, 5, 7, 9, 10 }) },
+    { "Mixolydian", scaleMask ({ 0, 2, 4, 5, 7, 9, 10 }) }
+};
+constexpr int numCorrectionScales = (int) std::size (correctionScales);
+
+inline bool inScale (unsigned mask, int key, int note)    { return ((mask >> (((note - key) % 12 + 12) % 12)) & 1u) != 0u; }
+
+/** Tracking ranges: a shorter window follows faster but can't hold two periods of a low note. */
+struct TrackRange { const char* name; float minHz, maxHz, windowMs; };
+
+const TrackRange trackRanges[] {
+    { "Low",   52.0f,  700.0f, 42.0f },
+    { "Voice", 70.0f, 1100.0f, 31.0f },
+    { "High", 110.0f, 1600.0f, 21.0f }
+};
+constexpr int numTrackRanges = (int) std::size (trackRanges);
+
+class PitchCorrector final : public Pedal
+{
+public:
+    static constexpr double latencySeconds = 0.010;
+
+    int getLatencySamples() const override      { return latency; }
+
+    void prepared() override
+    {
+        latency = juce::roundToInt (latencySeconds * sampleRate);
+        maxPeriod = 2.0 * (latency - guard);
+
+        factor = juce::jmax (1, juce::roundToInt (sampleRate / 24000.0));
+        trackRate = sampleRate / factor;
+        hopSamples = trackHop * factor;
+
+        int longest = 0;
+        for (size_t r = 0; r < windows.size(); ++r)
+        {
+            windows[r] = juce::roundToInt (trackRanges[r].windowMs * 0.001 * trackRate);
+            longest = juce::jmax (longest, windows[r]);
+        }
+
+        int size = 1;
+        while (size < longest + trackHop) size <<= 1;
+        history.assign ((size_t) size, 0.0f);
+        historyMask = size - 1;
+        frame.assign ((size_t) longest, 0.0f);
+        if (detector == nullptr || detectorWindow != longest)
+        {
+            detector = std::make_unique<PitchDetector> (longest);
+            detectorWindow = longest;
+        }
+
+        for (auto& v : voices)
+        {
+            v.line.setMaxSamples (latency * 3 + 64);
+            v.mix.reset (sampleRate, 0.03);
+        }
+
+        maxDelay = (double) (latency * 3);
+        events.assign ((size_t) (maxBlock / minSpacing + 16), Event {});
+        gates.assign ((size_t) juce::jmax (1, maxBlock), 0.0f);
+        gateStep = 1.0f / (0.006f * (float) sampleRate);
+
+        // Fourth-order Butterworth anti-alias filter ahead of the decimator.
+        const float aaHz = (float) juce::jmin (4000.0, 0.4 * trackRate);
+        aa1.setup (aaHz, 0.541f, sampleRate);
+        aa2.setup (aaHz, 1.307f, sampleRate);
+    }
+
+    void reset() override
+    {
+        for (auto& v : voices)
+        {
+            v.line.clear();
+            v.numGrains = 0;
+        }
+
+        std::fill (history.begin(), history.end(), 0.0f);
+        historyWrite = decimPhase = sinceHop = 0;
+        aa1.reset();
+        aa2.reset();
+
+        now = blockStart = 0;
+        nextS = (double) latency;
+        lastA = 0.0;
+        aligned = false;
+        idle = true;
+        period = 240.0;
+        voiced = hasPending = false;
+        unvoicedHops = 0;
+        gate = 0.0f;
+        note = -1;
+        midi = estTime = slope = pending = 0.0;
+        corr = slowErr = shiftBase = fastGain = 0.0;
+        heldSamples = 0;
+        numEvents = 0;
+        fresh = true;
+    }
+
+    void update() override
+    {
+        key = juce::jlimit (0, 11, juce::roundToInt (knob (0)));
+        scale = juce::jlimit (0, numCorrectionScales - 1, juce::roundToInt (knob (1)));
+        responseMs = juce::jmax (0.0f, knob (2));
+        humanize = juce::jlimit (0.0f, 1.0f, knob (3));
+        amount = juce::jlimit (0.0f, 1.0f, knob (4));
+        range = juce::jlimit (0, numTrackRanges - 1, juce::roundToInt (knob (5)));
+        refHz = juce::jlimit (400.0f, 480.0f, knob (6));
+
+        for (auto& v : voices)
+        {
+            if (fresh) v.mix.setCurrentAndTargetValue (knob (7));
+            else       v.mix.setTargetValue (knob (7));
+        }
+        fresh = false;
+    }
+
+    void processChannel (int ch, float* x, int n) override
+    {
+        if (ch == 0) lead (x, n);
+        else         follow (voices[1], x, n);
+    }
+
+private:
+    static constexpr int trackHop = 64;       // analysis hop, in tracker samples (2.7 ms at 48 kHz)
+    static constexpr int guard = 4;           // grains never read closer than this to the newest sample
+    static constexpr int minSpacing = 16;     // shortest grain spacing, in samples
+    static constexpr int maxGrains = 8;
+
+    /** One two-period slice of input, read at a fixed delay under a Hann window centred at `centre`. */
+    struct Grain { double centre = 0.0, delay = 0.0, half = 1.0; };
+
+    struct Voice
+    {
+        dsp::DelayBuffer line;
+        std::array<Grain, maxGrains> grains {};
+        int numGrains = 0;
+        juce::SmoothedValue<float> mix;
+
+        void add (const Grain& g)
+        {
+            if (numGrains < maxGrains) grains[(size_t) numGrains++] = g;
+        }
+
+        /** Every grain reads at the plain latency again (only done while the wet is silent). */
+        void realign (double plainDelay)
+        {
+            for (int k = 0; k < numGrains; ++k) grains[(size_t) k].delay = plainDelay;
+        }
+
+        float render (double t, float dry)
+        {
+            float acc = 0.0f, wsum = 0.0f;
+            for (int k = 0; k < numGrains;)
+            {
+                auto& g = grains[(size_t) k];
+                const double tau = t - g.centre;
+                if (tau >= g.half)
+                {
+                    grains[(size_t) k] = grains[(size_t) --numGrains];
+                    continue;
+                }
+                if (tau > -g.half)
+                {
+                    const float w = 0.5f + 0.5f * std::cos (juce::MathConstants<float>::pi * (float) (tau / g.half));
+                    acc += w * line.read ((float) g.delay);
+                    wsum += w;
+                }
+                ++k;
+            }
+
+            // Grains overlap enough that the weights sum to about one; only the very
+            // first grain after a reset leans on the dry signal to fill in.
+            const float fill = juce::jmax (0.0f, 0.25f - wsum);
+            return (acc + fill * dry) / (wsum + fill);
+        }
+    };
+
+    struct Event { int sample = 0; bool realign = false; Grain grain; };
+
+    /** Channel 0: track, decide, schedule grains, render; logs what it did for channel 1. */
+    void lead (float* x, int n)
+    {
+        auto& v = voices[0];
+        blockStart = now;
+        numEvents = 0;
+
+        for (int i = 0; i < n; ++i)
+        {
+            v.line.push (x[i]);
+            ++now;
+
+            track (x[i]);
+
+            // Fade the corrected voice in and out with voicing; once it is silent, drop
+            // any correction and line the grains back up with the dry timing.
+            gate = voiced ? juce::jmin (1.0f, gate + gateStep) : juce::jmax (0.0f, gate - gateStep);
+            if (gate > 0.0f)
+            {
+                idle = false;
+            }
+            else if (! idle)
+            {
+                idle = true;
+                aligned = false;
+                corr = slowErr = shiftBase = 0.0;
+                v.realign ((double) latency);
+                log (i, true, {});
+            }
+
+            schedule (i);
+
+            if (i < (int) gates.size()) gates[(size_t) i] = gate;
+            x[i] = renderAt (v, (double) now, gate);
+        }
+    }
+
+    /** Channel 1 (only when the chain is stereo): same grains and gate, its own audio. */
+    void follow (Voice& v, float* x, int n)
+    {
+        int e = 0;
+        for (int i = 0; i < n; ++i)
+        {
+            v.line.push (x[i]);
+
+            for (; e < numEvents && events[(size_t) e].sample == i; ++e)
+            {
+                if (events[(size_t) e].realign) v.realign ((double) latency);
+                else                            v.add (events[(size_t) e].grain);
+            }
+
+            const float g = gates[(size_t) juce::jmin (i, (int) gates.size() - 1)];
+            x[i] = renderAt (v, (double) (blockStart + i + 1), g);
+        }
+    }
+
+    float renderAt (Voice& v, double t, float g)
+    {
+        const float dry = v.line.read ((float) latency);
+        const float wet = v.render (t, dry);
+        const float corrected = dry + g * (wet - dry);
+        return dry + v.mix.getNextValue() * (corrected - dry);
+    }
+
+    void log (int i, bool realign, const Grain& g)
+    {
+        if (numEvents < (int) events.size())
+            events[(size_t) numEvents++] = { i, realign, g };
+    }
+
+    //==========================================================================
+    /** Low-pass, decimate to ~24 kHz, and analyse every hop. */
+    void track (float in)
+    {
+        const float lp = aa2.process (aa1.process (in).low).low;
+        if (++decimPhase < factor)
+            return;
+
+        decimPhase = 0;
+        history[(size_t) historyWrite] = lp;
+        historyWrite = (historyWrite + 1) & historyMask;
+
+        if (++sinceHop >= trackHop)
+        {
+            sinceHop = 0;
+            analyse();
+        }
+    }
+
+    void analyse()
+    {
+        const auto& tr = trackRanges[range];
+        const int w = windows[(size_t) range];
+        for (int k = 0; k < w; ++k)
+            frame[(size_t) k] = history[(size_t) ((historyWrite - w + k) & historyMask)];
+
+        const float lowest = juce::jmax (tr.minHz, (float) (sampleRate / maxPeriod));
+        const auto r = detector->analyse (frame.data(), w, trackRate, lowest, tr.maxHz);
+        const bool periodic = r.frequency > 0.0f && r.level > 1.0e-3f && r.clarity >= (voiced ? 0.75f : 0.88f);
+
+        if (! periodic)
+        {
+            // Hold through brief dropouts so a wobbly vowel doesn't flap the gate.
+            if (++unvoicedHops >= 3) voiced = false;
+            hasPending = false;
+            return;
+        }
+
+        unvoicedHops = 0;
+        const double m = 69.0 + 12.0 * std::log2 ((double) r.frequency / (double) refHz);
+        const double t = (double) now - 0.5 * w * factor;
+
+        if (voiced)
+        {
+            // A sudden leap is believed only once the next hop agrees (octave slips are one-offs).
+            if (std::abs (m - midi) > 1.5 && ! (hasPending && std::abs (m - pending) < 0.5))
+            {
+                pending = m;
+                hasPending = true;
+                return;
+            }
+
+            const double s = (m - midi) / juce::jmax (1.0, t - estTime);
+            slope = std::abs (m - midi) > 1.0 ? 0.0 : 0.5 * slope + 0.5 * s;
+        }
+        else
+        {
+            // A new phrase: start from no correction, so slow settings scoop in naturally.
+            slope = 0.0;
+            corr = 0.0;
+            note = -1;
+        }
+
+        hasPending = false;
+        voiced = true;
+        midi = m;
+        estTime = t;
+        period = juce::jlimit ((double) minSpacing, maxPeriod, sampleRate / (double) r.frequency);
+
+        chooseNote (m);
+
+        const double err = (double) note - m;
+        const double hopSec = (double) hopSamples / sampleRate;
+        const double coef = responseMs <= 0.0f ? 1.0 : 1.0 - std::exp (-hopSec / (responseMs * 0.001));
+        corr += coef * (err - corr);
+        slowErr += (1.0 - std::exp (-hopSec / 0.3)) * (err - slowErr);
+
+        heldSamples += hopSamples;
+        const double held = (double) heldSamples / sampleRate;
+        const double h = humanize * juce::jlimit (0.0, 1.0, (held - 0.15) / 0.35);
+
+        shiftBase = amount * ((1.0 - h) * corr + h * slowErr);
+        fastGain = amount * (1.0 - h) * coef;
+    }
+
+    /** Nearest allowed note, sticking with the current one unless another is clearly closer. */
+    void chooseNote (double m)
+    {
+        const unsigned mask = correctionScales[scale].mask;
+        const int centre = (int) std::lround (m);
+        int best = -1;
+        double bestDist = 1.0e9;
+
+        for (int k = centre - 7; k <= centre + 7; ++k)
+        {
+            const double d = std::abs (m - (double) k);
+            if (inScale (mask, key, k) && d < bestDist) { bestDist = d; best = k; }
+        }
+
+        const bool keep = note >= 0 && inScale (mask, key, note) && std::abs (m - (double) note) < bestDist + 0.15;
+        if (best < 0 || keep)
+            return;
+
+        if (best != note)
+        {
+            heldSamples = 0;
+            slowErr = (double) best - m;
+        }
+        note = best;
+    }
+
+    //==========================================================================
+    /** Starts every grain whose window opens at this sample. */
+    void schedule (int i)
+    {
+        for (int started = 0; started < 4; ++started)
+        {
+            // The pitch where this grain will read: extrapolate the tracker's estimate
+            // (taken at its window centre) so vibrato is cancelled on time, not late.
+            const double target = nextS - latency;
+            double dm = 0.0, shift = 0.0;
+
+            if (voiced)
+            {
+                dm = juce::jlimit (-0.5, 0.5, slope * (target - estTime));
+                shift = juce::jlimit (-3.0, 3.0, shiftBase - fastGain * dm);
+            }
+            else if (gate > 0.0f)
+            {
+                shift = juce::jlimit (-3.0, 3.0, shiftBase);
+            }
+
+            const double tin = juce::jlimit ((double) minSpacing, maxPeriod, period * std::exp2 (-dm / 12.0));
+            const double tout = juce::jmax ((double) minSpacing, tin * std::exp2 (-shift / 12.0));
+            const double half = tin;
+
+            if (nextS - half > (double) now)
+                return;
+
+            // Read from the input period nearest the dry timing, a whole number of
+            // periods on from the last grain so successive grains stay in phase.
+            double a = target;
+            if (aligned)
+                a = lastA + juce::jmax (0.0, std::round ((target - lastA) / tin)) * tin;
+            while (nextS - a < (double) guard) a -= tin;
+            if (nextS - a > maxDelay) a = target;
+
+            aligned = true;
+            lastA = a;
+
+            const Grain g { nextS, nextS - a, half };
+            voices[0].add (g);
+            log (i, false, g);
+            nextS += tout;
+        }
+    }
+
+    std::array<Voice, 2> voices;
+
+    // Tracker
+    std::unique_ptr<PitchDetector> detector;
+    int detectorWindow = 0;
+    std::vector<float> history, frame;
+    std::array<int, numTrackRanges> windows {};
+    int historyMask = 0, historyWrite = 0, decimPhase = 0, sinceHop = 0, factor = 2, hopSamples = 128;
+    double trackRate = 24000.0;
+    dsp::Svf aa1, aa2;
+
+    // Decisions
+    bool voiced = false, hasPending = false;
+    int unvoicedHops = 0, note = -1;
+    juce::int64 heldSamples = 0;
+    double midi = 0.0, estTime = 0.0, slope = 0.0, pending = 0.0;
+    double corr = 0.0, slowErr = 0.0, shiftBase = 0.0, fastGain = 0.0;
+
+    // Grain scheduler
+    juce::int64 now = 0, blockStart = 0;
+    double nextS = 0.0, lastA = 0.0, period = 240.0, maxPeriod = 900.0, maxDelay = 1440.0;
+    bool aligned = false, idle = true;
+    int latency = 480;
+    float gate = 0.0f, gateStep = 0.003f;
+
+    // What channel 0 did this block, replayed by channel 1.
+    std::vector<Event> events;
+    std::vector<float> gates;
+    int numEvents = 0;
+
+    // Knobs
+    int key = 0, scale = 0, range = 1;
+    float responseMs = 20.0f, humanize = 0.0f, amount = 1.0f, refHz = 440.0f;
+    bool fresh = true;
+};
+
+juce::StringArray scaleNames()
+{
+    juce::StringArray a;
+    for (auto& s : correctionScales) a.add (s.name);
+    return a;
+}
+
+juce::StringArray rangeNames()
+{
+    juce::StringArray a;
+    for (auto& r : trackRanges) a.add (r.name);
+    return a;
+}
+
 juce::StringArray patternNames()
 {
     juce::StringArray a;
@@ -986,6 +1467,17 @@ void registerPitchPedals (Registry& r)
                       knob ("gate", "Gate", 0.1f, 1.0f, 0.85f, "%"),
                       knob ("mix", "Mix", 0.0f, 1.0f, 0.55f, "%"),
                       knob ("tone", "Tone", 500.0f, 12000.0f, 7000.0f, "Hz", 0.4f) } });
+    r.add<PitchCorrector> ({ "pitch.correct", "PLUMB", "pitch correction", "Pitch",
+                             "Pulls a voice or lead line onto the notes of a key, from natural to hard-tuned",
+                             juce::Colour (0xffd8b25a), juce::Colour (0xff2b2010),
+                             { choice ("key", "Key", { "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" }, 0),
+                               choice ("scale", "Scale", scaleNames(), 0),
+                               knob ("response", "Response", 0.0f, 400.0f, 20.0f, "ms", 0.4f),
+                               knob ("humanize", "Humanize", 0.0f, 1.0f, 0.0f, "%"),
+                               knob ("amount", "Amount", 0.0f, 1.0f, 1.0f, "%"),
+                               choice ("range", "Range", rangeNames(), 1),
+                               knob ("ref", "A4", 430.0f, 450.0f, 440.0f, "Hz"),
+                               knob ("mix", "Mix", 0.0f, 1.0f, 1.0f, "%") } });
 }
 
 } // namespace woodshed
