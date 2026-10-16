@@ -99,6 +99,8 @@ TrackHeader::TrackHeader (ArrangeView& v, juce::ValueTree t)
     monitor.setTooltip ("Hear the input through the rig");
     for (auto* c : { &mute, &solo, &arm, &monitor })
         addAndMakeVisible (*c);
+    // An instrument has no input to monitor: what you play always sounds.
+    monitor.setVisible (! daw::Project::isInstrumentTrack (track));
 
     name.setText (track[ids::name].toString(), juce::dontSendNotification);
     name.setFont (theme::font (13.0f, theme::Weight::medium));
@@ -194,6 +196,14 @@ void TrackHeader::paint (juce::Graphics& g)
     g.setFont (theme::font (11.0f, theme::Weight::medium));
     g.drawText (juce::String (index + 1), juce::Rectangle<int> (8, name.getY(), 18, name.getHeight()),
                 juce::Justification::centred);
+
+    // What kind of track: piano keys for an instrument, a waveform for audio.
+    {
+        const bool instrument = daw::Project::isInstrumentTrack (track);
+        const auto box = juce::Rectangle<float> ((float) getWidth() - 32.0f, (float) mute.getY(), 20.0f, 20.0f);
+        icons::draw (g, instrument ? icons::keyboard() : icons::waveform(), box.reduced (1.0f),
+                     selected ? theme::dimText : theme::faintText, 1.4f);
+    }
 
     g.setColour (theme::separator);
     g.fillRect (0, getHeight() - 1, getWidth(), 1);

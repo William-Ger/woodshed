@@ -160,6 +160,7 @@ struct Mixer
         bool recording = false;
         const float* const* inputs = nullptr;
         int numInputs = 0;
+        bool monitorInputs = true;      // false: feedback protection, the live input isn't heard
         float* left = nullptr;
         float* right = nullptr;         // cleared, then the mix is added
 
@@ -245,6 +246,11 @@ public:
     Levels takeTrackLevels (int trackId);
     Levels takeMasterLevels();
 
+    /** Feedback protection: while on, no track plays its live input (recording still works).
+        For a computer's own microphone and speakers, which would howl. */
+    void setFeedbackProtection (bool on)                    { feedbackProtection = on; }
+    bool getFeedbackProtection() const                      { return feedbackProtection.load(); }
+
     /** Metronome loudness, linear (Settings). */
     void setClickLevel (float level)                        { clickLevel = level; }
     float getClickLevel() const                             { return clickLevel.load(); }
@@ -329,6 +335,7 @@ private:
     std::atomic<juce::int64> requestedPosition { -1 };
     std::atomic<float> masterPeakLeft { 0.0f }, masterPeakRight { 0.0f };
     std::atomic<float> clickLevel { 0.3f };
+    std::atomic<bool> feedbackProtection { false };
     Levels masterShown;
     std::atomic<juce::uint64> callbackCount { 0 };
 

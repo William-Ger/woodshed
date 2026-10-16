@@ -66,7 +66,8 @@ Lanes::Hit Lanes::regionAt (juce::Point<int> p) const
         hit.region = r;
 
         // Fade handles: in the name strip, at the end of each fade (the top corners when there's none).
-        if ((float) p.y < rect.getY() + nameBarHeight)
+        // MIDI regions have no fades.
+        if ((float) p.y < rect.getY() + nameBarHeight && ! daw::Project::isMidiRegion (r))
         {
             const auto length = (juce::int64) r[ids::length];
             auto fadeIn = (juce::int64) r.getProperty (ids::fadeIn, 0), fadeOut = (juce::int64) r.getProperty (ids::fadeOut, 0);
@@ -102,6 +103,8 @@ void Lanes::fitFades (juce::int64 length, juce::int64& fadeIn, juce::int64& fade
 
 juce::int64 Lanes::fileLengthOf (const juce::ValueTree& region)
 {
+    if (daw::Project::isMidiRegion (region))
+        return 0;       // no end to run into
     return view.waveforms.info (view.project().resolve (region[ids::file].toString())).length;
 }
 
@@ -354,9 +357,16 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
         }
     }
 
+    const auto wave = body.withTrimmedTop (nameBarHeight).reduced (0.0f, 3.0f);
+
+    if (daw::Project::isMidiRegion (region))
+    {
+        drawNotes (g, region, rect, wave, colour, look);
+    }
+    else
+    {
     // Waveform: only the slice the region plays, and only the part that's on screen.
     const auto file = view.project().resolve (region[ids::file].toString());
-    const auto wave = body.withTrimmedTop (nameBarHeight).reduced (0.0f, 3.0f);
     const auto info = view.waveforms.info (file);
     auto* thumb = info.length > 0 ? view.waveforms.thumbnail (file) : nullptr;
 
@@ -388,6 +398,7 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
     }
 
     drawFades (g, rect, body.withTrimmedTop (nameBarHeight), look);
+    }
 
     // Border: crisp in the track colour; brighter when selected.
     if (look.selected)
@@ -402,6 +413,58 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
         g.setColour (colour.withAlpha (0.75f));
         g.drawRoundedRectangle (body.reduced (0.5f), regionRadius, 1.0f);
     }
+}
+
+void Lanes::drawNotes (juce::Graphics& g, const juce::ValueTree& region, juce::Rectangle<float> rect,
+                       juce::Rectangle<float> area, juce::Colour colour, const RegionLook& look) const
+{
+    if (area.getHeight() < 4.0f || area.getWidth() < 1.0f)
+        return;
+
+    // The notes' pitch range, at least an octave, fills the region's height.
+    int low = 127, high = 0;
+    for (auto n : region)
+        if (n.hasType (ids::NOTE))
+        {
+            low = juce::jmin (low, (int) n[ids::pitch]);
+            high = juce::jmax (high, (int) n[ids::pitch]);
+        }
+    if (low > high)
+        return;
+    if (high - low < 12)
+    {
+        const int pad = (12 - (high - low)) / 2;
+        low -= pad;
+        high = low + 12;
+    }
+
+    const auto grid = view.project().grid();
+    const double origin = (double) (look.start - look.offset);
+    const double regionEnd = (double) (look.start + look.length);
+    const float rowHeight = juce::jlimit (1.5f, 5.0f, area.getHeight() / (float) (high - low + 1));
+    const float span = area.getHeight() - rowHeight;
+    const auto clip = g.getClipBounds().toFloat();
+
+    juce::Graphics::ScopedSaveState s (g);
+    g.reduceClipRegion (area.toNearestInt());
+    g.setColour (colour.interpolatedWith (juce::Colours::white, look.selected ? 0.7f : 0.5f).withAlpha (look.muted ? 0.5f : 0.95f));
+
+    for (auto n : region)
+    {
+        if (! n.hasType (ids::NOTE))
+            continue;
+        const auto note = daw::Project::noteFrom (n);
+        const double on = origin + grid.fromTicks ((double) note.start);
+        if (on < (double) look.start || on >= regionEnd)
+            continue;
+        const double off = juce::jmin (regionEnd, origin + grid.fromTicks ((double) (note.start + note.length)));
+        const float x1 = view.xForSample (on), x2 = view.xForSample (off);
+        if (x2 < clip.getX() || x1 > clip.getRight())
+            continue;
+        const float y = area.getY() + span * (1.0f - (float) (note.pitch - low) / (float) juce::jmax (1, high - low));
+        g.fillRect (juce::Rectangle<float> (x1, y, juce::jmax (1.5f, x2 - x1 - 0.5f), rowHeight));
+    }
+    juce::ignoreUnused (rect);
 }
 
 void Lanes::drawFades (juce::Graphics& g, juce::Rectangle<float> rect, juce::Rectangle<float> wave, const RegionLook& look) const
@@ -474,7 +537,9 @@ void Lanes::drawTakes (juce::Graphics& g)
         if (! (bool) p.track (i)[ids::arm])
             continue;
 
-        const auto rect = regionRect (i, start, length);
+        const bool instrument = daw::Project::isInstrumentTrack (p.track (i));
+        const auto trackStart = instrument ? recordStart : start;
+        const auto rect = regionRect (i, trackStart, length);
         g.setColour (theme::lane);
         g.fillRoundedRectangle (rect, regionRadius);
         g.setColour (theme::record.withAlpha (0.22f));
@@ -487,6 +552,29 @@ void Lanes::drawTakes (juce::Graphics& g)
         }
         if (auto* peaks = engine.getLivePeaks ((int) p.track (i)[ids::id]))
             drawLivePeaks (g, *peaks, rect.withTrimmedTop (nameBarHeight).reduced (0.0f, 3.0f), start);
+
+        // Notes played so far, on the track MIDI is recording into.
+        if (instrument && (int) p.track (i)[ids::id] == engine.getMidiTarget())
+        {
+            const auto area = rect.withTrimmedTop (nameBarHeight).reduced (0.0f, 3.0f);
+            const auto& notes = engine.getRecordedNotes();
+            int low = 127, high = 0;
+            for (auto& n : notes) { low = juce::jmin (low, n.pitch); high = juce::jmax (high, n.pitch); }
+            if (low <= high)
+            {
+                if (high - low < 12) { low -= (12 - (high - low)) / 2; high = low + 12; }
+                const float row = juce::jlimit (1.5f, 5.0f, area.getHeight() / (float) (high - low + 1));
+                const auto now = recordStart + length;
+                g.setColour (juce::Colours::white.withAlpha (0.9f));
+                for (auto& n : notes)
+                {
+                    const float x1 = view.xForSample ((double) n.start);
+                    const float x2 = view.xForSample ((double) (n.end >= 0 ? n.end : now));
+                    const float y = area.getY() + (area.getHeight() - row) * (1.0f - (float) (n.pitch - low) / (float) (high - low));
+                    g.fillRect (juce::Rectangle<float> (x1, y, juce::jmax (1.5f, x2 - x1), row));
+                }
+            }
+        }
 
         g.setColour (theme::record.withAlpha (0.9f));
         g.drawRoundedRectangle (rect.reduced (0.5f), regionRadius, 1.0f);
@@ -656,6 +744,12 @@ void Lanes::mouseDown (const juce::MouseEvent& e)
             studio.setSelectedRegions ({});
             juce::PopupMenu m;
             m.addItem ("Paste", studio.canPaste(), false, [&studio] { studio.paste(); });
+            if (hit.trackIndex >= 0 && daw::Project::isInstrumentTrack (view.project().track (hit.trackIndex)))
+            {
+                auto track = view.project().track (hit.trackIndex);
+                const auto at = (juce::int64) view.sampleAtX (e.x);
+                m.addItem ("Create MIDI Region", [&studio, track, at] { studio.createMidiRegion (track, at); });
+            }
             m.addItem ("Create Marker", [&studio] { studio.commands.invokeDirectly (cmd::createMarker, false); });
             m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
             return;
@@ -785,7 +879,8 @@ void Lanes::mouseDrag (const juce::MouseEvent& e)
     if (gesture == Gesture::trimLeft)
     {
         auto newStart = view.snap (mouseSample, snapOn);
-        newStart = juce::jmax (newStart, grabStart - grabOffset);           // not before the file starts
+        if (! daw::Project::isMidiRegion (grabbed))
+            newStart = juce::jmax (newStart, grabStart - grabOffset);       // not before the file starts
         newStart = juce::jmin (newStart, grabEnd - minLength);
         newStart = juce::jmax ((juce::int64) 0, newStart);
         trimStart = newStart;
@@ -838,9 +933,27 @@ void Lanes::mouseUp (const juce::MouseEvent& e)
 
 void Lanes::mouseDoubleClick (const juce::MouseEvent& e)
 {
+    const auto hit = regionAt (e.getPosition());
+
+    // A MIDI region opens in the piano roll.
+    if (hit.region.isValid())
+    {
+        if (daw::Project::isMidiRegion (hit.region))
+            view.studio.openInEditor ((int) hit.region[ids::id]);
+        return;
+    }
+
+    // An empty spot on an instrument track: a new one-bar MIDI region there.
+    if (hit.trackIndex >= 0)
+    {
+        auto track = view.project().track (hit.trackIndex);
+        if (daw::Project::isInstrumentTrack (track))
+            view.studio.createMidiRegion (track, (juce::int64) view.sampleAtX (e.x));
+        return;
+    }
+
     // Double-click below the last track for a new one.
-    if (view.trackIndexAtY (e.y) < 0 && ! regionAt (e.getPosition()).region.isValid())
-        view.addTrackAfterSelection();
+    view.addTrackAfterSelection();
 }
 
 void Lanes::commitMove (bool copy)
@@ -961,6 +1074,27 @@ void Lanes::showRegionMenu()
     m.addItem ("Mute / Unmute", [&studio] { studio.toggleMuteSelectedRegions(); });
     m.addItem ("Loop These Regions", [&studio] { studio.commands.invokeDirectly (cmd::loopToSelection, false); });
     m.addItem ("Remove Fades", [this] { removeFadesFromSelection(); });
+
+    // MIDI regions: open the editor, quantize.
+    juce::Array<int> midi;
+    for (int id : studio.getSelectedRegions())
+        if (auto r = studio.findRegion (id); r.isValid() && daw::Project::isMidiRegion (r))
+            midi.add (id);
+    if (! midi.isEmpty())
+    {
+        m.addSeparator();
+        m.addItem ("Open in Piano Roll", [&studio, first = midi[0]] { studio.openInEditor (first); });
+        juce::PopupMenu q;
+        const std::pair<const char*, int> grids[] { { "1/4 Note", 960 }, { "1/8 Note", 480 }, { "1/16 Note", 240 },
+                                                    { "1/32 Note", 120 }, { "1/8 Triplet", 320 }, { "1/16 Triplet", 160 } };
+        for (auto& [label, ticks] : grids)
+            q.addItem (label, [&studio, midi, t = ticks]
+            {
+                for (int id : midi)
+                    studio.quantizeNotes (studio.findRegion (id), {}, t);
+            });
+        m.addSubMenu ("Quantize Notes", q);
+    }
     m.addSeparator();
     m.addItem ("Delete", [&studio] { studio.deleteSelectedRegions(); });
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());

@@ -529,7 +529,7 @@ void ArrangeView::dragTrackTo (const juce::ValueTree& track, int yInView)
 
 void ArrangeView::addTrackAfterSelection()
 {
-    studio.addTrack();
+    studio.showNewTrackMenu();
 }
 
 void ArrangeView::showTrackMenu (juce::ValueTree track)
@@ -611,7 +611,7 @@ void ArrangeView::showTrackMenu (juce::ValueTree track)
     m.addItem ("New Track", withTrack ([] (ArrangeView& v, juce::ValueTree t)
     {
         v.studio.selectTrack ((int) t[ids::id]);
-        v.studio.addTrack();
+        v.studio.showNewTrackMenu();
     }));
 
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());

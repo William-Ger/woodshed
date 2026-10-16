@@ -4,12 +4,16 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), typing (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
     addChildComponent (mixer);
     addChildComponent (rig);
+    addChildComponent (instrument);
+    addChildComponent (pianoRoll);
+    addChildComponent (typing);
+    instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
     // Tracks above, the pane below; the divider between them can be dragged.
     layout.setItemLayout (0, 120, -1.0, -0.36);
@@ -37,10 +41,31 @@ void MainComponent::paint (juce::Graphics& g)
     g.fillAll (theme::window);
 }
 
+juce::Component* MainComponent::paneComponent()
+{
+    switch (shownPane)
+    {
+        case Studio::Pane::mixer:  return &mixer;
+        case Studio::Pane::editor: return &pianoRoll;
+        case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
+        case Studio::Pane::none:
+        default:                   return nullptr;
+    }
+}
+
+void MainComponent::showPaneComponents()
+{
+    auto* shown = paneComponent();
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll })
+        c->setVisible (c == shown);
+}
+
 void MainComponent::resized()
 {
     auto r = getLocalBounds();
     controlBar.setBounds (r.removeFromTop (theme::toolbarHeight));
+    typing.setBounds (juce::Rectangle<int> (MusicalTyping::preferredWidth, MusicalTyping::preferredHeight)
+                          .withCentre ({ getWidth() / 2, getHeight() - MusicalTyping::preferredHeight / 2 - 24 }));
 
     if (shownPane == Studio::Pane::none)
     {
@@ -50,18 +75,19 @@ void MainComponent::resized()
     }
 
     divider->setVisible (true);
-    juce::Component* pane = shownPane == Studio::Pane::mixer ? static_cast<juce::Component*> (&mixer) : &rig;
+    juce::Component* pane = paneComponent();
     juce::Component* items[] { &arrange, divider.get(), pane };
     layout.layOutComponents (items, 3, r.getX(), r.getY(), r.getWidth(), r.getHeight(), true, true);
 }
 
 void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
 {
-    if (studio.getPane() != shownPane)
+    const bool instrumentTrack = daw::Project::isInstrumentTrack (studio.getSelectedTrack());
+    if (studio.getPane() != shownPane || instrumentTrack != shownInstrument)
     {
         shownPane = studio.getPane();
-        mixer.setVisible (shownPane == Studio::Pane::mixer);
-        rig.setVisible (shownPane == Studio::Pane::rig);
+        shownInstrument = instrumentTrack;
+        showPaneComponents();
         resized();
     }
 
@@ -79,7 +105,8 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::newTrack, cmd::deleteTrack, cmd::duplicateTrack,
                   cmd::playStop, cmd::record, cmd::returnToStart, cmd::toggleLoop, cmd::toggleClick, cmd::toggleCountIn,
                   cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
-                  cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner });
+                  cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
+                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize });
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -156,7 +183,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
 
         case cmd::showMixer:       info.setInfo ("Mixer", {}, "View", 0); info.addDefaultKeypress ('x', 0);
                                    info.setTicked (studio.getPane() == Studio::Pane::mixer); break;
-        case cmd::showRig:         info.setInfo ("Rig", {}, "View", 0); info.addDefaultKeypress ('b', 0);
+        case cmd::showRig:         info.setInfo ("Rig / Instrument", {}, "View", 0); info.addDefaultKeypress ('b', 0);
                                    info.setTicked (studio.getPane() == Studio::Pane::rig); break;
         case cmd::hideBottom:      info.setInfo ("Tracks Only", {}, "View", 0); info.addDefaultKeypress ('h', 0); break;
         case cmd::zoomIn:          info.setInfo ("Zoom In", {}, "View", 0); info.addDefaultKeypress ('=', cmdKey); break;
@@ -164,6 +191,15 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::zoomToFit:       info.setInfo ("Zoom to Fit", {}, "View", 0); info.addDefaultKeypress ('z', 0); break;
         case cmd::toggleFullScreen:info.setInfo ("Full Screen", {}, "View", 0); info.addDefaultKeypress ('f', cmdKey | juce::ModifierKeys::ctrlModifier); break;
         case cmd::showTuner:       info.setInfo ("Tuner", {}, "View", 0); break;
+        case cmd::newAudioTrack:   info.setInfo ("New Audio Track", {}, "Track", 0); info.addDefaultKeypress ('a', cmdKey | juce::ModifierKeys::altModifier); break;
+        case cmd::newInstrumentTrack: info.setInfo ("New Software Instrument Track", {}, "Track", 0);
+                                   info.addDefaultKeypress ('s', cmdKey | juce::ModifierKeys::altModifier); break;
+        case cmd::newDrumTrack:    info.setInfo ("New Drum Track", {}, "Track", 0); info.addDefaultKeypress ('u', cmdKey | juce::ModifierKeys::altModifier); break;
+        case cmd::showEditor:      info.setInfo ("Piano Roll", {}, "View", 0); info.addDefaultKeypress ('e', 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::editor); break;
+        case cmd::musicalTyping:   info.setInfo ("Musical Typing", {}, "View", 0); info.addDefaultKeypress ('k', cmdKey);
+                                   info.setTicked (typing.isOpen()); break;
+        case cmd::quantize:        info.setInfo ("Quantize Notes", {}, "Edit", 0); info.addDefaultKeypress ('q', 0); break;
         default: break;
     }
 }
@@ -218,7 +254,7 @@ bool MainComponent::perform (const InvocationInfo& info)
             break;
         }
 
-        case cmd::newTrack:        studio.addTrack(); break;
+        case cmd::newTrack:        studio.showNewTrackMenu(); break;
         case cmd::deleteTrack:     studio.deleteSelectedTrack(); break;
         case cmd::duplicateTrack:  studio.duplicateSelectedTrack(); break;
 
@@ -258,6 +294,19 @@ bool MainComponent::perform (const InvocationInfo& info)
                 w->setFullScreen (! w->isFullScreen());
             break;
         case cmd::showTuner:       studio.setPane (Studio::Pane::rig); rig.showTuner(); break;
+        case cmd::newAudioTrack:   studio.addTrack(); break;
+        case cmd::newInstrumentTrack: studio.addInstrumentTrack ("synth.analog"); break;
+        case cmd::newDrumTrack:    studio.addInstrumentTrack ("drums.kit"); break;
+        case cmd::showEditor:      studio.setPane (studio.getPane() == Studio::Pane::editor ? Studio::Pane::none : Studio::Pane::editor); break;
+        case cmd::musicalTyping:   typing.isOpen() ? typing.close() : typing.open(); break;
+        case cmd::quantize:
+            if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
+                pianoRoll.quantizeSelection();
+            else
+                for (int id : studio.getSelectedRegions())
+                    if (auto r = studio.findRegion (id); daw::Project::isMidiRegion (r))
+                        studio.quantizeNotes (r, {}, studio.getQuantizeTicks());
+            break;
         default:                   return false;
     }
 
@@ -316,9 +365,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::muteRegions);
             m.addCommandItem (cm, cmd::nudgeLeft);
             m.addCommandItem (cm, cmd::nudgeRight);
+            m.addCommandItem (cm, cmd::quantize);
             break;
         case 2:
             m.addCommandItem (cm, cmd::newTrack);
+            m.addCommandItem (cm, cmd::newAudioTrack);
+            m.addCommandItem (cm, cmd::newInstrumentTrack);
+            m.addCommandItem (cm, cmd::newDrumTrack);
+            m.addSeparator();
             m.addCommandItem (cm, cmd::duplicateTrack);
             m.addCommandItem (cm, cmd::deleteTrack);
             m.addSeparator();
@@ -341,6 +395,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             break;
         case 4:
             m.addCommandItem (cm, cmd::showRig);
+            m.addCommandItem (cm, cmd::showEditor);
             m.addCommandItem (cm, cmd::showMixer);
             m.addCommandItem (cm, cmd::hideBottom);
             m.addSeparator();
@@ -349,6 +404,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::zoomToFit);
             m.addSeparator();
             m.addCommandItem (cm, cmd::showTuner);
+            m.addCommandItem (cm, cmd::musicalTyping);
             m.addCommandItem (cm, cmd::toggleFullScreen);
             break;
         default: break;
