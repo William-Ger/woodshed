@@ -370,6 +370,24 @@ int runProjectTest()
         check (start == 0 && offset == 200, "a take at the very start trims its first samples instead");
     }
 
+    std::cout << "looped regions\n";
+    {
+        for (int i = project->numTracks(); --i >= 0;)
+            project->track (i).setProperty (ids::mute, true, nullptr);
+        auto t = project->addTrack ("Loops");
+        t.setProperty (ids::rigOn, false, nullptr);
+        auto loopRegion = project->addRegion (t, "Audio/clicks.wav", 200000, 500, 1000, "loop");   // a click at 200500
+        project->addRegion (t, "Audio/clicks.wav", 203500, 0, 100, "stop");                         // repeats stop here
+        loopRegion.setProperty (ids::loop, true, nullptr);
+        auto r = offline (*project, pool, 205000);
+        check (clicks (r.left.data() + 200000, 5000) == std::vector<int> { 500, 1500, 2500 },
+               "a looped region repeats up to the next region");
+        check (project->loopEnd (loopRegion) == 203500 && project->contentEnd() >= 203600, "its loop ends at the next region");
+        project->state.removeChild (t, nullptr);
+        for (int i = project->numTracks(); --i >= 0;)
+            project->track (i).setProperty (ids::mute, false, nullptr);
+    }
+
     std::cout << "cycle recording and take folders\n";
     {
         // Cycle [1000, 2000), recording from 1500 for 2700 samples with 100 of latency:

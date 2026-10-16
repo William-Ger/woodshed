@@ -575,13 +575,15 @@ juce::ValueTree Studio::findRegion (int regionId) const
     return {};
 }
 
-juce::ValueTree Studio::addTrack()
+juce::ValueTree Studio::addTrack (bool throughRig, const juce::String& name)
 {
     auto& p = *currentProject;
     p.undo.beginNewTransaction ("New Track");
     const auto selected = getSelectedTrack();
     const int index = selected.isValid() ? p.state.indexOf (selected) + 1 : -1;
-    auto t = p.addTrack ("Track " + juce::String (p.numTracks() + 1), index);
+    auto t = p.addTrack (name.isNotEmpty() ? name : "Track " + juce::String (p.numTracks() + 1), index);
+    if (! throughRig)
+        t.setProperty (daw::ids::rigOn, false, &p.undo);
     selectTrack ((int) t[daw::ids::id]);
     return t;
 }
@@ -805,7 +807,8 @@ void Studio::showNewTrackMenu()
 {
     juce::PopupMenu m;
     m.addSectionHeader ("New Track");
-    m.addItem ("Audio  (microphone, guitar or line in)", [this] { addTrack(); });
+    m.addItem ("Guitar or Bass  (audio through the rig)", [this] { addTrack (true); });
+    m.addItem ("Voice or Microphone  (audio, no rig)", [this] { addTrack (false, "Vocal"); });
 
     // Software instruments, by library section; each instrument's sounds in a submenu.
     juce::PopupMenu instruments;
@@ -1129,6 +1132,26 @@ void Studio::toggleMuteSelectedRegions()
     {
         if (allMuted) r.removeProperty (daw::ids::mute, &currentProject->undo);
         else          r.setProperty (daw::ids::mute, true, &currentProject->undo);
+    }
+}
+
+void Studio::toggleLoopSelectedRegions()
+{
+    juce::Array<juce::ValueTree> regions;
+    bool allLooped = true;
+    for (int id : selectedRegions)
+        if (auto r = findRegion (id); r.isValid())
+        {
+            regions.add (r);
+            allLooped = allLooped && (bool) r[daw::ids::loop];
+        }
+    if (regions.isEmpty())
+        return;
+    currentProject->undo.beginNewTransaction (allLooped ? "Unloop Regions" : "Loop Regions");
+    for (auto& r : regions)
+    {
+        if (allLooped) r.removeProperty (daw::ids::loop, &currentProject->undo);
+        else           r.setProperty (daw::ids::loop, true, &currentProject->undo);
     }
 }
 

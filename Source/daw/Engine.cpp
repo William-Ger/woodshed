@@ -1194,20 +1194,35 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                 if (! r.hasType (ids::REGION) || ! Project::isMidiRegion (r) || (bool) r[ids::mute])
                     continue;
 
-                const auto start = (juce::int64) r[ids::start];
-                const auto end = start + (juce::int64) r[ids::length];
-                const auto origin = Project::contentOrigin (r);
-                for (auto note : r)
+                const auto regionStart = (juce::int64) r[ids::start];
+                const auto length = (juce::int64) r[ids::length];
+                const auto loopsTo = project.loopEnd (r);
+                const int transpose = (int) r.getProperty (ids::transpose, 0);
+                const int velocityShift = (int) r.getProperty (ids::velocity, 0);
+
+                // The region, then (looped) its repeats up to the next region.
+                for (juce::int64 shift = 0; regionStart + shift < loopsTo; shift += juce::jmax ((juce::int64) 1, length))
                 {
-                    if (! note.hasType (ids::NOTE))
-                        continue;
-                    const auto n = Project::noteFrom (note);
-                    const auto on = origin + (juce::int64) std::llround (grid.fromTicks ((double) n.start));
-                    if (on < start || on >= end)
-                        continue;
-                    const auto off = juce::jmin (end, origin + (juce::int64) std::llround (grid.fromTicks ((double) (n.start + n.length))));
-                    tp.midi.push_back ({ on, true, (std::uint8_t) n.pitch, (float) n.velocity / 127.0f });
-                    tp.midi.push_back ({ juce::jmax (on + 1, off), false, (std::uint8_t) n.pitch, 0.0f });
+                    const auto start = regionStart + shift;
+                    const auto end = juce::jmin (start + length, loopsTo);
+                    const auto origin = Project::contentOrigin (r) + shift;
+                    for (auto note : r)
+                    {
+                        if (! note.hasType (ids::NOTE))
+                            continue;
+                        const auto n = Project::noteFrom (note);
+                        const int pitch = n.pitch + transpose;
+                        if (pitch < 0 || pitch > 127)
+                            continue;
+                        const auto on = origin + (juce::int64) std::llround (grid.fromTicks ((double) n.start));
+                        if (on < start || on >= end)
+                            continue;
+                        const auto off = juce::jmin (end, origin + (juce::int64) std::llround (grid.fromTicks ((double) (n.start + n.length))));
+                        tp.midi.push_back ({ on, true, (std::uint8_t) pitch, (float) juce::jlimit (1, 127, n.velocity + velocityShift) / 127.0f });
+                        tp.midi.push_back ({ juce::jmax (on + 1, off), false, (std::uint8_t) pitch, 0.0f });
+                    }
+                    if (! (bool) r[ids::loop])
+                        break;
                 }
             }
             std::stable_sort (tp.midi.begin(), tp.midi.end(), [] (const MidiPlayback& x, const MidiPlayback& y)
@@ -1221,6 +1236,31 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         {
             if (! r.hasType (ids::REGION) || Project::isMidiRegion (r) || (bool) r[ids::mute])
                 continue;
+
+            // Looped: copies of what the region plays, back to back up to the next region.
+            const size_t firstPlayback = tp.regions.size();
+            auto addRepeats = [&]
+            {
+                if (! (bool) r[ids::loop])
+                    return;
+                const auto length = (juce::int64) r[ids::length];
+                const auto loopsTo = project.loopEnd (r);
+                const auto count = tp.regions.size();
+                for (juce::int64 shift = length; length > 0 && (juce::int64) r[ids::start] + shift < loopsTo; shift += length)
+                    for (size_t i = firstPlayback; i < count; ++i)
+                    {
+                        auto copy = tp.regions[i];
+                        copy.start += shift;
+                        if (copy.start >= loopsTo)
+                            continue;
+                        if (copy.start + copy.length > loopsTo)
+                        {
+                            copy.length = loopsTo - copy.start;
+                            clampFades (copy.length, copy.fadeIn, 0, copy.fadeIn, copy.fadeOut);
+                        }
+                        tp.regions.push_back (copy);
+                    }
+            };
 
             // A take folder plays its comp: each segment from its take, a short crossfade at
             // every switch (the de-click edges), the folder's fades at its ends.
@@ -1257,6 +1297,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                     if (rp.length > 0)
                         tp.regions.push_back (std::move (rp));
                 }
+                addRepeats();
                 continue;
             }
 
@@ -1273,6 +1314,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                         rp.fadeIn, rp.fadeOut);
             if (rp.length > 0)
                 tp.regions.push_back (std::move (rp));
+            addRepeats();
         }
 
         snap->tracks.push_back (std::move (tp));

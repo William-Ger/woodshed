@@ -840,8 +840,33 @@ juce::int64 Project::contentEnd() const
     for (auto t : state)
         for (auto r : t)
             if (r.hasType (ids::REGION))
-                end = juce::jmax (end, (juce::int64) r[ids::start] + (juce::int64) r[ids::length]);
+                end = juce::jmax (end, loopEnd (r));
     return end;
+}
+
+juce::int64 Project::loopEnd (const juce::ValueTree& region) const
+{
+    const auto start = (juce::int64) region[ids::start];
+    const auto end = start + (juce::int64) region[ids::length];
+    if (! (bool) region[ids::loop])
+        return end;
+
+    // The song ends where the last region that doesn't loop ends.
+    juce::int64 songEnd = 0;
+    for (auto t : state)
+        for (auto r : t)
+            if (r.hasType (ids::REGION) && ! (bool) r[ids::loop])
+                songEnd = juce::jmax (songEnd, (juce::int64) r[ids::start] + (juce::int64) r[ids::length]);
+
+    auto limit = songEnd > end ? songEnd : end + (juce::int64) std::llround (grid().samplesPerBar() * loopLimitBars);
+    for (auto other : region.getParent())
+        if (other.hasType (ids::REGION) && other != region)
+        {
+            const auto otherStart = (juce::int64) other[ids::start];
+            if (otherStart >= end)
+                limit = juce::jmin (limit, otherStart);
+        }
+    return limit;
 }
 
 } // namespace woodshed::daw

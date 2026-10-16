@@ -34,6 +34,8 @@ namespace woodshed::daw
                    last values before and after).
         REGION  id (int, unique), name, start (timeline sample), offset, length (samples), gain (dB),
                 fadeIn, fadeOut (samples; equal-power, so overlapping fades cross-fade), mute (bool),
+                loop (bool: repeats until the next region on the track, else to the end of the song
+                (the end of the last region that doesn't loop), or loopLimitBars if that's earlier), transpose (semitones) and velocity (added, -127..127) for MIDI,
                 and either
                   file (path relative to the project folder; offset is the sample in the file), or
                   kind = "midi", with NOTE children: pitch (0..127), velocity (1..127),
@@ -63,7 +65,7 @@ namespace ids
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
     WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
-    WOODSHED_ID (comp) WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
+    WOODSHED_ID (loop) WOODSHED_ID (transpose) WOODSHED_ID (comp) WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
 #undef WOODSHED_ID
 }
@@ -73,6 +75,9 @@ namespace kinds
 {
     inline const juce::String audio { "audio" }, instrument { "instrument" }, midi { "midi" }, aux { "aux" }, folder { "folder" };
 }
+
+/** How far a looped region repeats when nothing after it says where to stop. */
+constexpr int loopLimitBars = 8;
 
 /** MIDI note positions are in ticks: 960 per quarter note. */
 constexpr int ticksPerQuarter = 960;
@@ -269,8 +274,11 @@ public:
     juce::int64 nextMarkerAfter (juce::int64 from) const;
     juce::int64 previousMarkerBefore (juce::int64 from) const;
 
-    /** End of the last region, in samples. */
+    /** End of the last region, in samples (counting looped regions' repeats). */
     juce::int64 contentEnd() const;
+    /** Where a looped region's repeats stop: the next region's start on its track, else the end
+        of the song, else loopLimitBars after its own end. Its own end if it doesn't loop. */
+    juce::int64 loopEnd (const juce::ValueTree& region) const;
 
     int nextId();
 

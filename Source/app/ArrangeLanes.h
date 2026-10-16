@@ -78,6 +78,8 @@ private:
     void drawLivePeaks (juce::Graphics&, const daw::LivePeaks&, juce::Rectangle<float> wave, juce::int64 start) const;
     void drawHint (juce::Graphics&, int contentBottom) const;
     void showRegionMenu();
+    void showRegionSettings();
+    void drawLoopRepeats (juce::Graphics&, const juce::ValueTree& region, int trackIndex, const RegionLook&);
 
     // Automation view: each lane shows its track's chosen parameter as a line of points.
     void drawAutomation (juce::Graphics&);

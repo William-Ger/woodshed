@@ -110,7 +110,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::playStop, cmd::record, cmd::returnToStart, cmd::toggleLoop, cmd::toggleClick, cmd::toggleCountIn,
                   cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
-                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager });
+                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions });
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -206,6 +206,8 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::quantize:        info.setInfo ("Quantize Notes", {}, "Edit", 0); info.addDefaultKeypress ('q', 0); break;
         case cmd::importMidi:      info.setInfo ("Import MIDI File...", {}, "File", 0); info.addDefaultKeypress ('i', cmdKey); break;
         case cmd::exportMidi:      info.setInfo ("Export MIDI File...", {}, "File", 0); break;
+        case cmd::loopRegions:     info.setInfo ("Loop Regions", {}, "Edit", 0); info.addDefaultKeypress ('l', 0);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
         case cmd::pluginManager:   info.setInfo ("Plug-in Manager...", {}, "View", 0); break;
         case cmd::showAutomation:  info.setInfo ("Show Automation", {}, "View", 0); info.addDefaultKeypress ('a', 0);
                                    info.setTicked (studio.isShowingAutomation()); break;
@@ -311,6 +313,7 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::importMidi:      studio.importMidiDialog(); break;
         case cmd::exportMidi:      studio.exportMidiDialog(); break;
         case cmd::pluginManager:   studio.plugins().showManager(); break;
+        case cmd::loopRegions:     studio.toggleLoopSelectedRegions(); break;
         case cmd::showAutomation:  studio.setShowingAutomation (! studio.isShowingAutomation()); break;
         case cmd::quantize:
             if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
@@ -379,6 +382,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::splitAtPlayhead);
             m.addCommandItem (cm, cmd::repeatRegions);
             m.addCommandItem (cm, cmd::muteRegions);
+            m.addCommandItem (cm, cmd::loopRegions);
             m.addCommandItem (cm, cmd::nudgeLeft);
             m.addCommandItem (cm, cmd::nudgeRight);
             m.addCommandItem (cm, cmd::quantize);

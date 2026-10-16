@@ -203,6 +203,7 @@ void Lanes::paint (juce::Graphics& g)
                 (gesture == Gesture::fadeIn ? look.fadeIn : look.fadeOut) = fadeLength;
             }
 
+            drawLoopRepeats (g, r, i, look);
             drawRegion (g, r, i, look);
         }
     }
@@ -455,6 +456,31 @@ void Lanes::drawWave (juce::Graphics& g, const juce::File& file, juce::int64 fil
         g.setFont (theme::font (11.0f));
         g.drawText (file.existsAsFile() ? "Reading..." : "Missing audio file", wave.reduced (6.0f, 0.0f),
                     juce::Justification::centredLeft, true);
+    }
+}
+
+void Lanes::drawLoopRepeats (juce::Graphics& g, const juce::ValueTree& region, int trackIndex, const RegionLook& look)
+{
+    if (! (bool) region[ids::loop] || look.ghost || look.length <= 0)
+        return;
+
+    // Lighter copies after the region, up to where its loop stops, each with a notch at its start.
+    const auto end = view.project().loopEnd (region) + (look.start - (juce::int64) region[ids::start]);
+    auto colour = trackColour (view.project().track (trackIndex));
+    if (look.muted)
+        colour = colour.withSaturation (0.12f);
+    for (auto from = look.start + look.length; from < end; from += look.length)
+    {
+        const auto rect = regionRect (trackIndex, from, juce::jmin (look.length, end - from));
+        if (rect.getX() > (float) getWidth())
+            break;
+        if (rect.getRight() < 0.0f)
+            continue;
+        g.setColour (colour.withAlpha (0.12f));
+        g.fillRoundedRectangle (rect, regionRadius);
+        g.setColour (colour.withAlpha (0.4f));
+        g.drawRoundedRectangle (rect.reduced (0.5f), regionRadius, 1.0f);
+        g.fillRect (juce::Rectangle<float> (rect.getX(), rect.getY() + 3.0f, 2.0f, nameBarHeight - 6.0f));
     }
 }
 
@@ -1351,6 +1377,8 @@ void Lanes::showRegionMenu()
     m.addItem ("Split at Playhead", [&studio] { studio.splitSelectedAtPlayhead(); });
     m.addItem ("Repeat", [&studio] { studio.repeatSelectedRegions(); });
     m.addItem ("Mute / Unmute", [&studio] { studio.toggleMuteSelectedRegions(); });
+    m.addItem ("Loop / Unloop", [&studio] { studio.toggleLoopSelectedRegions(); });
+    m.addItem ("Region Settings...", [this] { showRegionSettings(); });
     m.addItem ("Loop These Regions", [&studio] { studio.commands.invokeDirectly (cmd::loopToSelection, false); });
     m.addItem ("Remove Fades", [this] { removeFadesFromSelection(); });
 
@@ -1392,6 +1420,97 @@ void Lanes::showRegionMenu()
     m.addSeparator();
     m.addItem ("Delete", [&studio] { studio.deleteSelectedRegions(); });
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+}
+
+void Lanes::showRegionSettings()
+{
+    auto& studio = view.studio;
+    if (studio.getSelectedRegions().isEmpty())
+        return;
+    auto region = studio.findRegion (studio.getSelectedRegions().getFirst());
+    if (! region.isValid())
+        return;
+
+    // Logic's region inspector, as a popover: name, loop, gain or (MIDI) transpose and velocity.
+    struct Settings final : public juce::Component
+    {
+        Settings (Studio& s, juce::ValueTree r) : studio (s), region (std::move (r))
+        {
+            const bool midi = daw::Project::isMidiRegion (region);
+            name.setText (region[ids::name].toString(), juce::dontSendNotification);
+            name.onReturnKey = name.onFocusLost = [this]
+            {
+                if (name.getText().isNotEmpty() && name.getText() != region[ids::name].toString())
+                {
+                    studio.project().undo.beginNewTransaction ("Rename Region");
+                    region.setProperty (ids::name, name.getText(), &studio.project().undo);
+                }
+            };
+            loop.setToggleState ((bool) region[ids::loop], juce::dontSendNotification);
+            loop.onClick = [this]
+            {
+                studio.project().undo.beginNewTransaction ("Loop Region");
+                region.setProperty (ids::loop, loop.getToggleState(), &studio.project().undo);
+            };
+            auto setup = [this] (juce::Slider& slider, juce::Label& label, const juce::String& text, double lo, double hi, double step,
+                                 const juce::Identifier& prop, const juce::String& suffix)
+            {
+                label.setText (text, juce::dontSendNotification);
+                label.setColour (juce::Label::textColourId, theme::dimText);
+                slider.setSliderStyle (juce::Slider::LinearHorizontal);
+                slider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 56, 20);
+                slider.setRange (lo, hi, step);
+                slider.setTextValueSuffix (suffix);
+                slider.setValue ((double) region.getProperty (prop, 0.0), juce::dontSendNotification);
+                slider.setDoubleClickReturnValue (true, 0.0);
+                slider.onDragStart = [this, text] { studio.project().undo.beginNewTransaction ("Region " + text); };
+                slider.onValueChange = [this, &slider, prop]
+                {
+                    if (juce::approximatelyEqual (slider.getValue(), 0.0) && prop != ids::gain) region.removeProperty (prop, &studio.project().undo);
+                    else region.setProperty (prop, slider.getValue(), &studio.project().undo);
+                };
+                addAndMakeVisible (slider);
+                addAndMakeVisible (label);
+            };
+            if (midi)
+            {
+                setup (first, firstLabel, "Transpose", -36.0, 36.0, 1.0, ids::transpose, " st");
+                setup (second, secondLabel, "Velocity", -64.0, 64.0, 1.0, ids::velocity, "");
+            }
+            else
+                setup (first, firstLabel, "Gain", -24.0, 12.0, 0.1, ids::gain, " dB");
+            addAndMakeVisible (name);
+            addAndMakeVisible (loop);
+            setSize (280, midi ? 150 : 118);
+        }
+
+        void resized() override
+        {
+            auto r = getLocalBounds().reduced (12);
+            name.setBounds (r.removeFromTop (24));
+            r.removeFromTop (8);
+            loop.setBounds (r.removeFromTop (22));
+            r.removeFromTop (6);
+            auto row = r.removeFromTop (24);
+            firstLabel.setBounds (row.removeFromLeft (70));
+            first.setBounds (row);
+            r.removeFromTop (6);
+            row = r.removeFromTop (24);
+            secondLabel.setBounds (row.removeFromLeft (70));
+            second.setBounds (row);
+        }
+
+        Studio& studio;
+        juce::ValueTree region;
+        juce::TextEditor name;
+        juce::ToggleButton loop { "Loop (repeat until the next region)" };
+        juce::Slider first, second;
+        juce::Label firstLabel, secondLabel;
+    };
+
+    const auto rect = regionRect (view.project().state.indexOf (region.getParent()), (juce::int64) region[ids::start], (juce::int64) region[ids::length]);
+    juce::CallOutBox::launchAsynchronously (std::make_unique<Settings> (studio, region),
+                                            localAreaToGlobal (rect.toNearestInt().withHeight (24)), nullptr);
 }
 
 void Lanes::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)

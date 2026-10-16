@@ -22,7 +22,7 @@ namespace cmd
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
         newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation,
-        importMidi, exportMidi, pluginManager
+        importMidi, exportMidi, pluginManager, loopRegions
     };
 }
 
@@ -88,7 +88,9 @@ public:
     juce::ValueTree findRegion (int regionId) const;
 
     // Edits that several views trigger.
-    juce::ValueTree addTrack();
+    /** An audio track after the selected one: through the guitar rig, or straight (a voice or
+        any microphone or line source), named `name` or "Track N". */
+    juce::ValueTree addTrack (bool throughRig = true, const juce::String& name = {});
     /** A software instrument track after the selected one, playing `type` with its patch `patchIndex`. */
     juce::ValueTree addInstrumentTrack (const juce::String& type, int patchIndex = 0);
     /** An aux (bus) after the selected track; with `withEffect`, that pedal type on it (a shared reverb). */
@@ -140,6 +142,8 @@ public:
     void nudgeSelectedRegions (int direction);
     /** Mutes the selected regions, or unmutes them if they're all muted. */
     void toggleMuteSelectedRegions();
+    /** Loops the selected regions (Logic's L), or unloops them if they all loop. */
+    void toggleLoopSelectedRegions();
     void toggleSelectedTrack (const juce::Identifier& property);
 
     /** Logic's automation view (A): every track shows the line of its chosen parameter. */
