@@ -108,7 +108,7 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         // Input monitoring (IN) always adds the live input. Armed tracks also go live while
         // stopped or recording. Takes play whenever the song plays, except on a track that is
         // recording a new one.
-        const bool hearInput = (track.monitor || (track.armed && (! b.playing || b.recording))) && b.inputs != nullptr;
+        const bool hearInput = b.monitorInputs && (track.monitor || (track.armed && (! b.playing || b.recording))) && b.inputs != nullptr;
         const bool playTakes = b.playing && ! (track.armed && b.recording);
 
         if (hearInput && juce::isPositiveAndBelow (track.input, b.numInputs) && b.inputs[track.input] != nullptr)
@@ -702,6 +702,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         b.recording = isRec;
         b.inputs = ins.data();
         b.numInputs = numIns;
+        b.monitorInputs = ! feedbackProtection.load (std::memory_order_relaxed);
         b.left = mixBuffer.getWritePointer (0);
         b.right = mixBuffer.getWritePointer (1);
         Mixer::render (snap, b);

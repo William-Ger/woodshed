@@ -161,6 +161,30 @@ void Studio::changeListenerCallback (juce::ChangeBroadcaster*)
         flash ("Switched to " + wanted.outputDeviceName);
 }
 
+void Studio::checkFeedbackRisk()
+{
+    // The computer's own microphone with its own speakers: whatever the mic hears comes straight
+    // back out a few inches away and howls (worse through a guitar amp). Headphones are fine.
+    const auto setup = deviceManager.getAudioDeviceSetup();
+    auto builtIn = [] (const juce::String& name)
+    {
+        return name.containsIgnoreCase ("MacBook") || name.containsIgnoreCase ("Built-in") || name.containsIgnoreCase ("iMac")
+            || name.containsIgnoreCase ("Mac mini") || name.containsIgnoreCase ("Mac Studio") || name.containsIgnoreCase ("Realtek")
+            || name.containsIgnoreCase ("Internal");
+    };
+    const bool micIn = builtIn (setup.inputDeviceName) || setup.inputDeviceName.containsIgnoreCase ("Microphone Array");
+    const bool speakersOut = (builtIn (setup.outputDeviceName) && ! setup.outputDeviceName.containsIgnoreCase ("Headphone"))
+                          || setup.outputDeviceName.containsIgnoreCase ("Speakers");
+    const bool risk = micIn && speakersOut && deviceManager.getCurrentAudioDevice() != nullptr;
+
+    if (risk == feedbackRisk)
+        return;
+    feedbackRisk = risk;
+    engineInstance->setFeedbackProtection (risk);
+    if (risk)
+        flash ("Built-in mic and speakers: live input is muted to stop feedback. Use headphones or your interface to hear it.");
+}
+
 void Studio::checkAudioAlive()
 {
     if (retryTicks > 0)
@@ -612,6 +636,7 @@ void Studio::flash (const juce::String& message)
 void Studio::timerCallback()
 {
     checkAudioAlive();
+    checkFeedbackRisk();
 
     if (flashTicks > 0 && --flashTicks == 0)
     {

@@ -121,6 +121,9 @@ private:
     /** Reopens the interface when it stops calling back (a USB blip leaves a dead device behind
         under the same name, so the device list alone never shows the change). */
     void checkAudioAlive();
+    /** Turns feedback protection on while the computer's own mic and speakers are in use. */
+    void checkFeedbackRisk();
+    bool feedbackRisk = false;
     juce::uint64 lastCallbackCount = 0;
     int silentTicks = 0, retryTicks = 0;
 
