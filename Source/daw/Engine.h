@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Project.h"
+#include "../instruments/Instrument.h"
+#include "../engine/Registry.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -27,6 +29,8 @@ private:
 
 /** Makes the guitar rig that sits on every audio track (the pedalboard, amp and cab). */
 using RigFactory = std::function<std::unique_ptr<juce::AudioProcessor>()>;
+/** Makes a software instrument by type id (InstrumentRegistry), or null if unknown. */
+using InstrumentFactory = std::function<std::unique_ptr<Instrument> (const juce::String& type)>;
 
 //==============================================================================
 /** The waveform of a take while it records: one peak per `hop` samples, written by the audio
@@ -70,11 +74,25 @@ private:
 };
 
 //==============================================================================
+/** One insert effect's pedal, kept while its FX node keeps its id and type. */
+struct InsertRuntime
+{
+    int id = 0;
+    juce::String type;
+    std::shared_ptr<Pedal> pedal;
+};
+
 /** Per-track state that lives as long as the track does, shared by successive snapshots. */
 struct TrackRuntime
 {
     int id = 0;
     std::unique_ptr<juce::AudioProcessor> rig;
+    juce::String instrumentType;
+    std::shared_ptr<Instrument> instrument;                             // instrument tracks
+    std::vector<InsertRuntime> inserts;                                 // message thread
+    std::vector<NoteEvent> events;                                      // audio thread scratch
+    juce::int64 expectedPosition = -1;                                  // audio thread: where the next block should start
+    bool notesSounding = false;                                         // audio thread
     juce::AudioBuffer<float> work;                                      // audio thread scratch
     juce::SmoothedValue<float> gainLeft, gainRight;
     std::atomic<float> peakLeft { 0.0f }, peakRight { 0.0f };          // audio thread accumulates
@@ -91,10 +109,30 @@ struct RegionPlayback
     float gain = 1.0f;
 };
 
+/** A note-on or note-off of a MIDI region, at a timeline sample. */
+struct MidiPlayback
+{
+    juce::int64 time = 0;
+    bool on = true;
+    std::uint8_t pitch = 60;
+    float velocity = 0.8f;
+};
+
+struct InsertPlayback
+{
+    std::shared_ptr<Pedal> pedal;
+    bool on = true;
+    std::array<float, Pedal::maxKnobs> knobs {};
+};
+
 struct TrackPlayback
 {
     std::shared_ptr<TrackRuntime> runtime;
     std::vector<RegionPlayback> regions;
+    std::shared_ptr<Instrument> instrument;                             // instrument tracks
+    std::array<float, Instrument::maxKnobs> instrumentKnobs {};
+    std::vector<MidiPlayback> midi;                                     // in time order, offs first
+    std::vector<InsertPlayback> inserts;
     float gain = 1.0f, pan = 0.0f;
     bool audible = true;            // mute and solo resolved
     bool armed = false, monitor = false, rigOn = true;
@@ -124,6 +162,11 @@ struct Mixer
         int numInputs = 0;
         float* left = nullptr;
         float* right = nullptr;         // cleared, then the mix is added
+
+        // Notes played live (a MIDI keyboard or musical typing), for one track.
+        int liveTrackId = -1;
+        const NoteEvent* liveEvents = nullptr;     // offsets within this block, in order
+        int numLiveEvents = 0;
     };
 
     static void render (const Snapshot&, const Block&);
@@ -147,7 +190,7 @@ class Engine final : public juce::AudioIODeviceCallback,
                      private juce::Timer
 {
 public:
-    Engine (juce::AudioDeviceManager&, RigFactory);
+    Engine (juce::AudioDeviceManager&, RigFactory, InstrumentFactory = {});
     ~Engine() override;
 
     /** Message thread. The engine doesn't own the project; pass nullptr before deleting it. */
@@ -181,6 +224,21 @@ public:
     void removeTrack (juce::ValueTree track);
     /** Copies every rig's settings into its track's RIG child; call before saving. */
     void syncRigStates();
+
+    /** The instrument on an instrument track (for its panel), or null. */
+    Instrument* getInstrument (int trackId) const;
+
+    // Live MIDI. Every enabled MIDI input, and musical typing, plays the target track (the
+    // selected one, when it's an instrument track) and records into it when it's armed.
+    void setMidiTarget (int trackId)                        { midiTarget = trackId; }
+    int getMidiTarget() const                               { return midiTarget.load(); }
+    /** Message thread or a MIDI thread. */
+    void sendLiveMidi (const juce::MidiMessage&);
+    /** Turns on every MIDI input the system has (new ones too); call now and then. */
+    void enableMidiInputs();
+    /** Notes recorded so far in the current take (for drawing), at timeline samples. */
+    struct RecordedNote { juce::int64 start = 0, end = -1; int pitch = 60, velocity = 100; };
+    const std::vector<RecordedNote>& getRecordedNotes() const   { return recordedNotes; }
 
     // Meters: the peak over the last 30 Hz frame, linear. Any number of views can read them.
     struct Levels { float left = 0.0f, right = 0.0f; };
@@ -221,6 +279,9 @@ public:
     void audioDeviceIOCallbackWithContext (const float* const* inputs, int numInputs, float* const* outputs,
                                            int numOutputs, int numSamples, const juce::AudioIODeviceCallbackContext&) override;
     void audioDeviceAboutToStart (juce::AudioIODevice*) override;
+    /** What the engine's 30 Hz timer does (meters, freeing old snapshots, closing finished
+        takes); tests call it directly. Message thread. */
+    void service()                                          { timerCallback(); }
     /** What audioDeviceAboutToStart does; tests call it directly. No callbacks may be running. */
     void prepare (double sampleRate, int blockSize);
     void audioDeviceStopped() override;
@@ -236,12 +297,17 @@ private:
 
     void syncRuntimes();
     void prepareRig (TrackRuntime&);
+    /** Brings a runtime's instrument and inserts in line with its track (message thread). */
+    void syncTrackDevices (TrackRuntime&, const juce::ValueTree& track, double rate, int block);
+    void drainRecordedMidi();
+    void finishMidiTake (int trackId, juce::int64 stopAt);
     void publish();
     void finishRecording();
     void freeRetired();
 
     juce::AudioDeviceManager& deviceManager;
     RigFactory makeRig;
+    InstrumentFactory makeInstrument;
     Project* project = nullptr;
     AudioPool pool;
 
@@ -266,9 +332,21 @@ private:
     Levels masterShown;
     std::atomic<juce::uint64> callbackCount { 0 };
 
+    // Live MIDI in, and what the audio thread records of it for the message thread.
+    juce::MidiMessageCollector liveMidi;
+    juce::MidiBuffer liveBuffer;                                    // audio thread
+    std::vector<NoteEvent> liveEvents;                              // audio thread
+    std::atomic<int> midiTarget { -1 };
+    struct MidiStamp { juce::int64 time; std::uint8_t pitch, velocity; bool on; };
+    juce::AbstractFifo midiRecordFifo { 8192 };
+    std::array<MidiStamp, 8192> midiRecordRing {};
+    std::atomic<int> midiRecordTrack { -1 };                        // the take's track while recording
+    std::vector<RecordedNote> recordedNotes;                        // message thread
+    int midiLatencyAtRecord = 0;
+
     // Recording bookkeeping (message thread).
     struct Take { int trackId; juce::File file; std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer;
-                  std::unique_ptr<LivePeaks> peaks; juce::int64 samples = 0; };
+                  std::unique_ptr<LivePeaks> peaks; juce::int64 samples = 0; bool midi = false; };
     std::vector<Take> takes;
     std::atomic<juce::int64> recordedSamples { 0 };
     juce::uint64 stopRequestedAt = 0;

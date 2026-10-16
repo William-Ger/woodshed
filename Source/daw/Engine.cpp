@@ -91,6 +91,76 @@ void AudioPool::forget (const juce::File& file)
 }
 
 //==============================================================================
+namespace
+{
+/** The instrument's events for this block: an all-notes-off after a jump or stop, the regions'
+    notes, and the live ones merged in, all in time order. */
+void collectNoteEvents (const TrackPlayback& track, TrackRuntime& rt, const Mixer::Block& b)
+{
+    auto& ev = rt.events;
+    ev.clear();
+    auto push = [&ev] (const NoteEvent& e) { if (ev.size() < ev.capacity()) ev.push_back (e); };
+
+    const int n = b.numSamples;
+    if (b.playing)
+    {
+        if (rt.notesSounding && rt.expectedPosition != b.position)
+        {
+            push ({ 0, NoteEvent::allNotesOff, 0, 0.0f });
+            rt.notesSounding = false;
+        }
+
+        auto it = std::lower_bound (track.midi.begin(), track.midi.end(), b.position,
+                                    [] (const MidiPlayback& m, juce::int64 t) { return m.time < t; });
+        for (; it != track.midi.end() && it->time < b.position + n; ++it)
+        {
+            push ({ (int) (it->time - b.position), it->on ? NoteEvent::noteOn : NoteEvent::noteOff, it->pitch, it->velocity });
+            rt.notesSounding = rt.notesSounding || it->on;
+        }
+        rt.expectedPosition = b.position + n;
+    }
+    else
+    {
+        if (rt.notesSounding)
+            push ({ 0, NoteEvent::allNotesOff, 0, 0.0f });
+        rt.notesSounding = false;
+        rt.expectedPosition = -1;
+    }
+
+    if (b.liveTrackId == rt.id && b.numLiveEvents > 0)
+    {
+        // Both lists are in time order; merge the live ones in.
+        const auto regionCount = ev.size();
+        for (int i = 0; i < b.numLiveEvents; ++i)
+            push (b.liveEvents[i]);
+        std::inplace_merge (ev.begin(), ev.begin() + (std::ptrdiff_t) regionCount, ev.end(),
+                            [] (const NoteEvent& x, const NoteEvent& y) { return x.offset < y.offset; });
+    }
+}
+
+void runInserts (const TrackPlayback& track, float* left, float* right, int n)
+{
+    for (auto& fx : track.inserts)
+    {
+        if (! fx.on || fx.pedal == nullptr)
+            continue;
+
+        auto& pedal = *fx.pedal;
+        for (int k = 0; k < Pedal::maxKnobs; ++k)
+            pedal.setKnob (k, fx.knobs[(size_t) k]);
+        pedal.update();
+
+        if (pedal.producesStereo())
+            pedal.processStereo (left, right, n);
+        else
+        {
+            pedal.processChannel (0, left, n);
+            pedal.processChannel (1, right, n);
+        }
+    }
+}
+}
+
 void Mixer::render (const Snapshot& snap, const Block& b)
 {
     const int n = b.numSamples;
@@ -105,45 +175,61 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         float* c = rt.work.getWritePointer (1);
         juce::FloatVectorOperations::clear (a, n);
 
-        // Input monitoring (IN) always adds the live input. Armed tracks also go live while
-        // stopped or recording. Takes play whenever the song plays, except on a track that is
-        // recording a new one.
-        const bool hearInput = (track.monitor || (track.armed && (! b.playing || b.recording))) && b.inputs != nullptr;
-        const bool playTakes = b.playing && ! (track.armed && b.recording);
-
-        if (hearInput && juce::isPositiveAndBelow (track.input, b.numInputs) && b.inputs[track.input] != nullptr)
-            juce::FloatVectorOperations::copy (a, b.inputs[track.input], n);
-
-        if (playTakes)
+        if (track.instrument != nullptr)
         {
-            for (auto& r : track.regions)
-            {
-                const auto from = juce::jmax (r.start, b.position);
-                const auto to = juce::jmin (r.start + r.length, b.position + n);
-                if (from >= to)
-                    continue;
+            juce::FloatVectorOperations::clear (c, n);
+            collectNoteEvents (track, rt, b);
 
-                const float* src = r.audio->getReadPointer (0);
-                for (auto t = from; t < to; ++t)
+            auto& instrument = *track.instrument;
+            for (int k = 0; k < Instrument::maxKnobs; ++k)
+                instrument.setKnob (k, track.instrumentKnobs[(size_t) k]);
+            instrument.update();
+            instrument.render (a, c, n, rt.events.data(), (int) rt.events.size());
+        }
+        else
+        {
+            // Input monitoring (IN) always adds the live input. Armed tracks also go live while
+            // stopped or recording. Takes play whenever the song plays, except on a track that is
+            // recording a new one.
+            const bool hearInput = (track.monitor || (track.armed && (! b.playing || b.recording))) && b.inputs != nullptr;
+            const bool playTakes = b.playing && ! (track.armed && b.recording);
+
+            if (hearInput && juce::isPositiveAndBelow (track.input, b.numInputs) && b.inputs[track.input] != nullptr)
+                juce::FloatVectorOperations::copy (a, b.inputs[track.input], n);
+
+            if (playTakes)
+            {
+                for (auto& r : track.regions)
                 {
-                    const auto intoRegion = t - r.start;
-                    const auto fromEnd = r.start + r.length - 1 - t;
-                    float g = r.gain;
-                    if (intoRegion < r.fadeIn) g *= fadeCurve ((float) intoRegion / (float) r.fadeIn);
-                    if (fromEnd < r.fadeOut)   g *= fadeCurve ((float) fromEnd / (float) r.fadeOut);
-                    a[t - b.position] += src[r.offset + intoRegion] * g;
+                    const auto from = juce::jmax (r.start, b.position);
+                    const auto to = juce::jmin (r.start + r.length, b.position + n);
+                    if (from >= to)
+                        continue;
+
+                    const float* src = r.audio->getReadPointer (0);
+                    for (auto t = from; t < to; ++t)
+                    {
+                        const auto intoRegion = t - r.start;
+                        const auto fromEnd = r.start + r.length - 1 - t;
+                        float g = r.gain;
+                        if (intoRegion < r.fadeIn) g *= fadeCurve ((float) intoRegion / (float) r.fadeIn);
+                        if (fromEnd < r.fadeOut)   g *= fadeCurve ((float) fromEnd / (float) r.fadeOut);
+                        a[t - b.position] += src[r.offset + intoRegion] * g;
+                    }
                 }
+            }
+
+            juce::FloatVectorOperations::copy (c, a, n);
+
+            if (track.rigOn && rt.rig != nullptr)
+            {
+                juce::AudioBuffer<float> view (rt.work.getArrayOfWritePointers(), 2, n);
+                juce::MidiBuffer noMidi;
+                rt.rig->processBlock (view, noMidi);
             }
         }
 
-        juce::FloatVectorOperations::copy (c, a, n);
-
-        if (track.rigOn && rt.rig != nullptr)
-        {
-            juce::AudioBuffer<float> view (rt.work.getArrayOfWritePointers(), 2, n);
-            juce::MidiBuffer noMidi;
-            rt.rig->processBlock (view, noMidi);
-        }
+        runInserts (track, a, c, n);
 
         // Constant-power pan, unity in the middle.
         const float angle = (juce::jlimit (-1.0f, 1.0f, track.pan) + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
@@ -192,11 +278,16 @@ void Mixer::addClick (const Snapshot& snap, const Block& b, float level)
 }
 
 //==============================================================================
-Engine::Engine (juce::AudioDeviceManager& dm, RigFactory factory)
-    : deviceManager (dm), makeRig (std::move (factory))
+Engine::Engine (juce::AudioDeviceManager& dm, RigFactory factory, InstrumentFactory instruments)
+    : deviceManager (dm), makeRig (std::move (factory)), makeInstrument (std::move (instruments))
 {
+    liveMidi.reset (sampleRate);
+    liveBuffer.ensureSize (4096);
+    liveEvents.reserve (1024);
+    recordedNotes.reserve (4096);
     writerThread.startThread();
     deviceManager.addAudioCallback (this);
+    deviceManager.addMidiInputDeviceCallback ({}, &liveMidi);
     startTimerHz (30);
 }
 
@@ -206,6 +297,7 @@ Engine::~Engine()
     if (bounceThread != nullptr)
         bounceThread->stopThread (5000);
 
+    deviceManager.removeMidiInputDeviceCallback ({}, &liveMidi);
     deviceManager.removeAudioCallback (this);
     setProject (nullptr);
 
@@ -277,6 +369,7 @@ void Engine::stop()
                 it->second->livePeaks = nullptr;
             }
 
+        midiRecordTrack = -1;
         stopRequestedAt = callbackCount.load();
         finishPending = true;
     }
@@ -309,6 +402,22 @@ void Engine::record()
     project->audioFolder().createDirectory();
 
     takes.clear();
+    recordedNotes.clear();
+    midiRecordFifo.reset();
+
+    // MIDI records into the track it plays: the MIDI target, if it's an armed instrument track,
+    // else the first armed instrument track (which then becomes the target).
+    {
+        auto target = project->trackById (midiTarget.load());
+        if (! (target.isValid() && Project::isInstrumentTrack (target) && (bool) target[ids::arm]))
+            for (auto t : project->state)
+                if (t.hasType (ids::TRACK) && Project::isInstrumentTrack (t) && (bool) t[ids::arm])
+                {
+                    midiTarget = (int) t[ids::id];
+                    break;
+                }
+    }
+
     for (auto t : project->state)
     {
         if (! t.hasType (ids::TRACK) || ! (bool) t[ids::arm])
@@ -318,6 +427,18 @@ void Engine::record()
         auto it = runtimes.find (id);
         if (it == runtimes.end())
             continue;
+
+        if (Project::isInstrumentTrack (t))
+        {
+            if (id == midiTarget.load())
+            {
+                Take take;
+                take.trackId = id;
+                take.midi = true;
+                takes.push_back (std::move (take));
+            }
+            continue;
+        }
 
         auto file = project->audioFolder().getNonexistentChildFile (juce::File::createLegalFileName (t[ids::name].toString()) + " take", ".wav", true);
         std::unique_ptr<juce::OutputStream> stream (file.createOutputStream());
@@ -344,6 +465,12 @@ void Engine::record()
         return;
 
     latencyAtRecord = getRecordLatencySamples();
+    midiLatencyAtRecord = 0;
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+        midiLatencyAtRecord = device->getOutputLatencyInSamples();
+    for (auto& t : takes)
+        if (t.midi)
+            midiRecordTrack = t.trackId;
     recordedSamples = 0;
 
     const auto grid = project->grid();
@@ -391,8 +518,23 @@ void Engine::finishRecording()
     placeRecording (recordStart.load(), latencyAtRecord, start, offset);
 
     bool added = false;
+    drainRecordedMidi();
+
     for (auto& t : takes)
     {
+        if (t.midi)
+        {
+            auto track = project != nullptr ? project->trackById (t.trackId) : juce::ValueTree();
+            if (! track.isValid() || recordedNotes.empty())
+                continue;
+
+            if (! added)
+                project->undo.beginNewTransaction ("Record");
+            added = true;
+            finishMidiTake (t.trackId, recordStart.load() + samples);
+            continue;
+        }
+
         t.writer.reset();   // flushes and closes the file
 
         auto track = project != nullptr ? project->trackById (t.trackId) : juce::ValueTree();
@@ -415,6 +557,85 @@ void Engine::finishRecording()
 
     takes.clear();
     sendChangeMessage();
+}
+
+void Engine::finishMidiTake (int trackId, juce::int64 stopAt)
+{
+    auto track = project->trackById (trackId);
+    const auto grid = project->grid();
+
+    // Notes still held when recording stopped end there; everything moves back by the output
+    // latency, since you played along with what you heard.
+    std::vector<RecordedNote> notes;
+    juce::int64 last = stopAt;
+    for (auto n : recordedNotes)
+    {
+        if (n.end < 0) n.end = stopAt;
+        n.start = juce::jmax ((juce::int64) 0, n.start - midiLatencyAtRecord);
+        n.end = juce::jmax (n.start + 1, n.end - midiLatencyAtRecord);
+        last = juce::jmax (last, n.end);
+        notes.push_back (n);
+    }
+
+    // Like Logic, the region runs from the bar the recording started in to the end of the bar
+    // it stopped in.
+    const auto bar = grid.samplesPerBar();
+    const auto from = (juce::int64) (std::floor ((double) juce::jmax ((juce::int64) 0, recordStart.load()) / bar) * bar);
+    const auto to = (juce::int64) (std::ceil ((double) last / bar) * bar);
+
+    auto region = project->addMidiRegion (track, from, juce::jmax ((juce::int64) bar, to - from), track[ids::name].toString());
+    for (auto& n : notes)
+    {
+        Note note;
+        note.pitch = n.pitch;
+        note.velocity = n.velocity;
+        note.start = std::llround (grid.toTicks ((double) (n.start - from)));
+        note.length = juce::jmax ((juce::int64) 1, (juce::int64) std::llround (grid.toTicks ((double) (n.end - n.start))));
+        project->addNote (region, note);
+    }
+}
+
+void Engine::drainRecordedMidi()
+{
+    const auto scope = midiRecordFifo.read (midiRecordFifo.getNumReady());
+    auto take = [this] (const MidiStamp& m)
+    {
+        if (m.on)
+        {
+            if (recordedNotes.size() < recordedNotes.capacity())
+                recordedNotes.push_back ({ m.time, -1, m.pitch, m.velocity });
+            return;
+        }
+        for (auto it = recordedNotes.rbegin(); it != recordedNotes.rend(); ++it)
+            if (it->pitch == m.pitch && it->end < 0)
+            {
+                it->end = juce::jmax (it->start + 1, m.time);
+                break;
+            }
+    };
+    for (int i = 0; i < scope.blockSize1; ++i) take (midiRecordRing[(size_t) (scope.startIndex1 + i)]);
+    for (int i = 0; i < scope.blockSize2; ++i) take (midiRecordRing[(size_t) (scope.startIndex2 + i)]);
+}
+
+void Engine::sendLiveMidi (const juce::MidiMessage& message)
+{
+    auto m = message;
+    m.setTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001);
+    liveMidi.addMessageToQueue (m);
+}
+
+void Engine::enableMidiInputs()
+{
+    for (auto& device : juce::MidiInput::getAvailableDevices())
+        if (! deviceManager.isMidiInputDeviceEnabled (device.identifier))
+            deviceManager.setMidiInputDeviceEnabled (device.identifier, true);
+}
+
+Instrument* Engine::getInstrument (int trackId) const
+{
+    if (auto it = runtimes.find (trackId); it != runtimes.end())
+        return it->second->instrument.get();
+    return nullptr;
 }
 
 const LivePeaks* Engine::getLivePeaks (int trackId) const
@@ -481,6 +702,57 @@ void Engine::prepareRig (TrackRuntime& rt)
         rt.rig->setRateAndBufferSizeDetails (sampleRate, blockSize);
         rt.rig->prepareToPlay (sampleRate, blockSize);
     }
+
+    if (rt.instrument != nullptr)
+        rt.instrument->prepare (sampleRate, blockSize);
+    for (auto& fx : rt.inserts)
+        fx.pedal->prepare (sampleRate, blockSize);
+    rt.expectedPosition = -1;
+    rt.notesSounding = false;
+}
+
+void Engine::syncTrackDevices (TrackRuntime& rt, const juce::ValueTree& track, double rate, int block)
+{
+    if (rt.events.capacity() < 4096)
+        rt.events.reserve (4096);
+
+    // The instrument: replaced when the track switches to another one. A snapshot still playing
+    // the old one keeps it alive until the audio thread lets go.
+    const auto type = Project::isInstrumentTrack (track) ? track.getChildWithName (ids::INSTRUMENT)[ids::type].toString() : juce::String();
+    if (type != rt.instrumentType)
+    {
+        rt.instrumentType = type;
+        rt.instrument.reset();
+        if (type.isNotEmpty() && makeInstrument)
+            if (auto made = makeInstrument (type))
+            {
+                made->prepare (rate, block);
+                rt.instrument = std::move (made);
+            }
+    }
+
+    // Inserts: keep each pedal (and its tails) while its FX node keeps its id and type.
+    std::vector<InsertRuntime> next;
+    for (auto fx : Project::inserts (track))
+    {
+        const int id = (int) fx[ids::id];
+        const auto pedalType = fx[ids::type].toString();
+        auto existing = std::find_if (rt.inserts.begin(), rt.inserts.end(),
+                                      [&] (const InsertRuntime& r) { return r.id == id && r.type == pedalType; });
+        if (existing != rt.inserts.end())
+        {
+            next.push_back (*existing);
+            continue;
+        }
+
+        if (auto* pt = Registry::get().find (pedalType))
+        {
+            std::shared_ptr<Pedal> pedal = pt->create();
+            pedal->prepare (rate, block);
+            next.push_back ({ id, pedalType, std::move (pedal) });
+        }
+    }
+    rt.inserts = std::move (next);
 }
 
 void Engine::syncRuntimes()
@@ -497,13 +769,15 @@ void Engine::syncRuntimes()
             const int id = (int) t[ids::id];
             if (auto it = runtimes.find (id); it != runtimes.end())
             {
+                syncTrackDevices (*it->second, t, sampleRate, blockSize);
                 next[id] = it->second;
                 continue;
             }
 
             auto rt = std::make_shared<TrackRuntime>();
             rt->id = id;
-            if (makeRig)
+            syncTrackDevices (*rt, t, sampleRate, blockSize);
+            if (makeRig && ! Project::isInstrumentTrack (t))
             {
                 rt->rig = makeRig();
                 restoreRig (*rt->rig, t);
@@ -553,9 +827,73 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         tp.rigOn = (bool) t.getProperty (ids::rigOn, true);
         tp.input = (int) t.getProperty (ids::input, 0);
 
+        const auto& rt = *it->second;
+        for (auto& fx : rt.inserts)
+        {
+            auto node = t.getChildWithProperty (ids::id, fx.id);
+            if (! node.hasType (ids::FX))
+                continue;
+            InsertPlayback ip;
+            ip.pedal = fx.pedal;
+            ip.on = (bool) node.getProperty (ids::on, true);
+            const auto values = Project::decodeValues (node[ids::knobs].toString());
+            if (auto* pt = Registry::get().find (fx.type))
+                for (size_t k = 0; k < pt->info.knobs.size() && k < ip.knobs.size(); ++k)
+                    ip.knobs[k] = k < values.size() ? values[k] : pt->info.knobs[k].def;
+            tp.inserts.push_back (std::move (ip));
+        }
+        // Inserts in the FX nodes' order.
+        {
+            const auto order = Project::inserts (t);
+            std::vector<InsertPlayback> sorted;
+            for (auto& node : order)
+                for (size_t i = 0; i < rt.inserts.size(); ++i)
+                    if (rt.inserts[i].id == (int) node[ids::id])
+                        for (auto& ip : tp.inserts)
+                            if (ip.pedal == rt.inserts[i].pedal)
+                                sorted.push_back (ip);
+            tp.inserts = std::move (sorted);
+        }
+
+        if (Project::isInstrumentTrack (t))
+        {
+            tp.instrument = rt.instrument;
+            const auto values = Project::decodeValues (t.getChildWithName (ids::INSTRUMENT)[ids::knobs].toString());
+            for (size_t k = 0; k < values.size() && k < tp.instrumentKnobs.size(); ++k)
+                tp.instrumentKnobs[k] = values[k];
+
+            const auto grid = project.grid();
+            for (auto r : t)
+            {
+                if (! r.hasType (ids::REGION) || ! Project::isMidiRegion (r) || (bool) r[ids::mute])
+                    continue;
+
+                const auto start = (juce::int64) r[ids::start];
+                const auto end = start + (juce::int64) r[ids::length];
+                const auto origin = Project::contentOrigin (r);
+                for (auto note : r)
+                {
+                    if (! note.hasType (ids::NOTE))
+                        continue;
+                    const auto n = Project::noteFrom (note);
+                    const auto on = origin + (juce::int64) std::llround (grid.fromTicks ((double) n.start));
+                    if (on < start || on >= end)
+                        continue;
+                    const auto off = juce::jmin (end, origin + (juce::int64) std::llround (grid.fromTicks ((double) (n.start + n.length))));
+                    tp.midi.push_back ({ on, true, (std::uint8_t) n.pitch, (float) n.velocity / 127.0f });
+                    tp.midi.push_back ({ juce::jmax (on + 1, off), false, (std::uint8_t) n.pitch, 0.0f });
+                }
+            }
+            std::stable_sort (tp.midi.begin(), tp.midi.end(), [] (const MidiPlayback& x, const MidiPlayback& y)
+                              { return x.time != y.time ? x.time < y.time : (! x.on && y.on); });
+
+            snap->tracks.push_back (std::move (tp));
+            continue;
+        }
+
         for (auto r : t)
         {
-            if (! r.hasType (ids::REGION) || (bool) r[ids::mute])
+            if (! r.hasType (ids::REGION) || Project::isMidiRegion (r) || (bool) r[ids::mute])
                 continue;
 
             RegionPlayback rp;
@@ -604,6 +942,8 @@ void Engine::freeRetired()
 void Engine::timerCallback()
 {
     freeRetired();
+    if (isRecording())
+        drainRecordedMidi();
 
     // One meter frame: collect the audio thread's peaks so every view sees the same values.
     masterShown = { masterPeakLeft.exchange (0.0f), masterPeakRight.exchange (0.0f) };
@@ -630,6 +970,7 @@ void Engine::prepare (double newSampleRate, int newBlockSize)
     sampleRate = newSampleRate;
     blockSize = juce::jmax (64, newBlockSize);
     mixBuffer.setSize (2, blockSize);
+    liveMidi.reset (sampleRate);
 
     // No callbacks run until this returns, so the rigs can be re-prepared for the new settings.
     for (auto& [id, rt] : runtimes)
@@ -685,6 +1026,29 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
     std::array<const float*, 64> ins {};
     float masterL = 0.0f, masterR = 0.0f;
 
+    // Live MIDI for the whole callback, as instrument events with offsets into it.
+    liveBuffer.clear();
+    liveMidi.removeNextBlockOfMessages (liveBuffer, numSamples);
+    liveEvents.clear();
+    for (const auto meta : liveBuffer)
+    {
+        const auto m = meta.getMessage();
+        NoteEvent e;
+        e.offset = juce::jlimit (0, numSamples - 1, meta.samplePosition);
+        if (m.isNoteOn())                                   { e.kind = NoteEvent::noteOn;  e.note = m.getNoteNumber(); e.value = m.getFloatVelocity(); }
+        else if (m.isNoteOff())                             { e.kind = NoteEvent::noteOff; e.note = m.getNoteNumber(); }
+        else if (m.isSustainPedalOn() || m.isSustainPedalOff()) { e.kind = NoteEvent::sustain; e.value = m.isSustainPedalOn() ? 1.0f : 0.0f; }
+        else if (m.isPitchWheel())                          { e.kind = NoteEvent::pitchBend; e.value = (float) (m.getPitchWheelValue() - 8192) / 8192.0f; }
+        else if (m.isControllerOfType (1))                  { e.kind = NoteEvent::modWheel; e.value = (float) m.getControllerValue() / 127.0f; }
+        else if (m.isAllNotesOff() || m.isAllSoundOff())    { e.kind = NoteEvent::allNotesOff; }
+        else continue;
+        if (liveEvents.size() < liveEvents.capacity())
+            liveEvents.push_back (e);
+    }
+    const int liveTarget = midiTarget.load();
+    const int recordingMidiInto = midiRecordTrack.load();
+    size_t liveIndex = 0;
+
     for (int done = 0; done < numSamples;)
     {
         int n = juce::jmin (numSamples - done, mixBuffer.getNumSamples());
@@ -704,6 +1068,34 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         b.numInputs = numIns;
         b.left = mixBuffer.getWritePointer (0);
         b.right = mixBuffer.getWritePointer (1);
+
+        // This sub-block's share of the live events, re-based to its start.
+        const size_t firstLive = liveIndex;
+        while (liveIndex < liveEvents.size() && liveEvents[liveIndex].offset < done + n)
+            liveEvents[liveIndex++].offset -= done;
+        b.liveTrackId = liveTarget;
+        b.liveEvents = liveEvents.data() + firstLive;
+        b.numLiveEvents = (int) (liveIndex - firstLive);
+
+        // Recording MIDI: the live notes, at timeline samples, from the record start on.
+        if (isRec && isPlaying && recordingMidiInto == liveTarget && recordingMidiInto >= 0)
+        {
+            for (int i = 0; i < b.numLiveEvents; ++i)
+            {
+                const auto& e = b.liveEvents[i];
+                const auto when = pos + e.offset;
+                if ((e.kind != NoteEvent::noteOn && e.kind != NoteEvent::noteOff) || (e.kind == NoteEvent::noteOn && when < recordStart.load()))
+                    continue;
+                if (midiRecordFifo.getFreeSpace() > 0)
+                {
+                    const auto scope = midiRecordFifo.write (1);
+                    midiRecordRing[(size_t) (scope.blockSize1 > 0 ? scope.startIndex1 : scope.startIndex2)]
+                        = { when, (std::uint8_t) e.note, (std::uint8_t) juce::jlimit (1, 127, juce::roundToInt (e.value * 127.0f)),
+                            e.kind == NoteEvent::noteOn };
+                }
+            }
+        }
+
         Mixer::render (snap, b);
 
         // Recording: the dry input of every armed track, from the record start onwards.
@@ -838,8 +1230,9 @@ void Engine::startBounce (const juce::File& wav, juce::int64 start, juce::int64 
         rt->work.setSize (2, bounceBlock);
         rt->gainLeft.reset (sampleRate, 0.03);
         rt->gainRight.reset (sampleRate, 0.03);
+        syncTrackDevices (*rt, t, sampleRate, bounceBlock);
 
-        if (makeRig)
+        if (makeRig && ! Project::isInstrumentTrack (t))
         {
             rt->rig = makeRig();
             restoreRig (*rt->rig, t);

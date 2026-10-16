@@ -15,13 +15,25 @@ namespace woodshed::daw
              loopOn (bool), loopStart, loopEnd (samples), masterVolume (dB), selectedTrack (id),
              markers (JSON array of { id, name, position }; a property, so the children stay tracks)
       TRACK  id (int, unique), name, colour (ARGB int), volume (dB), pan (-1..1),
-             mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool)
-        RIG     state (XML string of the track's rig: its board, amp, cab and knobs)
-        REGION  id (int, unique), name, file (path relative to the project folder),
-                start (timeline sample), offset (sample in the file), length (samples), gain (dB),
-                fadeIn, fadeOut (samples; equal-power, so overlapping fades cross-fade), mute (bool)
+             mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool),
+             kind ("audio" when absent, or "instrument")
+        RIG        state (XML string of the track's rig: its board, amp, cab and knobs); audio tracks
+        INSTRUMENT type (InstrumentRegistry id), patch (name), knobs (comma-separated real values in
+                   the instrument's knob order); instrument tracks
+        FX         id, type (pedal Registry id), on (bool), knobs (comma-separated real values in the
+                   pedal's knob order); the track's insert effects in signal order, after the rig or
+                   instrument
+        REGION  id (int, unique), name, start (timeline sample), offset, length (samples), gain (dB),
+                fadeIn, fadeOut (samples; equal-power, so overlapping fades cross-fade), mute (bool),
+                and either
+                  file (path relative to the project folder; offset is the sample in the file), or
+                  kind = "midi", with NOTE children: pitch (0..127), velocity (1..127),
+                  start, length (ticks, 960 per quarter note, from the region's content origin,
+                  which sits at timeline sample start - offset). Only the part of the content
+                  inside [start, start + length) plays, so trims, splits and copies treat both
+                  kinds of region alike.
 
-    All positions and lengths are in samples at the project sample rate.
+    All positions and lengths are in samples at the project sample rate, except notes (ticks).
 */
 namespace ids
 {
@@ -34,8 +46,19 @@ namespace ids
     WOODSHED_ID (arm) WOODSHED_ID (monitor) WOODSHED_ID (input) WOODSHED_ID (rigOn) WOODSHED_ID (state)
     WOODSHED_ID (file) WOODSHED_ID (start) WOODSHED_ID (offset) WOODSHED_ID (length) WOODSHED_ID (gain)
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
+    WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
+    WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
 #undef WOODSHED_ID
 }
+
+/** Track and region kinds (the `kind` property). */
+namespace kinds
+{
+    inline const juce::String audio { "audio" }, instrument { "instrument" }, midi { "midi" };
+}
+
+/** MIDI note positions are in ticks: 960 per quarter note. */
+constexpr int ticksPerQuarter = 960;
 
 /** Musical time helpers for a constant tempo and meter. */
 struct TimeGrid
@@ -52,6 +75,17 @@ struct TimeGrid
     juce::String toBarsBeats (juce::int64 samples) const;
     /** "m:ss.mmm". */
     juce::String toClock (juce::int64 samples) const;
+
+    double samplesPerTick() const               { return sampleRate * 60.0 / tempo / ticksPerQuarter; }
+    double toTicks (double samples) const       { return samples / samplesPerTick(); }
+    double fromTicks (double ticks) const       { return ticks * samplesPerTick(); }
+};
+
+/** One note of a MIDI region, as stored (ticks from the region's content origin). */
+struct Note
+{
+    int pitch = 60, velocity = 100;
+    juce::int64 start = 0, length = ticksPerQuarter;
 };
 
 /** A named point on the timeline (Logic's marker track). */
@@ -97,6 +131,22 @@ public:
     juce::ValueTree track (int index) const                 { return trackList().getChild (index); }
     juce::ValueTree trackById (int id) const;
     juce::ValueTree addTrack (const juce::String& name, int insertIndex = -1);
+    /** A software instrument track playing `instrumentType` with these knob values (real units). */
+    juce::ValueTree addInstrumentTrack (const juce::String& name, const juce::String& instrumentType,
+                                        const juce::String& patchName, const std::vector<float>& knobs,
+                                        int insertIndex = -1);
+    static bool isInstrumentTrack (const juce::ValueTree& track) { return track[ids::kind].toString() == kinds::instrument; }
+
+    // Insert effects ------------------------------------------------------------
+    /** Adds a pedal from the Registry to the track's inserts (at `index`, or the end). */
+    juce::ValueTree addInsert (juce::ValueTree track, const juce::String& pedalType, const std::vector<float>& knobs,
+                               int index = -1);
+    /** The track's FX children, in signal order. */
+    static juce::Array<juce::ValueTree> inserts (const juce::ValueTree& track);
+
+    /** "1,0.5,-3" <-> values. */
+    static juce::String encodeValues (const std::vector<float>&);
+    static std::vector<float> decodeValues (const juce::String&);
     void removeTrack (const juce::ValueTree& track);
     juce::ValueTree trackList() const                       { return state; }
 
@@ -107,6 +157,20 @@ public:
     juce::ValueTree splitRegion (juce::ValueTree region, juce::int64 at);
     static juce::ValueTree trackOf (const juce::ValueTree& region) { return region.getParent(); }
     juce::ValueTree regionById (int id) const;
+
+    // MIDI regions ---------------------------------------------------------------
+    /** An empty MIDI region on an instrument track. */
+    juce::ValueTree addMidiRegion (juce::ValueTree track, juce::int64 start, juce::int64 length, const juce::String& name);
+    static bool isMidiRegion (const juce::ValueTree& region)   { return region[ids::kind].toString() == kinds::midi; }
+    /** Adds a note (ticks from the region's content origin); returns its NOTE. */
+    juce::ValueTree addNote (juce::ValueTree region, const Note&);
+    static Note noteFrom (const juce::ValueTree& note);
+    void setNote (juce::ValueTree note, const Note&);
+    /** Timeline sample of the region's content origin (where tick 0 of its notes falls). */
+    static juce::int64 contentOrigin (const juce::ValueTree& region)
+    {
+        return (juce::int64) region[ids::start] - (juce::int64) region[ids::offset];
+    }
 
     /** Copies of these regions for the clipboard: each one's start is relative to the earliest and
         its `lane` is its track's index relative to the topmost track among them. The clipboard
