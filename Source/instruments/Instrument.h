@@ -91,6 +91,10 @@ private:
         bool isActive() const;
         void render (float* left, float* right, int numSamples, const Owner&);   // adds
     and may read the owner's knobs, bend() (in semitones) and mod() while rendering.
+
+    Voices and effects render into private scratch that is then added to the output, so
+    processEffects() only sees this instrument. Allocate effect buffers in prepareEffects()
+    (prepared() is used here).
 */
 template <typename Owner, typename Voice, int numVoices = 16>
 class PolyInstrument : public Instrument
@@ -113,18 +117,38 @@ public:
 
     void render (float* left, float* right, int numSamples, const NoteEvent* events, int numEvents) override
     {
-        int done = 0;
-        for (int e = 0; e <= numEvents; ++e)
+        // Voices and effects run on private scratch, then get added to the caller's buffers,
+        // so shared effects only ever see this instrument's own signal.
+        const int chunk = (int) scratchL.size();
+        int start = 0, e = 0;
+
+        while (chunk > 0 && start < numSamples)
         {
-            const int until = e < numEvents ? juce::jlimit (done, numSamples, events[e].offset) : numSamples;
-            if (until > done)
-                renderVoices (left + done, right + done, until - done);
-            done = until;
-            if (e < numEvents)
+            const int n = juce::jmin (chunk, numSamples - start);
+            std::fill (scratchL.begin(), scratchL.begin() + n, 0.0f);
+            std::fill (scratchR.begin(), scratchR.begin() + n, 0.0f);
+
+            int done = 0;
+            for (; e < numEvents && events[e].offset < start + n; ++e)
+            {
+                const int until = juce::jlimit (done, n, events[e].offset - start);
+                if (until > done)
+                    renderVoices (scratchL.data() + done, scratchR.data() + done, until - done);
+                done = until;
                 handle (events[e]);
+            }
+
+            if (n > done)
+                renderVoices (scratchL.data() + done, scratchR.data() + done, n - done);
+
+            processEffects (scratchL.data(), scratchR.data(), n);
+            juce::FloatVectorOperations::add (left + start, scratchL.data(), n);
+            juce::FloatVectorOperations::add (right + start, scratchR.data(), n);
+            start += n;
         }
 
-        processEffects (left, right, numSamples);
+        for (; e < numEvents; ++e)
+            handle (events[e]);
     }
 
     /** Pitch bend in semitones (smoothed), for voices to read. */
@@ -140,6 +164,8 @@ public:
 protected:
     void prepared() override
     {
+        scratchL.assign ((size_t) juce::jmax (64, maxBlock), 0.0f);
+        scratchR.assign ((size_t) juce::jmax (64, maxBlock), 0.0f);
         for (auto& v : voices)
             v.voice.prepare (sampleRate);
         prepareEffects();
@@ -237,6 +263,7 @@ private:
         return *oldest;
     }
 
+    std::vector<float> scratchL, scratchR;
     bool sustainDown = false;
     float bendTarget = 0.0f, bendNow = 0.0f, modValue = 0.0f;
     juce::uint64 clock = 0;
