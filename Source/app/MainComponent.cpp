@@ -4,7 +4,7 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), typing (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), drummer (s), stepSequencer (s), typing (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -12,6 +12,8 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (rig);
     addChildComponent (instrument);
     addChildComponent (pianoRoll);
+    addChildComponent (drummer);
+    addChildComponent (stepSequencer);
     addChildComponent (typing);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
@@ -47,6 +49,8 @@ juce::Component* MainComponent::paneComponent()
     {
         case Studio::Pane::mixer:  return &mixer;
         case Studio::Pane::editor: return &pianoRoll;
+        case Studio::Pane::drummer: return &drummer;
+        case Studio::Pane::stepSequencer: return &stepSequencer;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
         default:                   return nullptr;
@@ -56,7 +60,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &drummer, &stepSequencer })
         c->setVisible (c == shown);
 }
 
@@ -107,7 +111,8 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::playStop, cmd::record, cmd::returnToStart, cmd::toggleLoop, cmd::toggleClick, cmd::toggleCountIn,
                   cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
-                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi });
+                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi,
+                  cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer });
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -198,6 +203,11 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::newDrumTrack:    info.setInfo ("New Drum Track", {}, "Track", 0); info.addDefaultKeypress ('u', cmdKey | juce::ModifierKeys::altModifier); break;
         case cmd::showEditor:      info.setInfo ("Piano Roll", {}, "View", 0); info.addDefaultKeypress ('e', 0);
                                    info.setTicked (studio.getPane() == Studio::Pane::editor); break;
+        case cmd::newDrummerTrack: info.setInfo ("New Drummer Track", {}, "Track", 0); break;
+        case cmd::showDrummer:     info.setInfo ("Drummer", {}, "View", 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::drummer); break;
+        case cmd::showStepSequencer: info.setInfo ("Step Sequencer", {}, "View", 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::stepSequencer); break;
         case cmd::musicalTyping:   info.setInfo ("Musical Typing", {}, "View", 0); info.addDefaultKeypress ('k', cmdKey);
                                    info.setTicked (typing.isOpen()); break;
         case cmd::quantize:        info.setInfo ("Quantize Notes", {}, "Edit", 0); info.addDefaultKeypress ('q', 0); break;
@@ -303,6 +313,11 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::newInstrumentTrack: studio.addInstrumentTrack ("synth.analog"); break;
         case cmd::newDrumTrack:    studio.addInstrumentTrack ("drums.kit"); break;
         case cmd::showEditor:      studio.setPane (studio.getPane() == Studio::Pane::editor ? Studio::Pane::none : Studio::Pane::editor); break;
+        case cmd::newDrummerTrack: studio.addDrummerTrack(); break;
+        case cmd::showDrummer:     studio.setPane (studio.getPane() == Studio::Pane::drummer ? Studio::Pane::none : Studio::Pane::drummer); break;
+        case cmd::showStepSequencer:
+            studio.setPane (studio.getPane() == Studio::Pane::stepSequencer ? Studio::Pane::none : Studio::Pane::stepSequencer);
+            break;
         case cmd::musicalTyping:   typing.isOpen() ? typing.close() : typing.open(); break;
         case cmd::importMidi:      studio.importMidiDialog(); break;
         case cmd::exportMidi:      studio.exportMidiDialog(); break;
@@ -383,6 +398,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::newAudioTrack);
             m.addCommandItem (cm, cmd::newInstrumentTrack);
             m.addCommandItem (cm, cmd::newDrumTrack);
+            m.addCommandItem (cm, cmd::newDrummerTrack);
             m.addSeparator();
             m.addCommandItem (cm, cmd::duplicateTrack);
             m.addCommandItem (cm, cmd::deleteTrack);
@@ -407,6 +423,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
         case 4:
             m.addCommandItem (cm, cmd::showRig);
             m.addCommandItem (cm, cmd::showEditor);
+            m.addCommandItem (cm, cmd::showStepSequencer);
+            m.addCommandItem (cm, cmd::showDrummer);
             m.addCommandItem (cm, cmd::showMixer);
             m.addCommandItem (cm, cmd::showAutomation);
             m.addCommandItem (cm, cmd::hideBottom);

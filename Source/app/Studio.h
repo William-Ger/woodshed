@@ -21,7 +21,8 @@ namespace cmd
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
         newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation,
-        importMidi, exportMidi
+        importMidi, exportMidi,
+        newDrummerTrack, showDrummer, showStepSequencer
     };
 }
 
@@ -103,6 +104,18 @@ public:
     // MIDI region, else the selected track's region under (or nearest before) the playhead.
     juce::ValueTree getEditorRegion() const;
     void openInEditor (int regionId);
+    /** The same region in the Drummer or Step Sequencer pane. */
+    void openInDrummer (int regionId);
+    void openInStepSequencer (int regionId);
+    /** Opens a region where it was made: a Drummer region in the Drummer, a step pattern in the
+        Step Sequencer, anything else in the piano roll (double-click). */
+    void openRegion (int regionId);
+    /** Logic's Drummer track: a drum kit with an 8-bar Drummer region at the playhead's bar,
+        opened in the Drummer (one undo step). */
+    juce::ValueTree addDrummerTrack();
+    /** A Drummer region of `bars` bars on an instrument track at `at` (snapped to the bar). */
+    juce::ValueTree createDrummerRegion (juce::ValueTree track, juce::int64 at, int bars = 8);
+    static bool isDrumTrack (const juce::ValueTree& track);
     /** A new empty MIDI region of one bar on an instrument track at `at` (snapped to the bar). */
     juce::ValueTree createMidiRegion (juce::ValueTree track, juce::int64 at);
     /** Snaps the notes (the selected ones, or all) of the editor's region to `gridTicks`. */
@@ -139,7 +152,7 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor };
+    enum class Pane { none, rig, mixer, editor, drummer, stepSequencer };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
 

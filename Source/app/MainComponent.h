@@ -6,6 +6,8 @@
 #include "RigPanel.h"
 #include "InstrumentPanel.h"
 #include "PianoRoll.h"
+#include "DrummerEditor.h"
+#include "StepSequencer.h"
 #include "MusicalTyping.h"
 
 namespace woodshed::app
@@ -45,6 +47,8 @@ private:
     RigPanel rig;
     InstrumentPanel instrument;
     PianoRoll pianoRoll;
+    DrummerEditor drummer;
+    StepSequencer stepSequencer;
     MusicalTyping typing;
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */

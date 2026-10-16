@@ -32,7 +32,7 @@ bool isCrash (int pitch)    { return pitch == 49 || pitch == 57; }
 }
 
 /** A text picture of a groove: one line per drum, one column per 16th (or triplet 8th). */
-void printGroove (const juce::StringArray& args)
+static void printGroove (const juce::StringArray& args)
 {
     using namespace woodshed::daw::drummer;
     Settings s = withStyle (Settings(), styleFromName (args[0].replace ("_", " ")));
@@ -423,6 +423,14 @@ int writeDrummerDemoProject (const juce::File& folder)
         apply (*project, region, s, nullptr);
         at += bar * 4;
     }
+
+    // A step-sequencer pattern on a second kit, for the Step Sequencer pane.
+    auto steps = project->addInstrumentTrack ("Steps", "drums.kit", "Studio Kit", woodshed::patchValues (kit->info, nullptr));
+    StepPattern pattern;
+    for (int pitch : StepPattern::drumRows())
+        pattern.rows.push_back ({ pitch, false, false, std::vector<int> (16, 0) });
+    pattern.randomize (5, true, 0.6f);
+    pattern.applyTo (*project, project->addMidiRegion (steps, 0, bar * 4, "Pattern"), nullptr);
 
     if (! project->save())
         return 1;

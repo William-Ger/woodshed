@@ -220,7 +220,7 @@ void StepPattern::randomize (juce::uint32 seed, bool drums, float density)
                 switch (pitch)
                 {
                     case 35: case 36:
-                        p = inBar == 0 ? 1.0f : inBar == ticksPerQuarter * 2 ? 0.6f
+                        p = inBar == 0 ? 1.0f : inBar == ticksPerQuarter * 2 ? 0.8f
                           : backbeat ? 0.0f : eighth ? 0.2f * more : sixteenth ? 0.06f * more : 0.0f;
                         break;
                     case 38: case 40:
@@ -245,9 +245,12 @@ void StepPattern::randomize (juce::uint32 seed, bool drums, float density)
                     case 44: case 51: case 53: case 52: case 55: case 59:
                         p = 0.0f;
                         break;
-                    default:    // hand percussion: off-beats
-                        p = eighth && ! quarter ? 0.35f * more : sixteenth && ! eighth ? 0.12f * more : 0.0f;
+                    default:    // hand percussion: off-beats; shakers and tambourines busier than the rest
+                    {
+                        const float busy = pitch == 54 || pitch == 69 || pitch == 70 ? 1.0f : 0.35f;
+                        p = (eighth && ! quarter ? 0.35f * more : sixteenth && ! eighth ? 0.12f * more : 0.0f) * busy;
                         break;
+                    }
                 }
                 const float u = rng.uniform();
                 const int v = velocityFor (pos, rng);

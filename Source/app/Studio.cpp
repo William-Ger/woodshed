@@ -2,6 +2,8 @@
 #include "SettingsWindow.h"
 #include "../PluginProcessor.h"
 #include "../daw/MidiFiles.h"
+#include "../daw/Drummer.h"
+#include "../daw/StepPattern.h"
 
 namespace woodshed::app
 {
@@ -67,6 +69,8 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     if (testPane == "editor") pane = Pane::editor;
     else if (testPane == "mixer") pane = Pane::mixer;
     else if (testPane == "none") pane = Pane::none;
+    else if (testPane == "drummer") pane = Pane::drummer;
+    else if (testPane == "steps") pane = Pane::stepSequencer;
     automationShown = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_AUTOMATION", {}) == "1";
     if (const auto n = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_TRACK", {}).getIntValue(); n > 0)
         if (auto t = currentProject->track (n - 1); t.isValid())
@@ -694,6 +698,8 @@ void Studio::showNewTrackMenu()
     m.addSubMenu ("Aux  (a bus that tracks send to)", aux);
     m.addItem ("Drums  (a drum kit to program or play)", InstrumentRegistry::get().find ("drums.kit") != nullptr,
                false, [this] { addInstrumentTrack ("drums.kit"); });
+    m.addItem ("Drummer  (a drummer that plays along)", InstrumentRegistry::get().find ("drums.kit") != nullptr,
+               false, [this] { addDrummerTrack(); });
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
@@ -737,6 +743,70 @@ void Studio::openInEditor (int regionId)
         selectTrack ((int) r.getParent()[daw::ids::id]);
     pane = Pane::editor;
     sendChangeMessage();
+}
+
+void Studio::openInDrummer (int regionId)
+{
+    editorRegionId = regionId;
+    if (auto r = findRegion (regionId); r.isValid())
+        selectTrack ((int) r.getParent()[daw::ids::id]);
+    pane = Pane::drummer;
+    sendChangeMessage();
+}
+
+void Studio::openInStepSequencer (int regionId)
+{
+    editorRegionId = regionId;
+    if (auto r = findRegion (regionId); r.isValid())
+        selectTrack ((int) r.getParent()[daw::ids::id]);
+    pane = Pane::stepSequencer;
+    sendChangeMessage();
+}
+
+void Studio::openRegion (int regionId)
+{
+    const auto r = findRegion (regionId);
+    if (daw::drummer::isDrummerRegion (r))
+        openInDrummer (regionId);
+    else if (r.hasProperty (daw::StepPattern::property))
+        openInStepSequencer (regionId);
+    else
+        openInEditor (regionId);
+}
+
+bool Studio::isDrumTrack (const juce::ValueTree& track)
+{
+    return daw::Project::isInstrumentTrack (track)
+        && track.getChildWithName (daw::ids::INSTRUMENT)[daw::ids::type].toString() == "drums.kit";
+}
+
+juce::ValueTree Studio::createDrummerRegion (juce::ValueTree track, juce::int64 at, int bars)
+{
+    if (! daw::Project::isInstrumentTrack (track))
+        return {};
+    auto& p = *currentProject;
+    const auto bar = p.grid().samplesPerBar();
+    const auto start = (juce::int64) (std::floor ((double) juce::jmax ((juce::int64) 0, at) / bar) * bar);
+    auto r = p.addMidiRegion (track, start, (juce::int64) std::llround (bar * bars), "Drummer");
+    daw::drummer::Settings settings;
+    settings.bars = bars;
+    settings.seed = (juce::uint32) juce::Random::getSystemRandom().nextInt (1 << 30) + 1u;
+    daw::drummer::apply (p, r, settings, &p.undo);
+    setSelectedRegions ({ (int) r[daw::ids::id] });
+    return r;
+}
+
+juce::ValueTree Studio::addDrummerTrack()
+{
+    auto t = addInstrumentTrack ("drums.kit");
+    if (! t.isValid())
+        return {};
+    auto& p = *currentProject;
+    p.undo.setCurrentTransactionName ("New Drummer Track");
+    t.setProperty (daw::ids::name, "Drummer", &p.undo);
+    auto r = createDrummerRegion (t, engineInstance->getPosition());
+    openInDrummer ((int) r[daw::ids::id]);
+    return t;
 }
 
 juce::ValueTree Studio::createMidiRegion (juce::ValueTree track, juce::int64 at)
