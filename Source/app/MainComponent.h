@@ -7,6 +7,8 @@
 #include "InstrumentPanel.h"
 #include "PianoRoll.h"
 #include "ScoreView.h"
+#include "DrummerEditor.h"
+#include "StepSequencer.h"
 #include "MusicalTyping.h"
 #include "TakesEditor.h"
 
@@ -48,6 +50,8 @@ private:
     InstrumentPanel instrument;
     PianoRoll pianoRoll;
     ScoreView scoreView;
+    DrummerEditor drummer;
+    StepSequencer stepSequencer;
     MusicalTyping typing;
     TakesEditor takesEditor;
 

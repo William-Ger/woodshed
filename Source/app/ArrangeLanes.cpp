@@ -1044,11 +1044,11 @@ void Lanes::mouseDoubleClick (const juce::MouseEvent& e)
 
     const auto hit = regionAt (e.getPosition());
 
-    // A MIDI region opens in the piano roll.
+    // A MIDI region opens in its editor: the Drummer, the Step Sequencer or the piano roll.
     if (hit.region.isValid())
     {
         if (daw::Project::isMidiRegion (hit.region))
-            view.studio.openInEditor ((int) hit.region[ids::id]);
+            view.studio.openRegion ((int) hit.region[ids::id]);
         else if (daw::Project::isTakeFolder (hit.region))
             view.studio.openTakes ((int) hit.region[ids::id]);
         return;
@@ -1406,6 +1406,8 @@ void Lanes::showRegionMenu()
     {
         m.addSeparator();
         m.addItem ("Open in Piano Roll", [&studio, first = midi[0]] { studio.openInEditor (first); });
+        m.addItem ("Open in Step Sequencer", [&studio, first = midi[0]] { studio.openInStepSequencer (first); });
+        m.addItem ("Open in Drummer", [&studio, first = midi[0]] { studio.openInDrummer (first); });
         juce::PopupMenu q;
         const std::pair<const char*, int> grids[] { { "1/4 Note", 960 }, { "1/8 Note", 480 }, { "1/16 Note", 240 },
                                                     { "1/32 Note", 120 }, { "1/8 Triplet", 320 }, { "1/16 Triplet", 160 } };

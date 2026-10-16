@@ -484,6 +484,8 @@ int runScoreTest();
 int renderScoreSamples (const juce::File&);
 int runInstrumentTest (const juce::StringArray& args);
 int writeMidiDemoProject (const juce::File&);
+int runDrummerTest (const juce::StringArray&);
+int writeDrummerDemoProject (const juce::File&);
 int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
 
@@ -553,6 +555,15 @@ int main (int argc, char* argv[])
         return renderProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]),
                               juce::File::getCurrentWorkingDirectory().getChildFile (args[2]));
 
+    if (args[0] == "drummer")
+    {
+        args.remove (0);
+        return runDrummerTest (args);
+    }
+
+    if (args[0] == "demo-drummer" && args.size() > 1)
+        return writeDrummerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+
     if (args[0] == "demo-midi" && args.size() > 1)
         return writeMidiDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
 
@@ -571,7 +582,8 @@ int main (int argc, char* argv[])
     {
         std::cerr << "usage: woodshed-bench list | knobs [type ...] | run [type ...] [--wav file] [--render dir]"
                      " | presets [file.json ...] [--wav file] [--render dir]"
-                     " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir\n";
+                     " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
+                     " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>\n";
         return 2;
     }
 
