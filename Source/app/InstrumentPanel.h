@@ -62,8 +62,10 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
+    void openPlugin (int fxId);
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeChildAdded (juce::ValueTree&, juce::ValueTree&) override        { refresh(); }
     void valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree&, int) override  { refresh(); }
@@ -79,7 +81,7 @@ private:
     juce::Array<juce::ValueTree> fx;
     int selectedFx = -1;            // FX id
     int dragFrom = -1, dragTo = -1;
-    juce::TextButton addButton { "+ Add Effect" };
+    juce::TextButton addButton { "+ Add Effect" }, openButton { "Open Plug-in Window" };
     ParamGrid knobs;
     juce::Viewport knobView;
 
@@ -126,7 +128,9 @@ private:
     juce::ValueTree watched, shownTrack;
     juce::String shownTypeId;
 
-    juce::TextButton instrumentButton, patchButton, previousPatch { "<" }, nextPatch { ">" }, typingButton { "Musical Typing" };
+    juce::TextButton instrumentButton, patchButton, previousPatch { "<" }, nextPatch { ">" }, typingButton { "Musical Typing" },
+                     openPluginButton { "Open Plug-in Window" };
+    bool isPlugin() const;
     ParamGrid knobs;
     juce::Viewport knobView;
     InsertsEditor inserts;

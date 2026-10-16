@@ -21,10 +21,11 @@ namespace woodshed::daw
              through its inserts and fader; it has no regions or input)
         RIG        state (XML string of the track's rig: its board, amp, cab and knobs); audio tracks
         INSTRUMENT type (InstrumentRegistry id), patch (name), knobs (comma-separated real values in
-                   the instrument's knob order); instrument tracks
+                   the instrument's knob order); instrument tracks. Or type "plugin": an Audio Unit or
+                   VST3, with plugin (its PluginDescription as XML) and state (base64)
         FX         id, type (pedal Registry id), on (bool), knobs (comma-separated real values in the
                    pedal's knob order); the track's insert effects in signal order, after the rig or
-                   instrument
+                   instrument. Or type "plugin" with plugin and state, as for INSTRUMENT
         SEND       bus (an aux track's id), level (dB), pre (bool: before the fader and pan); the
                    track's signal, also sent to that aux
         AUTOMATION param ("volume" in dB, "pan" -1..1, "inst:<knob index>" or "fx:<FX id>:<knob index>"
@@ -58,7 +59,7 @@ namespace ids
     WOODSHED_ID (fadeIn) WOODSHED_ID (fadeOut) WOODSHED_ID (CLIPBOARD) WOODSHED_ID (lane) WOODSHED_ID (markers)
     WOODSHED_ID (kind) WOODSHED_ID (INSTRUMENT) WOODSHED_ID (FX) WOODSHED_ID (NOTE) WOODSHED_ID (type) WOODSHED_ID (patch)
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
-    WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
+    WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
 #undef WOODSHED_ID
 }

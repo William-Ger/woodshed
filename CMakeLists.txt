@@ -95,6 +95,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/InstrumentPanel.cpp
         Source/app/PianoRoll.cpp
         Source/app/MusicalTyping.cpp
+        Source/app/PluginHost.cpp
         Source/app/StudioLookAndFeel.cpp
         Source/app/WindowStyle_other.cpp
         ${WOODSHED_RIG_SOURCES}
@@ -112,6 +113,8 @@ if(NOT WOODSHED_BENCH_ONLY)
     target_compile_definitions(WoodshedStudio PRIVATE
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
+        JUCE_PLUGINHOST_AU=1
+        JUCE_PLUGINHOST_VST3=1
         JUCE_APPLICATION_NAME_STRING="Woodshed"
         JUCE_APPLICATION_VERSION_STRING="0.2.0")
 

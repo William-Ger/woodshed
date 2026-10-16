@@ -742,6 +742,53 @@ void Engine::syncRigStates()
     for (auto& [id, rt] : runtimes)
         if (auto track = project->trackById (id); track.isValid() && rt->rig != nullptr)
             storeRig (*rt->rig, track);
+
+    // Plug-ins keep their own settings; copy them into their nodes so they're saved.
+    auto store = [] (juce::AudioPluginInstance& plugin, juce::ValueTree node)
+    {
+        juce::MemoryBlock data;
+        plugin.getStateInformation (data);
+        node.setProperty (ids::state, data.toBase64Encoding(), nullptr);
+    };
+    auto storeInserts = [&store] (const TrackRuntime& rt, const juce::ValueTree& owner)
+    {
+        for (auto& fx : rt.inserts)
+            if (auto* p = dynamic_cast<PluginEffect*> (fx.pedal.get()))
+                if (auto node = owner.getChildWithProperty (ids::id, fx.id); node.hasType (ids::FX))
+                    store (p->getPlugin(), node);
+    };
+    for (auto& [id, rt] : runtimes)
+    {
+        auto track = project->trackById (id);
+        if (! track.isValid())
+            continue;
+        if (auto* p = dynamic_cast<PluginInstrument*> (rt->instrument.get()))
+            store (p->getPlugin(), track.getChildWithName (ids::INSTRUMENT));
+        storeInserts (*rt, track);
+    }
+    if (masterRuntime != nullptr)
+        storeInserts (*masterRuntime, project->state.getChildWithName (ids::MASTER));
+}
+
+std::shared_ptr<Instrument> Engine::shareInstrument (int trackId) const
+{
+    if (auto it = runtimes.find (trackId); it != runtimes.end())
+        return it->second->instrument;
+    return nullptr;
+}
+
+std::shared_ptr<Pedal> Engine::shareInsert (int trackId, int fxId) const
+{
+    const TrackRuntime* rt = nullptr;
+    if (trackId < 0)
+        rt = masterRuntime.get();
+    else if (auto it = runtimes.find (trackId); it != runtimes.end())
+        rt = it->second.get();
+    if (rt != nullptr)
+        for (auto& fx : rt->inserts)
+            if (fx.id == fxId)
+                return fx.pedal;
+    return nullptr;
 }
 
 void Engine::removeTrack (juce::ValueTree track)
@@ -797,12 +844,31 @@ void Engine::syncTrackDevices (TrackRuntime& rt, const juce::ValueTree& track, d
 
     // The instrument: replaced when the track switches to another one. A snapshot still playing
     // the old one keeps it alive until the audio thread lets go.
-    const auto type = Project::isInstrumentTrack (track) ? track.getChildWithName (ids::INSTRUMENT)[ids::type].toString() : juce::String();
+    // A plug-in's identity is its description, so choosing another plug-in replaces it.
+    auto deviceKey = [] (const juce::ValueTree& node)
+    {
+        const auto type = node[ids::type].toString();
+        return type == "plugin" ? "plugin:" + juce::String::toHexString (node[ids::plugin].toString().hashCode64()) : type;
+    };
+
+    const auto instNode = track.getChildWithName (ids::INSTRUMENT);
+    const auto type = Project::isInstrumentTrack (track) ? deviceKey (instNode) : juce::String();
     if (type != rt.instrumentType)
     {
         rt.instrumentType = type;
         rt.instrument.reset();
-        if (type.isNotEmpty() && makeInstrument)
+        if (type.startsWith ("plugin:"))
+        {
+            if (makePlugin)
+                if (auto plugin = makePlugin (instNode[ids::plugin].toString(), rate, block, pluginError))
+                {
+                    restorePluginState (*plugin, instNode);
+                    auto made = std::make_shared<PluginInstrument> (std::move (plugin));
+                    made->prepare (rate, block);
+                    rt.instrument = std::move (made);
+                }
+        }
+        else if (type.isNotEmpty() && makeInstrument)
             if (auto made = makeInstrument (type))
             {
                 made->prepare (rate, block);
@@ -815,7 +881,7 @@ void Engine::syncTrackDevices (TrackRuntime& rt, const juce::ValueTree& track, d
     for (auto fx : Project::inserts (track))
     {
         const int id = (int) fx[ids::id];
-        const auto pedalType = fx[ids::type].toString();
+        const auto pedalType = deviceKey (fx);
         auto existing = std::find_if (rt.inserts.begin(), rt.inserts.end(),
                                       [&] (const InsertRuntime& r) { return r.id == id && r.type == pedalType; });
         if (existing != rt.inserts.end())
@@ -824,7 +890,18 @@ void Engine::syncTrackDevices (TrackRuntime& rt, const juce::ValueTree& track, d
             continue;
         }
 
-        if (auto* pt = Registry::get().find (pedalType))
+        if (pedalType.startsWith ("plugin:"))
+        {
+            if (makePlugin)
+                if (auto plugin = makePlugin (fx[ids::plugin].toString(), rate, block, pluginError))
+                {
+                    restorePluginState (*plugin, fx);
+                    std::shared_ptr<Pedal> pedal = std::make_shared<PluginEffect> (std::move (plugin));
+                    pedal->prepare (rate, block);
+                    next.push_back ({ id, pedalType, std::move (pedal) });
+                }
+        }
+        else if (auto* pt = Registry::get().find (pedalType))
         {
             std::shared_ptr<Pedal> pedal = pt->create();
             pedal->prepare (rate, block);
@@ -832,6 +909,14 @@ void Engine::syncTrackDevices (TrackRuntime& rt, const juce::ValueTree& track, d
         }
     }
     rt.inserts = std::move (next);
+}
+
+void Engine::restorePluginState (juce::AudioPluginInstance& plugin, const juce::ValueTree& node)
+{
+    juce::MemoryBlock data;
+    const auto encoded = node[ids::state].toString();
+    if (encoded.isNotEmpty() && data.fromBase64Encoding (encoded))
+        plugin.setStateInformation (data.getData(), (int) data.getSize());
 }
 
 void Engine::syncRuntimes()

@@ -1,5 +1,6 @@
 #include "Studio.h"
 #include "SettingsWindow.h"
+#include "PluginHost.h"
 #include "../PluginProcessor.h"
 #include "../daw/MidiFiles.h"
 
@@ -39,6 +40,9 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
                 return t->create();
             return nullptr;
         });
+    pluginHost = std::make_unique<PluginHost> (*this);
+    engineInstance->setPluginFactory ([this] (const juce::String& xml, double rate, int block, juce::String& error)
+                                      { return pluginHost->create (xml, rate, block, error); });
     engineInstance->settleRig = [] (juce::AudioProcessor& rig)
     {
         if (auto* w = dynamic_cast<WoodshedProcessor*> (&rig))
@@ -68,6 +72,8 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     else if (testPane == "mixer") pane = Pane::mixer;
     else if (testPane == "none") pane = Pane::none;
     automationShown = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_AUTOMATION", {}) == "1";
+    if (juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_PLAY", {}) == "1")
+        juce::Timer::callAfterDelay (1500, [this] { engineInstance->play(); });
     if (const auto n = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_TRACK", {}).getIntValue(); n > 0)
         if (auto t = currentProject->track (n - 1); t.isValid())
             currentProject->state.setProperty (daw::ids::selectedTrack, t[daw::ids::id], nullptr);
@@ -81,9 +87,11 @@ Studio::~Studio()
     settingsWindow = nullptr;
     saveProject();
     deviceManager.removeChangeListener (this);
+    pluginHost->closeEditors();
     engineInstance->setProject (nullptr);
     currentProject->state.removeListener (this);
     engineInstance.reset();
+    pluginHost.reset();
     deviceManager.closeAudioDevice();
 }
 
@@ -519,6 +527,45 @@ juce::ValueTree Studio::addAuxTrack (const juce::String& name, const juce::Strin
     return t;
 }
 
+juce::ValueTree Studio::addPluginInstrumentTrack (const juce::PluginDescription& d)
+{
+    auto& p = *currentProject;
+    const auto selected = getSelectedTrack();
+    const int index = selected.isValid() ? p.state.indexOf (selected) + 1 : -1;
+    p.undo.beginNewTransaction ("New Instrument Track");
+    auto t = p.addInstrumentTrack (d.name, "plugin", {}, {}, index);
+    auto inst = t.getChildWithName (daw::ids::INSTRUMENT);
+    inst.setProperty (daw::ids::plugin, PluginHost::toXml (d), &p.undo);
+    inst.setProperty (daw::ids::patch, d.name, &p.undo);
+    selectTrack ((int) t[daw::ids::id]);
+    setPane (Pane::rig);
+    return t;
+}
+
+void Studio::setPluginInstrument (juce::ValueTree track, const juce::PluginDescription& d)
+{
+    if (! daw::Project::isInstrumentTrack (track))
+        return;
+    auto& p = *currentProject;
+    p.undo.beginNewTransaction ("Choose " + d.name);
+    auto inst = track.getOrCreateChildWithName (daw::ids::INSTRUMENT, &p.undo);
+    inst.setProperty (daw::ids::type, "plugin", &p.undo);
+    inst.setProperty (daw::ids::plugin, PluginHost::toXml (d), &p.undo);
+    inst.setProperty (daw::ids::patch, d.name, &p.undo);
+    inst.removeProperty (daw::ids::state, &p.undo);
+    inst.removeProperty (daw::ids::knobs, &p.undo);
+}
+
+juce::ValueTree Studio::addPluginInsert (juce::ValueTree owner, const juce::PluginDescription& d)
+{
+    auto& p = *currentProject;
+    p.undo.beginNewTransaction ("Add " + d.name);
+    auto fx = p.addInsert (owner, "plugin", {});
+    fx.setProperty (daw::ids::plugin, PluginHost::toXml (d), &p.undo);
+    fx.setProperty (daw::ids::name, d.name, &p.undo);
+    return fx;
+}
+
 void Studio::setInstrument (juce::ValueTree track, const juce::String& type, int patchIndex)
 {
     auto* it = InstrumentRegistry::get().find (type);
@@ -537,6 +584,8 @@ void Studio::setInstrument (juce::ValueTree track, const juce::String& type, int
     const bool autoNamed = trackName == oldPatch || (oldType != nullptr && trackName == oldType->info.name);
 
     p.undo.beginNewTransaction (patch != nullptr ? "Choose " + patch->name : "Choose " + info.name);
+    inst.removeProperty (daw::ids::plugin, &p.undo);
+    inst.removeProperty (daw::ids::state, &p.undo);
     inst.setProperty (daw::ids::type, type, &p.undo);
     inst.setProperty (daw::ids::patch, patch != nullptr ? patch->name : juce::String(), &p.undo);
     inst.setProperty (daw::ids::knobs, daw::Project::encodeValues (patchValues (info, patch)), &p.undo);
@@ -684,6 +733,34 @@ void Studio::showNewTrackMenu()
             else
                 instruments.addItem (t.info.name, [this, type] { addInstrumentTrack (type); });
         }
+    }
+    // Audio Units and VST3s, by maker.
+    {
+        const auto found = pluginHost->instruments();
+        if (! found.isEmpty())
+        {
+            instruments.addSeparator();
+            instruments.addSectionHeader ("Audio Units & VST3");
+            juce::String maker;
+            juce::PopupMenu byMaker;
+            auto flush = [&]
+            {
+                if (byMaker.getNumItems() > 0)
+                    instruments.addSubMenu (maker.isNotEmpty() ? maker : juce::String ("Other"), byMaker);
+                byMaker = {};
+            };
+            for (auto& d : found)
+            {
+                if (d.manufacturerName != maker)
+                {
+                    flush();
+                    maker = d.manufacturerName;
+                }
+                byMaker.addItem (d.name + (d.pluginFormatName == "VST3" ? "  (VST3)" : ""), [this, d] { addPluginInstrumentTrack (d); });
+            }
+            flush();
+        }
+        instruments.addItem ("Plug-in Manager...", [this] { pluginHost->showManager(); });
     }
     m.addSubMenu ("Software Instrument", instruments, instruments.getNumItems() > 0);
     juce::PopupMenu aux;

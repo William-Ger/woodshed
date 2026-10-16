@@ -1,4 +1,5 @@
 #include "InstrumentPanel.h"
+#include "PluginHost.h"
 
 namespace woodshed::app
 {
@@ -170,6 +171,10 @@ InsertsEditor::InsertsEditor (Studio& s) : studio (s)
     makeQuiet (addButton);
     addAndMakeVisible (addButton);
 
+    openButton.onClick = [this] { openPlugin (selectedFx); };
+    makeQuiet (openButton);
+    addChildComponent (openButton);
+
     knobs.onGestureStart = [this] { studio.project().undo.beginNewTransaction ("Effect Knob"); };
     knobs.onChange = [this] (int index, float value)
     {
@@ -220,6 +225,7 @@ void InsertsEditor::refresh()
         selectedFx = fx.isEmpty() ? -1 : (int) fx.getLast()[ids::id];
 
     auto node = track.getChildWithProperty (ids::id, selectedFx);
+    openButton.setVisible (node.hasType (ids::FX) && node[ids::type].toString() == "plugin");
     if (auto* type = node.hasType (ids::FX) ? Registry::get().find (node[ids::type].toString()) : nullptr)
     {
         knobs.setSpecs (type->info.knobs, type->info.body);
@@ -252,6 +258,7 @@ void InsertsEditor::resized()
 {
     addButton.setBounds (getWidth() - 8 - 104, 3, 104, 22);
     const int top = titleHeight + juce::jmax (1, fx.size()) * rowHeight + 8;
+    openButton.setBounds (juce::Rectangle<int> (8, top, getWidth() - 16, 26));
     knobView.setBounds (0, top, getWidth(), juce::jmax (0, getHeight() - top));
     const int w = knobView.getWidth() - knobView.getScrollBarThickness();
     knobs.setSize (juce::jmax (1, w), knobs.heightFor (juce::jmax (1, w)));
@@ -301,13 +308,14 @@ void InsertsEditor::paint (juce::Graphics& g)
 
         g.setColour (on ? theme::text : theme::dimText);
         g.setFont (theme::font (12.0f, theme::Weight::semibold));
-        const auto name = type != nullptr ? type->info.name : node[ids::type].toString();
+        const bool plugin = node[ids::type].toString() == "plugin";
+        const auto name = type != nullptr ? type->info.name : plugin ? node[ids::name].toString() : node[ids::type].toString();
         g.drawText (name, r.removeFromLeft (juce::jmin (r.getWidth(), 92)), juce::Justification::centredLeft, true);
-        if (type != nullptr)
+        if (type != nullptr || plugin)
         {
             g.setColour (theme::faintText);
             g.setFont (theme::font (11.0f));
-            g.drawText (type->info.subtitle, r, juce::Justification::centredLeft, true);
+            g.drawText (plugin ? juce::String ("plug-in") : type->info.subtitle, r, juce::Justification::centredLeft, true);
         }
     }
 }
@@ -372,6 +380,19 @@ void InsertsEditor::mouseDown (const juce::MouseEvent& e)
     refresh();
 }
 
+void InsertsEditor::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    const int row = rowAt (e.getPosition());
+    if (row >= 0 && fx[row][ids::type].toString() == "plugin")
+        openPlugin ((int) fx[row][ids::id]);
+}
+
+void InsertsEditor::openPlugin (int fxId)
+{
+    studio.syncRigStatesIfNeeded();
+    studio.plugins().showEditor (track.hasType (ids::MASTER) ? -1 : (int) track[ids::id], fxId);
+}
+
 void InsertsEditor::mouseDrag (const juce::MouseEvent& e)
 {
     if (dragFrom < 0)
@@ -428,6 +449,39 @@ void InsertsEditor::showAddMenu()
         if (sub.getNumItems() > 0)
             m.addSubMenu (category, sub);
     }
+
+    // Audio Units and VST3 effects, by maker.
+    const auto found = studio.plugins().effects();
+    juce::PopupMenu plugins;
+    juce::String maker;
+    juce::PopupMenu byMaker;
+    auto flush = [&]
+    {
+        if (byMaker.getNumItems() > 0)
+            plugins.addSubMenu (maker.isNotEmpty() ? maker : juce::String ("Other"), byMaker);
+        byMaker = {};
+    };
+    for (auto& d : found)
+    {
+        if (d.manufacturerName != maker)
+        {
+            flush();
+            maker = d.manufacturerName;
+        }
+        byMaker.addItem (d.name + (d.pluginFormatName == "VST3" ? "  (VST3)" : ""), [this, d]
+        {
+            auto node = studio.addPluginInsert (track, d);
+            selectedFx = (int) node[ids::id];
+            refresh();
+            openPlugin (selectedFx);
+        });
+    }
+    flush();
+    if (plugins.getNumItems() > 0)
+        plugins.addSeparator();
+    plugins.addItem ("Plug-in Manager...", [this] { studio.plugins().showManager(); });
+    m.addSeparator();
+    m.addSubMenu ("Audio Units & VST3", plugins);
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (addButton));
 }
 
@@ -444,6 +498,12 @@ InstrumentPanel::InstrumentPanel (Studio& s) : studio (s), inserts (s)
     nextPatch.onClick = [this] { stepPatch (1); };
     typingButton.setTooltip ("Play with your computer keyboard (Cmd+K)");
     typingButton.onClick = [this] { if (onMusicalTyping) onMusicalTyping(); };
+    openPluginButton.onClick = [this]
+    {
+        studio.plugins().showEditor ((int) shownTrack[ids::id], -1);
+    };
+    makeQuiet (openPluginButton);
+    addChildComponent (openPluginButton);
     for (auto* b : { &instrumentButton, &patchButton, &previousPatch, &nextPatch, &typingButton })
     {
         makeQuiet (*b);
@@ -510,6 +570,11 @@ const InstrumentType* InstrumentPanel::shownType() const
     return InstrumentRegistry::get().find (shownTrack.getChildWithName (ids::INSTRUMENT)[ids::type].toString());
 }
 
+bool InstrumentPanel::isPlugin() const
+{
+    return shownTrack.getChildWithName (ids::INSTRUMENT)[ids::type].toString() == "plugin";
+}
+
 int InstrumentPanel::currentPatchIndex() const
 {
     if (auto* type = shownType())
@@ -548,6 +613,12 @@ void InstrumentPanel::sync()
         const auto patch = shownTrack.getChildWithName (ids::INSTRUMENT)[ids::patch].toString();
         patchButton.setButtonText ((patch.isNotEmpty() ? patch : juce::String ("Custom")) + juce::String (juce::CharPointer_UTF8 ("  \xe2\x96\xbe")));
     }
+    else if (isPlugin())
+    {
+        knobs.setSpecs ({}, theme::accent);
+        instrumentButton.setButtonText (shownTrack.getChildWithName (ids::INSTRUMENT)[ids::patch].toString()
+                                        + juce::String (juce::CharPointer_UTF8 ("  \xe2\x96\xbe")));
+    }
     else
     {
         knobs.setSpecs ({}, theme::accent);
@@ -555,12 +626,14 @@ void InstrumentPanel::sync()
         patchButton.setButtonText ("-");
     }
 
+    const bool plugin = isPlugin();
     for (auto* b : { &instrumentButton, &patchButton, &previousPatch, &nextPatch, &typingButton })
     {
         b->setEnabled (track.isValid());
-        b->setVisible (! aux);
+        b->setVisible (! aux && ! (plugin && (b == &patchButton || b == &previousPatch || b == &nextPatch)));
     }
-    knobView.setVisible (! aux);
+    knobView.setVisible (! aux && ! plugin);
+    openPluginButton.setVisible (plugin);
     resized();
     repaint();
 }
@@ -590,6 +663,15 @@ void InstrumentPanel::showInstrumentMenu()
             m.addItem (std::move (item));
         }
     }
+    // Audio Units and VST3 instruments.
+    const auto found = studio.plugins().instruments();
+    if (! found.isEmpty())
+    {
+        m.addSectionHeader ("Audio Units & VST3");
+        for (auto& d : found)
+            m.addItem (d.manufacturerName + ": " + d.name, [this, d] { studio.setPluginInstrument (shownTrack, d); });
+    }
+    m.addItem ("Plug-in Manager...", [this] { studio.plugins().showManager(); });
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (instrumentButton));
 }
 
@@ -653,6 +735,7 @@ void InstrumentPanel::resized()
         return;
     }
     inserts.setBounds (r.removeFromRight (juce::jlimit (240, 340, r.getWidth() / 3)));
+    openPluginButton.setBounds (r.withSizeKeepingCentre (220, 34));
     knobView.setBounds (r.reduced (12, 8));
     const int w = knobView.getWidth() - knobView.getScrollBarThickness();
     knobs.setSize (juce::jmax (1, w), knobs.heightFor (juce::jmax (1, w)));

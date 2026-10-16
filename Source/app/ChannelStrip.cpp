@@ -876,6 +876,8 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
             if (auxTrack)
                 return juce::String ("Aux Bus");
             const auto inst = tree.getChildWithName (ids::INSTRUMENT);
+            if (inst[ids::type].toString() == "plugin")
+                return inst[ids::patch].toString();
             if (auto* type = InstrumentRegistry::get().find (inst[ids::type].toString()))
                 return type->info.name;
             return juce::String ("Instrument");

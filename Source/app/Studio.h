@@ -7,6 +7,7 @@ namespace woodshed::app
 {
 
 class SettingsWindow;
+class PluginHost;
 
 /** Every menu and keyboard command in the studio. MainComponent routes them. */
 namespace cmd
@@ -21,7 +22,7 @@ namespace cmd
         playStop, record, returnToStart, toggleLoop, toggleClick, toggleCountIn, loopToSelection,
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
         newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation,
-        importMidi, exportMidi
+        importMidi, exportMidi, pluginManager
     };
 }
 
@@ -53,6 +54,10 @@ public:
     juce::ApplicationCommandManager commands;
 
     daw::Engine& engine()                                   { return *engineInstance; }
+    /** Copies the rigs' and plug-ins' live settings into the project. */
+    void syncRigStatesIfNeeded()                            { engineInstance->syncRigStates(); }
+    /** Audio Units and VST3s. */
+    PluginHost& plugins()                                   { return *pluginHost; }
     daw::Project& project()                                 { return *currentProject; }
     juce::ApplicationProperties& settings()                 { return appSettings; }
 
@@ -96,6 +101,11 @@ public:
     void exportMidiDialog();
     /** Logic's New Track choice: Audio, Software Instrument (by category) or Drums, at the mouse. */
     void showNewTrackMenu();
+    /** A new instrument track playing an Audio Unit / VST3, or switches `track` to one. */
+    juce::ValueTree addPluginInstrumentTrack (const juce::PluginDescription&);
+    void setPluginInstrument (juce::ValueTree track, const juce::PluginDescription&);
+    /** Adds an Audio Unit / VST3 effect to a track's (or the MASTER node's) inserts. */
+    juce::ValueTree addPluginInsert (juce::ValueTree owner, const juce::PluginDescription&);
     /** Switches an instrument track to another instrument or patch (one undo step). */
     void setInstrument (juce::ValueTree track, const juce::String& type, int patchIndex);
 
@@ -171,6 +181,7 @@ private:
 
     juce::ApplicationProperties& appSettings;
     std::unique_ptr<daw::Engine> engineInstance;
+    std::unique_ptr<PluginHost> pluginHost;
     std::unique_ptr<daw::Project> currentProject;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<SettingsWindow> settingsWindow;

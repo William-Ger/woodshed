@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "PluginHost.h"
 
 namespace woodshed::app
 {
@@ -107,7 +108,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::playStop, cmd::record, cmd::returnToStart, cmd::toggleLoop, cmd::toggleClick, cmd::toggleCountIn,
                   cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
-                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi });
+                  cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager });
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -203,6 +204,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::quantize:        info.setInfo ("Quantize Notes", {}, "Edit", 0); info.addDefaultKeypress ('q', 0); break;
         case cmd::importMidi:      info.setInfo ("Import MIDI File...", {}, "File", 0); info.addDefaultKeypress ('i', cmdKey); break;
         case cmd::exportMidi:      info.setInfo ("Export MIDI File...", {}, "File", 0); break;
+        case cmd::pluginManager:   info.setInfo ("Plug-in Manager...", {}, "View", 0); break;
         case cmd::showAutomation:  info.setInfo ("Show Automation", {}, "View", 0); info.addDefaultKeypress ('a', 0);
                                    info.setTicked (studio.isShowingAutomation()); break;
         default: break;
@@ -306,6 +308,7 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::musicalTyping:   typing.isOpen() ? typing.close() : typing.open(); break;
         case cmd::importMidi:      studio.importMidiDialog(); break;
         case cmd::exportMidi:      studio.exportMidiDialog(); break;
+        case cmd::pluginManager:   studio.plugins().showManager(); break;
         case cmd::showAutomation:  studio.setShowingAutomation (! studio.isShowingAutomation()); break;
         case cmd::quantize:
             if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
@@ -417,6 +420,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addSeparator();
             m.addCommandItem (cm, cmd::showTuner);
             m.addCommandItem (cm, cmd::musicalTyping);
+            m.addCommandItem (cm, cmd::pluginManager);
             m.addCommandItem (cm, cmd::toggleFullScreen);
             break;
         default: break;

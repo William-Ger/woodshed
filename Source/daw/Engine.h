@@ -3,6 +3,7 @@
 #include "Project.h"
 #include "../instruments/Instrument.h"
 #include "../engine/Registry.h"
+#include "PluginWrappers.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -246,6 +247,15 @@ public:
 
     /** The instrument on an instrument track (for its panel), or null. */
     Instrument* getInstrument (int trackId) const;
+    /** The same, shared, so a plug-in window can keep it alive while it shows its editor. */
+    std::shared_ptr<Instrument> shareInstrument (int trackId) const;
+    /** An insert's pedal (a plug-in's wrapper, for its window); trackId -1 for the master. */
+    std::shared_ptr<Pedal> shareInsert (int trackId, int fxId) const;
+
+    /** Where Audio Units and VST3s come from. Without one, plug-in tracks and inserts are silent. */
+    void setPluginFactory (PluginFactory f)                 { makePlugin = std::move (f); }
+    /** Why the last plug-in failed to load, if one did. */
+    juce::String getPluginError() const                     { return pluginError; }
 
     // Live MIDI. Every enabled MIDI input, and musical typing, plays the target track (the
     // selected one, when it's an instrument track) and records into it when it's armed.
@@ -333,6 +343,10 @@ private:
     juce::AudioDeviceManager& deviceManager;
     RigFactory makeRig;
     InstrumentFactory makeInstrument;
+    PluginFactory makePlugin;
+    juce::String pluginError;
+    /** Restores a plug-in's saved state (the node's `state`). */
+    static void restorePluginState (juce::AudioPluginInstance&, const juce::ValueTree& node);
     Project* project = nullptr;
     AudioPool pool;
 
