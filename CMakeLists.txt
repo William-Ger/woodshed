@@ -75,8 +75,10 @@ if(NOT WOODSHED_BENCH_ONLY)
     #--------------------------------------------------------------------------
     # The studio app (Woodshed.app / Woodshed.exe).
     juce_add_gui_app(WoodshedStudio
-        COMPANY_NAME "Gerstung Works"
-        BUNDLE_ID com.gerstungworks.woodshed
+        COMPANY_NAME "willgerstung.com"
+        COMPANY_WEBSITE "https://willgerstung.com"
+        COMPANY_COPYRIGHT "Built by willgerstung.com. Free software under the GNU AGPLv3."
+        BUNDLE_ID com.willgerstung.woodshed
         PRODUCT_NAME "Woodshed"
         VERSION 0.3.0
         ICON_BIG art/icon/woodshed-icon.png
@@ -174,10 +176,12 @@ if(NOT WOODSHED_BENCH_ONLY)
     #--------------------------------------------------------------------------
     # The rig alone as a plug-in.
     juce_add_plugin(WoodshedRig
-        COMPANY_NAME "Gerstung Works"
-        BUNDLE_ID com.gerstungworks.woodshed.rig
+        COMPANY_NAME "willgerstung.com"
+        COMPANY_WEBSITE "https://willgerstung.com"
+        COMPANY_COPYRIGHT "Built by willgerstung.com. Free software under the GNU AGPLv3."
+        BUNDLE_ID com.willgerstung.woodshed.rig
         PRODUCT_NAME "Woodshed Rig"
-        PLUGIN_MANUFACTURER_CODE Gwks
+        PLUGIN_MANUFACTURER_CODE Wger
         PLUGIN_CODE Wdsh
         FORMATS AU VST3
         IS_SYNTH FALSE

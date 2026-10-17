@@ -117,7 +117,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::loopToSelection, cmd::showMixer, cmd::showRig, cmd::hideBottom, cmd::zoomIn, cmd::zoomOut,
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
                   cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions, cmd::showScore,
-                  cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer });
+                  cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -137,6 +137,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::bounce:          info.setInfo ("Bounce...", {}, "File", 0); info.addDefaultKeypress ('b', cmdKey);
                                    info.setActive (! studio.engine().isBouncing()); break;
         case cmd::audioSettings:   info.setInfo ("Settings...", {}, "File", 0); info.addDefaultKeypress (',', cmdKey); break;
+        case cmd::visitWebsite:    info.setInfo ("Built by willgerstung.com", {}, "File", 0); break;
 
         case cmd::undo:            info.setInfo ("Undo " + p.undo.getUndoDescription(), {}, "Edit", 0); info.addDefaultKeypress ('z', cmdKey);
                                    info.setActive (p.undo.canUndo()); break;
@@ -244,6 +245,7 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::saveProjectAs:   studio.saveProjectAsDialog(); break;
         case cmd::bounce:          studio.bounceDialog(); break;
         case cmd::audioSettings:   studio.showAudioSettings(); break;
+        case cmd::visitWebsite:    juce::URL ("https://willgerstung.com").launchInDefaultBrowser(); break;
 
         case cmd::undo:            p.undo.undo(); break;
         case cmd::redo:            p.undo.redo(); break;
@@ -385,7 +387,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::bounce);
            #if ! JUCE_MAC
             m.addSeparator();
-            m.addCommandItem (cm, cmd::audioSettings);     // on the Mac it's in the app menu
+            m.addCommandItem (cm, cmd::audioSettings);     // on the Mac these are in the app menu
+            m.addCommandItem (cm, cmd::visitWebsite);
            #endif
             break;
         }

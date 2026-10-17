@@ -21,6 +21,8 @@ public:
         // Settings... sits in the app menu, under About, like every Mac app.
         juce::PopupMenu appMenu;
         appMenu.addCommandItem (&studio.commands, cmd::audioSettings);
+        appMenu.addSeparator();
+        appMenu.addCommandItem (&studio.commands, cmd::visitWebsite);
         juce::MenuBarModel::setMacMainMenu (content, &appMenu);
        #else
         setMenuBar (content);
@@ -66,7 +68,7 @@ public:
     }
 
     const juce::String getApplicationName() override       { return "Woodshed"; }
-    const juce::String getApplicationVersion() override    { return "0.2.0"; }
+    const juce::String getApplicationVersion() override    { return JUCE_APPLICATION_VERSION_STRING; }
     bool moreThanOneInstanceAllowed() override             { return false; }
 
     void initialise (const juce::String&) override

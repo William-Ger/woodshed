@@ -1,5 +1,7 @@
 # Woodshed
 
+Built by [willgerstung.com](https://willgerstung.com).
+
 A free, open-source studio for making music: record, write, arrange and mix, with a full guitar
 rig built in. No paywalls, no locked "pro" features, no paid sound packs. Everything here is
 free for anyone to use, study and improve, under the GNU AGPLv3.

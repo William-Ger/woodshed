@@ -23,7 +23,7 @@ namespace cmd
         showMixer, showRig, hideBottom, zoomIn, zoomOut, zoomToFit, toggleFullScreen, showTuner,
         newAudioTrack, newInstrumentTrack, newDrumTrack, showEditor, musicalTyping, quantize, showAutomation,
         importMidi, exportMidi, pluginManager, loopRegions, showScore,
-        newDrummerTrack, showDrummer, showStepSequencer
+        newDrummerTrack, showDrummer, showStepSequencer, visitWebsite
     };
 }
 
