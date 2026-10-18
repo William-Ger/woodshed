@@ -425,6 +425,26 @@ int runLoopGridTest()
         check (peaks (live.left, live.origin, 0.4f) == std::vector<juce::int64> { 20000 - latency, bar + 20000 - latency }, "the saved cell plays its file");
     }
 
+    std::cout << "recording with interface latency\n";
+    {
+        // What you hear is `latency` late, so the take loops from `latency` samples into it.
+        auto rec = project->track (project->numTracks() - 1);
+        Live live (*project);
+        constexpr int latency = 300;
+        std::vector<float> input ((size_t) (4 * bar), 0.0f);
+        input[20000] = 0.5f;
+        live.engine.play();
+        check (live.engine.getLoopPlayer().startRecording ((int) rec[ids::id], 5, lg::Quantize::bar, 1, false, latency, rate, (double) bar),
+               "a take with 300 samples of latency starts");
+        live.runTo (3 * bar, &input);
+        const auto loud = peaks (live.left, live.origin, 0.4f);
+        check (loud == std::vector<juce::int64> { 20000, bar + 20000 - latency, 2 * bar + 20000 - latency }, "heard live, then it loops 300 samples earlier " + list (loud));
+        live.grid.service();
+        const auto content = lg::contentOf (lg::cellAt (rec, 5));
+        check ((juce::int64) content[ids::offset] == latency && (juce::int64) content[ids::length] == bar, "saved with the latency as its offset");
+        lg::removeCell (*project, lg::cellAt (rec, 5));
+    }
+
     std::cout << "copy to the grid, and save / load\n";
     {
         auto region = project->addRegion (b, "Audio/loop.wav", 4 * bar, 0, bar + bar / 2, "loop");

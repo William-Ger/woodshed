@@ -162,6 +162,7 @@ void LoopGrid::setPerformRecording (bool on)
 {
     if (on == perform)
         return;
+    service();          // what happened before this belongs to before
     perform = on;
     auto* p = project();
     if (p == nullptr)
@@ -181,7 +182,6 @@ void LoopGrid::setPerformRecording (bool on)
     }
     else
     {
-        service();
         bool began = false;
         std::vector<int> ids;
         for (auto& [id, o] : open)

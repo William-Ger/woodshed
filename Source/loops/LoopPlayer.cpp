@@ -334,9 +334,15 @@ void LoopPlayer::beginBlock (const daw::Snapshot& snap, juce::int64 pos, int n, 
 
     auto state = getRecordState();
     if (! playing && (state == RecordState::waiting || state == RecordState::recording))
-        state = RecordState::idle, recordState = (int) RecordState::idle;
+    {
+        state = RecordState::idle;
+        recordState = (int) RecordState::idle;
+    }
     if (! playing && state == RecordState::tail)
-        state = RecordState::finished, recordState = (int) RecordState::finished;
+    {
+        state = RecordState::finished;
+        recordState = (int) RecordState::finished;
+    }
     if (state == RecordState::waiting || state == RecordState::recording)
     {
         // The track went away (or the project did): nothing to record into.
@@ -344,7 +350,10 @@ void LoopPlayer::beginBlock (const daw::Snapshot& snap, juce::int64 pos, int n, 
         for (auto& tp : snap.tracks)
             present = present || tp.runtime->id == recordTrack;
         if (! present)
-            state = RecordState::idle, recordState = (int) RecordState::idle;
+        {
+            state = RecordState::idle;
+            recordState = (int) RecordState::idle;
+        }
     }
     captureFrom = state == RecordState::recording || state == RecordState::tail ? 0 : n;
 
@@ -368,7 +377,10 @@ void LoopPlayer::beginBlock (const daw::Snapshot& snap, juce::int64 pos, int n, 
             inUse = inUse || st.fallback;
         }
         if (! inUse)
-            state = RecordState::idle, recordState = (int) RecordState::idle;
+        {
+            state = RecordState::idle;
+            recordState = (int) RecordState::idle;
+        }
     }
 
     for (auto& tp : snap.tracks)
