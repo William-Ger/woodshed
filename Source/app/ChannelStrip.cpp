@@ -1,6 +1,8 @@
 #include "ChannelStrip.h"
+#include "MixCommands.h"
 #include "InstrumentPanel.h"
 #include "Icons.h"
+#include "SpatialPanner.h"
 
 namespace woodshed::app
 {
@@ -247,7 +249,23 @@ void Fader::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDet
 PanKnob::PanKnob (Studio& s, juce::ValueTree t)
     : Bound (s, std::move (t), ids::pan, "Pan")
 {
-    setTooltip ("Pan. Drag up or right, double-click to centre.");
+    setTooltip ("Pan. Drag up or right, double-click to centre. Right-click for the 3D panner.");
+}
+
+bool PanKnob::isSpatial() const   { return (bool) tree[ids::spatial]; }
+
+void PanKnob::showSpatialMenu()
+{
+    // Spatial audio: the 3D panner instead of the stereo pan.
+    juce::PopupMenu m;
+    m.addItem ("3D Panner...", [this] { SpatialPanner::show (studio, tree, getScreenBounds()); });
+    m.addItem (isSpatial() ? "Use Stereo Pan" : "Use 3D Position", [this]
+    {
+        studio.project().undo.beginNewTransaction (isSpatial() ? "Stereo Pan" : "3D Position");
+        tree.setProperty (ids::spatial, ! isSpatial(), &studio.project().undo);
+        repaint();
+    });
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 
 float PanKnob::value() const      { return juce::jlimit (-1.0f, 1.0f, (float) (double) tree.getProperty (prop, 0.0)); }
@@ -281,6 +299,26 @@ void PanKnob::paint (juce::Graphics& g)
     const float v = value();
     const bool hot = isMouseOverOrDragging();
     const auto centre = knobArea.getCentre();
+
+    // A 3D track: a top view with the source's direction instead of the knob.
+    if (isSpatial())
+    {
+        const float r = knobArea.getWidth() * 0.5f - 1.5f;
+        g.setColour (well);
+        g.fillEllipse (knobArea.reduced (1.5f));
+        g.setColour (hot ? theme::accent : theme::accent.withAlpha (0.7f));
+        g.drawEllipse (knobArea.reduced (1.5f), 1.5f);
+        const float az = (float) (double) tree.getProperty (ids::azimuth, 0.0) * juce::MathConstants<float>::pi / 180.0f;
+        const float reach = r * (0.35f + 0.55f * SpatialPanner::radiusFor ((float) (double) tree.getProperty (ids::distance, 1.0)));
+        g.setColour (theme::text);
+        g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ centre.x + reach * std::sin (az), centre.y - reach * std::cos (az) }));
+        g.setColour (theme::dimText);
+        g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre (centre));
+        g.setFont (theme::readout (10.0f, theme::Weight::medium));
+        g.drawText ("3D", textArea, sideways ? juce::Justification::centredLeft : juce::Justification::centred, false);
+        return;
+    }
+
     const float ringR = knobArea.getWidth() * 0.5f - 1.5f;
     const float bodyR = ringR - 4.0f;
     constexpr float sweep = juce::MathConstants<float>::pi * 0.75f;
@@ -325,8 +363,18 @@ void PanKnob::paint (juce::Graphics& g)
     g.drawText (text, textArea, sideways ? juce::Justification::centredLeft : juce::Justification::centred, false);
 }
 
-void PanKnob::mouseDown (const juce::MouseEvent&)
+void PanKnob::mouseDown (const juce::MouseEvent& e)
 {
+    if (e.mods.isPopupMenu())
+    {
+        showSpatialMenu();
+        return;
+    }
+    if (isSpatial())
+    {
+        SpatialPanner::show (studio, tree, getScreenBounds());
+        return;
+    }
     beginGesture();
     dragStart = value();
     repaint();
@@ -334,6 +382,8 @@ void PanKnob::mouseDown (const juce::MouseEvent&)
 
 void PanKnob::mouseDrag (const juce::MouseEvent& e)
 {
+    if (e.mods.isPopupMenu() || isSpatial())
+        return;
     const auto offset = e.getOffsetFromDragStart();
     const float scale = e.mods.isShiftDown() ? 0.002f : 0.012f;
     setValue (dragStart + (float) (offset.x - offset.y) * scale);
@@ -341,6 +391,8 @@ void PanKnob::mouseDrag (const juce::MouseEvent& e)
 
 void PanKnob::mouseDoubleClick (const juce::MouseEvent&)
 {
+    if (isSpatial())
+        return;
     beginGesture();
     setValue (0.0f);
 }
@@ -352,6 +404,8 @@ void PanKnob::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelD
         Component::mouseWheelMove (e, w);
         return;
     }
+    if (isSpatial())
+        return;
     beginWheelGesture();
     setValue (value() + w.deltaY * (w.isReversed ? -1.0f : 1.0f) * 0.5f);
 }
@@ -606,7 +660,7 @@ void SendSlot::showAddMenu()
     for (int i = 0; i < p.numTracks(); ++i)
     {
         auto t = p.track (i);
-        if (! daw::Project::isAuxTrack (t) || t == track)
+        if (! daw::stacks::isSendTarget (t) || t == track)     // not a stack main or a VCA
             continue;
         const int busId = (int) t[ids::id];
         m.addItem (t[ids::name].toString(), [this, busId]
@@ -649,7 +703,7 @@ void SendSlot::showSendMenu()
     for (int i = 0; i < p.numTracks(); ++i)
     {
         auto t = p.track (i);
-        if (! daw::Project::isAuxTrack (t) || t == track)
+        if (! daw::stacks::isSendTarget (t) || t == track)     // not a stack main or a VCA
             continue;
         to.addItem (t[ids::name].toString(), true, (int) s[ids::bus] == (int) t[ids::id], [this, s, busId = (int) t[ids::id]]() mutable
         {
@@ -873,6 +927,9 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
         instrumentSlot->setTooltip ("This track's instrument: click to edit its sound");
         instrumentSlot->text = [this]
         {
+            if (daw::stacks::isVca (tree))      return juce::String ("VCA");
+            if (daw::stacks::isFolder (tree))   return juce::String ("Folder Stack");
+            if (daw::stacks::isSumming (tree))  return juce::String ("Summing Stack");
             if (auxTrack)
                 return juce::String ("Aux Bus");
             const auto inst = tree.getChildWithName (ids::INSTRUMENT);
@@ -894,9 +951,21 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
         fxSlot->lit = [this] { return ! daw::Project::inserts (tree).isEmpty(); };
         fxSlot->onClick = [this] { showInserts(); };
 
-        if (auxTrack)
+        // A VCA or a folder stack's main is only a fader: no effects, pan or sends.
+        scalerOnly = daw::stacks::isVca (tree) || daw::stacks::isFolder (tree);
+        if (scalerOnly)
         {
-            instrumentSlot->setTooltip ("An aux bus: tracks reach it through their sends. Click to edit its effects.");
+            instrumentSlot->setTooltip (daw::stacks::isVca (tree) ? "A VCA: its fader moves its tracks' levels by the same dB; no audio passes through it"
+                                                                   : "A folder stack's main: its fader and mute scale the tracks in the stack");
+            for (auto& slot : sendSlots)
+                slot->setVisible (false);
+            for (auto* c : std::initializer_list<juce::Component*> { instrumentSlot.get(), mute.get(), solo.get() })
+                addAndMakeVisible (c);
+        }
+        else if (auxTrack)
+        {
+            instrumentSlot->setTooltip (daw::stacks::isSumming (tree) ? "A summing stack's main: its tracks play through its effects and fader"
+                                                                       : "An aux bus: tracks reach it through their sends. Click to edit its effects.");
             for (auto* c : std::initializer_list<juce::Component*> { instrumentSlot.get(), fxSlot.get(), mute.get(), solo.get(), pan.get() })
                 addAndMakeVisible (c);
         }
@@ -907,6 +976,25 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
             for (auto* c : std::initializer_list<juce::Component*> { input.get(), rig.get(), mute.get(), solo.get(), arm.get(),
                                                                      monitor.get(), openRig.get(), pan.get(), fxSlot.get() })
                 addAndMakeVisible (c);
+    }
+
+    if (! master)
+    {
+        // Groups and VCAs: a small chip in the name plate.
+        groupSlot = std::make_unique<mixer::SlotButton>();
+        groupSlot->setTooltip ("Group and VCA: grouped tracks move together; a VCA scales its tracks");
+        groupSlot->text = [this]
+        {
+            const int g = daw::groups::groupOf (tree);
+            return g > 0 ? juce::String (g) : tree.hasProperty (ids::vca) ? juce::String ("V") : juce::String ("-");
+        };
+        groupSlot->lit = [this] { return daw::groups::groupOf (tree) > 0 || tree.hasProperty (ids::vca); };
+        groupSlot->onClick = [this]
+        {
+            select();
+            mixui::groupMenu (studio, tree).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (groupSlot.get()));
+        };
+        addAndMakeVisible (*groupSlot);
     }
 
     if (master)
@@ -1043,7 +1131,8 @@ void ChannelStrip::paint (juce::Graphics& g)
         const auto name = master ? juce::String ("Stereo Out") : tree[ids::name].toString();
         g.setColour (selected ? theme::accent : theme::text);
         g.setFont (theme::font (12.0f, selected || master ? theme::Weight::semibold : theme::Weight::medium));
-        g.drawFittedText (name, plate.toNearestInt().reduced (6, 0), juce::Justification::centred, 1, 0.85f);
+        g.drawFittedText (name, plate.toNearestInt().reduced (6, 0).withTrimmedRight (groupSlot != nullptr ? 18 : 0),
+                          juce::Justification::centred, 1, 0.85f);
     }
 
     if (master)
@@ -1083,6 +1172,8 @@ void ChannelStrip::resized()
     r.removeFromBottom (4);
     nameArea = juce::Rectangle<int> (0, r.getBottom() - 22, getWidth(), 22);
     r.removeFromBottom (22 + m.gap);
+    if (groupSlot != nullptr)
+        groupSlot->setBounds (nameArea.getRight() - 24, nameArea.getY() + 4, 20, 17);
 
     // Readouts above the name.
     if (m.readouts)
@@ -1116,7 +1207,9 @@ void ChannelStrip::resized()
             sendSlots[1]->setBounds (c.getX(), ioBottom - m.chipH, c.getWidth(), m.chipH);
             sendSlots[0]->setBounds (c.getX(), ioBottom - m.chipH * 2 - 4, c.getWidth(), m.chipH);
         }
-        if (instrumentTrack || auxTrack)
+        if (scalerOnly)
+            instrumentSlot->setBounds (c.removeFromTop (m.chipH));
+        else if (instrumentTrack || auxTrack)
         {
             if (m.tall)
             {

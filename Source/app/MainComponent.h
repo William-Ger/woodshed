@@ -12,6 +12,9 @@
 #include "MusicalTyping.h"
 #include "TakesEditor.h"
 #include "MasteringPanel.h"
+#include "LoopGridView.h"
+#include "SamplerEditor.h"
+#include "Movie.h"
 
 namespace woodshed::app
 {
@@ -56,6 +59,9 @@ private:
     MusicalTyping typing;
     TakesEditor takesEditor;
     MasteringPanel masteringPanel;
+    LoopGridView loopGridView;
+    SamplerEditor samplerEditor;
+    std::unique_ptr<MovieController> movie;         // spatial and video
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */
     juce::Component* paneComponent();

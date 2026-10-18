@@ -2,6 +2,7 @@
 #include "Theme.h"
 #include "SettingsWindow.h"
 #include "PluginHost.h"
+#include "MixCommands.h"
 #include "../PluginProcessor.h"
 #include "../daw/MidiFiles.h"
 #include "../daw/Drummer.h"
@@ -44,6 +45,7 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
             return nullptr;
         });
     pluginHost = std::make_unique<PluginHost> (*this);
+    loopGridInstance = std::make_unique<loops::LoopGrid> (*engineInstance);
     engineInstance->setPluginFactory ([this] (const juce::String& xml, double rate, int block, juce::String& error)
                                       { return pluginHost->create (xml, rate, block, error); });
     engineInstance->settleRig = [] (juce::AudioProcessor& rig)
@@ -76,11 +78,19 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     else if (testPane == "score") pane = Pane::score;
     else if (testPane == "none") pane = Pane::none;
     else if (testPane == "takes") pane = Pane::takes;
+    else if (testPane == "loopgrid") pane = Pane::loopGrid;
+    // WOODSHED_TEST_GRID=<scene number>: show the Loop Grid and launch that scene.
+    if (const int scene = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_GRID", {}).getIntValue(); scene > 0)
+    {
+        pane = Pane::loopGrid;
+        juce::Timer::callAfterDelay (1500, [this, scene] { loopGridInstance->launchScene (scene - 1); });
+    }
     if (const auto r = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_REGION", {}).getIntValue(); r > 0)
         selectedRegions = { r };
     else if (testPane == "drummer") pane = Pane::drummer;
     else if (testPane == "steps") pane = Pane::stepSequencer;
-    else if (testPane == "mastering") pane = Pane::mastering;
+    if (testPane == "sampler") pane = Pane::sampler;
+    if (testPane == "mastering") pane = Pane::mastering;
     automationShown = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_AUTOMATION", {}) == "1";
     if (juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_PLAY", {}) == "1")
         juce::Timer::callAfterDelay (1500, [this] { engineInstance->play(); });
@@ -100,6 +110,7 @@ Studio::~Studio()
     pluginHost->closeEditors();
     engineInstance->setProject (nullptr);
     currentProject->state.removeListener (this);
+    loopGridInstance.reset();
     engineInstance.reset();
     pluginHost.reset();
     deviceManager.closeAudioDevice();
@@ -292,7 +303,10 @@ void Studio::adopt (std::unique_ptr<daw::Project> next)
     if (currentProject != nullptr)
         currentProject->state.removeListener (this);
 
+    groupLinker.reset();
+    trackSelection.clear();
     currentProject = std::move (next);
+    groupLinker = std::make_unique<daw::groups::Linker> (*currentProject);
 
     // An empty project follows the interface's rate; one with recordings keeps its own.
     const double deviceRate = deviceManager.getCurrentAudioDevice() != nullptr
@@ -420,9 +434,18 @@ public:
         stems.setToggleState (false, juce::dontSendNotification);
         format.onChange = [this] { if (format.getSelectedId() == 3 && bits.getSelectedId() == 3) bits.setSelectedId (2); };
 
-        for (auto* c : std::initializer_list<juce::Component*> { &format, &bits, &range, &normalize, &stems, &bounce, &cancel })
+        // Surround: a multichannel WAV panned from the tracks' 3D positions.
+        channels.addItemList ({ "Stereo", "5.1 surround (WAV, 6 channels)", "7.1.4 surround (WAV, 12 channels)" }, 1);
+        const auto surround = props.getValue ("bounceSurround");
+        channels.setSelectedId (surround == "5.1" ? 2 : surround == "7.1.4" ? 3 : 1, juce::dontSendNotification);
+        channels.setTooltip ("Surround bounces place each track by its 3D position (stereo tracks across the front). "
+                             "The LFE stays silent and the master effects are left out.");
+        channels.onChange = [this] { format.setEnabled (channels.getSelectedId() == 1); if (channels.getSelectedId() != 1) format.setSelectedId (1); };
+        channels.onChange();
+
+        for (auto* c : std::initializer_list<juce::Component*> { &format, &bits, &range, &channels, &normalize, &stems, &bounce, &cancel })
             addAndMakeVisible (c);
-        for (auto* l : { &formatLabel, &bitsLabel, &rangeLabel })
+        for (auto* l : { &formatLabel, &bitsLabel, &rangeLabel, &channelsLabel })
         {
             l->setFont (theme::font (12.0f, theme::Weight::medium));
             l->setColour (juce::Label::textColourId, theme::dimText);
@@ -437,6 +460,8 @@ public:
             o.bits = bits.getSelectedId() == 1 ? 16 : bits.getSelectedId() == 3 ? 32 : 24;
             o.normalize = normalize.getToggleState();
             o.stems = stems.getToggleState();
+            o.surround = channels.getSelectedId() == 2 ? "5.1" : channels.getSelectedId() == 3 ? "7.1.4" : "";
+            props.setValue ("bounceSurround", o.surround);
             props.setValue ("bounceFormat", o.format);
             props.setValue ("bounceBits", o.bits);
             props.setValue ("bounceNormalize", o.normalize);
@@ -447,7 +472,7 @@ public:
             callback (o, cycle);
         };
         cancel.onClick = [this] { if (auto* w = findParentComponentOfClass<juce::DialogWindow>()) w->exitModalState (0); };
-        setSize (380, 250);
+        setSize (380, 286);
     }
 
     void paint (juce::Graphics& g) override { g.fillAll (theme::panel); }
@@ -459,6 +484,7 @@ public:
         auto line = row(); formatLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); format.setBounds (line);
         line = row(); bitsLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); bits.setBounds (line);
         line = row(); rangeLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); range.setBounds (line);
+        line = row(); channelsLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); channels.setBounds (line);
         line = r.removeFromTop (24); line.removeFromLeft (100); normalize.setBounds (line);
         line = r.removeFromTop (24); line.removeFromLeft (100); stems.setBounds (line);
         auto buttons = getLocalBounds().reduced (20, 16).removeFromBottom (30);
@@ -470,8 +496,8 @@ public:
 private:
     juce::PropertiesFile& props;
     std::function<void (daw::BounceOptions, bool)> onBounce;
-    juce::ComboBox format, bits, range;
-    juce::Label formatLabel { {}, "Format" }, bitsLabel { {}, "Resolution" }, rangeLabel { {}, "Range" };
+    juce::ComboBox format, bits, range, channels;
+    juce::Label formatLabel { {}, "Format" }, bitsLabel { {}, "Resolution" }, rangeLabel { {}, "Range" }, channelsLabel { {}, "Channels" };
     juce::ToggleButton normalize { "Normalize (peak at -0.1 dB)" }, stems { "All tracks as separate files (stems)" };
     juce::TextButton bounce { "Bounce" }, cancel { "Cancel" };
 };
@@ -493,8 +519,8 @@ void Studio::bounceDialog()
             auto& st = currentProject->state;
             const auto from = cycle ? (juce::int64) st[daw::ids::loopStart] : (juce::int64) 0;
             const auto to = cycle ? (juce::int64) st[daw::ids::loopEnd] : end;
-            const auto extension = options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
-            const auto name = currentProject->folder.getFileName();
+            const auto extension = options.surround.isNotEmpty() ? ".wav" : options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
+            const auto name = currentProject->folder.getFileName() + (options.surround.isNotEmpty() ? " " + options.surround : juce::String());
             auto suggested = juce::File::getSpecialLocation (juce::File::userMusicDirectory)
                                  .getChildFile (options.stems ? name + " stems" : name + extension);
             chooser = std::make_unique<juce::FileChooser> (options.stems ? "Choose a folder for the stems" : "Bounce the song to a file", suggested,
@@ -540,6 +566,23 @@ juce::ValueTree Studio::getSelectedTrack() const
 
 void Studio::selectTrack (int trackId)
 {
+    // A track in a group that links selection brings the rest of its group along.
+    {
+        juce::Array<int> others;
+        const auto track = currentProject->trackById (trackId);
+        if (const int g = daw::groups::groupOf (track); g > 0)
+            if (auto group = daw::groups::find (*currentProject, g); group.has_value() && group->select)
+                for (auto& t : daw::groups::members (*currentProject, g))
+                    if ((int) t[daw::ids::id] != trackId)
+                        others.add ((int) t[daw::ids::id]);
+        if (others != trackSelection)
+        {
+            trackSelection = others;
+            if (trackId == getSelectedTrackId())
+                sendChangeMessage();
+        }
+    }
+
     if (trackId == getSelectedTrackId())
         return;
 
@@ -561,6 +604,40 @@ void Studio::selectTrack (int trackId)
     }
 
     currentProject->state.setProperty (daw::ids::selectedTrack, trackId, nullptr);
+    sendChangeMessage();
+}
+
+juce::Array<int> Studio::getSelectedTrackIds() const
+{
+    juce::Array<int> list;
+    for (int i = 0; i < currentProject->numTracks(); ++i)
+        if (const int id = (int) currentProject->track (i)[daw::ids::id]; isTrackSelected (id))
+            list.add (id);
+    return list;
+}
+
+void Studio::extendTrackSelection (int trackId, bool range)
+{
+    const int anchor = getSelectedTrackId();
+    if (anchor < 0 || anchor == trackId)
+    {
+        selectTrack (trackId);
+        return;
+    }
+
+    if (range)
+    {
+        auto& p = *currentProject;
+        const int from = p.state.indexOf (p.trackById (anchor)), to = p.state.indexOf (p.trackById (trackId));
+        trackSelection.clear();
+        for (int i = juce::jmin (from, to); i <= juce::jmax (from, to); ++i)
+            if (const int id = (int) p.track (i)[daw::ids::id]; id != anchor)
+                trackSelection.add (id);
+    }
+    else if (trackSelection.contains (trackId))
+        trackSelection.removeFirstMatchingValue (trackId);
+    else
+        trackSelection.add (trackId);
     sendChangeMessage();
 }
 
@@ -888,6 +965,8 @@ juce::ValueTree Studio::getEditorRegion() const
 {
     if (auto r = findRegion (editorRegionId); r.isValid() && daw::Project::isMidiRegion (r))
         return r;
+    if (auto r = loops::findCellRegion (*currentProject, editorRegionId); daw::Project::isMidiRegion (r))
+        return r;       // a Loop Grid cell's notes
 
     for (int id : selectedRegions)
         if (auto r = findRegion (id); r.isValid() && daw::Project::isMidiRegion (r))
@@ -986,7 +1065,7 @@ bool Studio::isDrumTrack (const juce::ValueTree& track)
 
 juce::ValueTree Studio::createDrummerRegion (juce::ValueTree track, juce::int64 at, int bars)
 {
-    if (! daw::Project::isInstrumentTrack (track))
+    if (! daw::Project::isInstrumentTrack (track) || mixui::blockedByFreeze (*this, track))
         return {};
     auto& p = *currentProject;
     const auto& grid = p.grid();
@@ -1030,7 +1109,7 @@ juce::ValueTree Studio::createMidiRegion (juce::ValueTree track, juce::int64 at)
 
 void Studio::quantizeNotes (juce::ValueTree region, const juce::Array<juce::ValueTree>& notes, int gridTicks, float strength)
 {
-    if (! region.isValid() || gridTicks <= 0)
+    if (! region.isValid() || gridTicks <= 0 || mixui::blockedByFreeze (*this, daw::Project::trackOf (region)))
         return;
 
     juce::Array<juce::ValueTree> targets (notes);
@@ -1106,6 +1185,8 @@ void Studio::deleteSelectedRegions()
 {
     if (selectedRegions.isEmpty())
         return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
 
     currentProject->undo.beginNewTransaction ("Delete");
     for (int id : selectedRegions)
@@ -1125,8 +1206,10 @@ void Studio::splitSelectedAtPlayhead()
             targets.add (r);
 
     // Nothing selected: split whatever is under the playhead on the selected track.
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
     if (targets.isEmpty())
-        if (auto t = getSelectedTrack(); t.isValid())
+        if (auto t = getSelectedTrack(); t.isValid() && ! mixui::blockedByFreeze (*this, t))
             for (auto r : t)
                 if (r.hasType (daw::ids::REGION))
                     targets.add (r);
@@ -1151,6 +1234,8 @@ void Studio::cutSelectedRegions()
 {
     if (selectedRegions.isEmpty())
         return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
     copySelectedRegions();
     currentProject->undo.beginNewTransaction ("Cut");
     for (int id : selectedRegions)
@@ -1168,6 +1253,8 @@ void Studio::paste()
         addTrack();
 
     const auto selected = getSelectedTrack();
+    if (mixui::blockedByFreeze (*this, selected))
+        return;
     const int firstTrack = selected.isValid() ? p.trackList().indexOf (selected) : 0;
     p.undo.beginNewTransaction ("Paste");
     setSelectedRegions (p.pasteRegions (clipboard, engineInstance->getPosition(), juce::jmax (0, firstTrack)));
@@ -1177,6 +1264,8 @@ void Studio::repeatSelectedRegions()
 {
     if (selectedRegions.isEmpty())
         return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
     currentProject->undo.beginNewTransaction ("Repeat");
     setSelectedRegions (currentProject->repeatRegions (selectedRegions));
 }
@@ -1184,6 +1273,8 @@ void Studio::repeatSelectedRegions()
 void Studio::nudgeSelectedRegions (int direction)
 {
     if (selectedRegions.isEmpty())
+        return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
         return;
     const auto grid = currentProject->grid();
     const auto step = (juce::int64) std::llround (grid.samplesPerBeat() * grid.beatUnit / 16.0);   // a 16th note in any meter
@@ -1202,6 +1293,8 @@ void Studio::toggleMuteSelectedRegions()
             allMuted = allMuted && (bool) r[daw::ids::mute];
         }
     if (regions.isEmpty())
+        return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
         return;
 
     currentProject->undo.beginNewTransaction (allMuted ? "Unmute Regions" : "Mute Regions");
@@ -1224,6 +1317,8 @@ void Studio::toggleLoopSelectedRegions()
         }
     if (regions.isEmpty())
         return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
     currentProject->undo.beginNewTransaction (allLooped ? "Unloop Regions" : "Loop Regions");
     for (auto& r : regions)
     {
@@ -1236,6 +1331,24 @@ void Studio::toggleSelectedTrack (const juce::Identifier& property)
 {
     if (auto t = getSelectedTrack(); t.isValid())
         t.setProperty (property, ! (bool) t[property], nullptr);
+}
+
+//==============================================================================
+void Studio::copySelectedToLoopGrid()
+{
+    auto& p = *currentProject;
+    p.undo.beginNewTransaction ("Copy to Loop Grid");
+    int copied = 0;
+    for (int id : selectedRegions)
+    {
+        const auto region = findRegion (id);
+        auto track = daw::Project::trackOf (region);
+        if (const int column = loops::firstEmptyColumn (track, p.state); column >= 0)
+            copied += loops::copyRegionToCell (p, region, track, column).isValid() ? 1 : 0;
+    }
+    flash (copied == 0 ? juce::String ("Nothing to copy (or no empty cells left)")
+                       : "Copied " + juce::String (copied) + (copied == 1 ? " region" : " regions") + " to the Loop Grid");
+    setPane (Pane::loopGrid);
 }
 
 void Studio::setPane (Pane p)

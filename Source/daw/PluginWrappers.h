@@ -26,6 +26,8 @@ public:
         pendingAllOff = true;
     }
 
+    int getLatencySamples() const override                      { return plugin->getLatencySamples(); }
+
     void render (float* left, float* right, int numSamples, const NoteEvent* events, int numEvents) override
     {
         midi.clear();

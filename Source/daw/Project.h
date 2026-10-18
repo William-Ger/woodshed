@@ -15,11 +15,25 @@ namespace woodshed::daw
              name, sampleRate, tempo, beatsPerBar, beatUnit, click (bool), countIn (bool),
              loopOn (bool), loopStart, loopEnd (samples), masterVolume (dB), selectedTrack (id),
              tempoChanges ("tick:bpm;..." after the start), meterChanges ("bar:beats/unit;..." after bar 1),
-             markers (JSON array of { id, name, position }; a property, so the children stay tracks)
+             markers (JSON array of { id, name, position }; a property, so the children stay tracks),
+             groups (JSON array of { id 1..32, name, colour, volume, mute, solo, arm, select }: the track
+             groups and what each links), punchOn (bool), punchIn, punchOut (samples: Autopunch's range),
+             spatialOutput ("binaural": 3D tracks reach the stereo master through binaural cues, for
+             headphones; else "stereo", amplitude panning), movie (the movie's path, relative to the
+             project folder when it's inside it), movieOffset (timeline sample where the movie starts)
       TRACK  id (int, unique), name, colour (ARGB int), volume (dB), pan (-1..1),
              mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool),
              kind ("audio" when absent, "instrument", or "aux": a bus that plays the sends it receives
-             through its inserts and fader; it has no regions or input)
+             through its inserts and fader; it has no regions or input),
+             spatial (bool: a 3D position instead of the pan), azimuth (degrees, 0 ahead, + right),
+             elevation (degrees, + up), distance (metres), spread (0..1), room (early reflections, 0..1),
+             stack (a stack main's id: this track is in that Track Stack), group (1..32, 0 or absent for
+             none), vca (a VCA's id: that VCA's fader scales this one), frozen (bool) and freezeFile (path
+             relative to the project folder: the track plays this pre-fader render instead of itself)
+             An aux may have busRole: "summing" (a summing stack's main: its members play through it),
+             "folder" (a folder stack's main: no audio of its own; its fader and mute scale its members)
+             or "vca" (a VCA: no audio; its volume, automated or not, is a dB offset on its tracks'
+             faders). Stack mains have collapsed (bool: the arrange hides the members).
         RIG        state (XML string of the track's rig: its board, amp, cab and knobs); audio tracks
         INSTRUMENT type (InstrumentRegistry id), patch (name), knobs (comma-separated real values in
                    the instrument's knob order); instrument tracks. Or type "plugin": an Audio Unit or
@@ -31,7 +45,7 @@ namespace woodshed::daw
         SEND       bus (an aux track's id), level (dB), pre (bool: before the fader and pan); the
                    track's signal, also sent to that aux
         AUTOMATION param ("volume" in dB, "pan" -1..1, "inst:<knob index>" or "fx:<FX id>:<knob index>"
-                   in the knob's real units), points ("sample:value;..." in time order). With
+                   in the knob's real units, "spatial:azimuth|elevation|distance|spread" on 3D tracks), points ("sample:value;..." in time order). With
                    points, the parameter follows the line between them (and holds the first and
                    last values before and after).
         REGION  id (int, unique), name, start (timeline sample), offset, length (samples), gain (dB),
@@ -49,6 +63,8 @@ namespace woodshed::daw
                   takes (file, offset, length, and start measured from the folder's content
                   origin), and comp ("from:to:take;..." from the content origin: which take plays
                   where; empty means the last take throughout).
+
+        LOOPGRID   the track's Loop Grid cells (see loops/LoopModel.h; scenes are the PROJECT's loopScenes)
 
       MASTER  the Stereo Out's insert effects: FX children as on a track (mastering EQ, a limiter...)
 
@@ -69,6 +85,10 @@ namespace ids
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
     WOODSHED_ID (tempoChanges) WOODSHED_ID (meterChanges) WOODSHED_ID (loop) WOODSHED_ID (transpose) WOODSHED_ID (comp) WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
+    WOODSHED_ID (stack) WOODSHED_ID (busRole) WOODSHED_ID (collapsed) WOODSHED_ID (group) WOODSHED_ID (groups) WOODSHED_ID (vca) WOODSHED_ID (frozen) WOODSHED_ID (freezeFile) WOODSHED_ID (punchOn) WOODSHED_ID (punchIn) WOODSHED_ID (punchOut)
+    // Spatial audio and video
+    WOODSHED_ID (spatial) WOODSHED_ID (azimuth) WOODSHED_ID (elevation) WOODSHED_ID (distance) WOODSHED_ID (spread) WOODSHED_ID (room)
+    WOODSHED_ID (spatialOutput) WOODSHED_ID (movie) WOODSHED_ID (movieOffset)
 #undef WOODSHED_ID
 }
 

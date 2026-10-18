@@ -62,8 +62,7 @@ public:
     bool producesStereo() const override                { return true; }
     void processStereo (float* left, float* right, int numSamples) override;
 
-    // TODO: if the Pedal base gains a latencySamples() hook for delay compensation, report the
-    // lookahead there too.
+    // The lookahead (and the detector's delay): the engine's delay compensation counts it.
     int getLatencySamples() const override              { return latency; }
 
     /** Message thread: the matching curve (encodeCurve). */

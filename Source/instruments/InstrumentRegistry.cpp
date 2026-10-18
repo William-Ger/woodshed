@@ -9,6 +9,7 @@ InstrumentRegistry::InstrumentRegistry()
     registerSynthInstruments (*this);
     registerOrchestralInstruments (*this);
     registerDrumInstruments (*this);
+    registerSamplerInstruments (*this);
 }
 
 const InstrumentRegistry& InstrumentRegistry::get()
@@ -28,7 +29,7 @@ const InstrumentType* InstrumentRegistry::find (const juce::String& type) const
 
 const juce::StringArray& InstrumentRegistry::categories()
 {
-    static const juce::StringArray list { "Keyboards", "Synthesizers", "Bass", "Drums", "Orchestral", "Mallets & Plucked" };
+    static const juce::StringArray list { "Keyboards", "Synthesizers", "Bass", "Drums", "Orchestral", "Mallets & Plucked", "Sampler" };
     return list;
 }
 

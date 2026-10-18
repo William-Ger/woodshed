@@ -1,6 +1,8 @@
 #include "ArrangeHeader.h"
 #include "ArrangeView.h"
 #include "Icons.h"
+#include "MixCommands.h"
+#include "../daw/Stacks.h"
 
 namespace woodshed::app::arrange
 {
@@ -67,6 +69,10 @@ void TrackHeader::Toggle::paint (juce::Graphics& g)
             icons::draw (g, icons::headphones(), r.withSizeKeepingCentre (13.0f, 13.0f), ink);
             break;
 
+        case Glyph::snowflake:
+            mixui::drawSnowflake (g, r.withSizeKeepingCentre (12.0f, 12.0f), ink);
+            break;
+
         case Glyph::text:
         default:
             g.setColour (ink);
@@ -79,6 +85,11 @@ void TrackHeader::Toggle::paint (juce::Graphics& g)
 void TrackHeader::Toggle::mouseDown (const juce::MouseEvent&)
 {
     repaint();
+    if (onClick)
+    {
+        onClick();
+        return;
+    }
     auto& p = owner.view.project();
     p.undo.beginNewTransaction (undoName);
     owner.track.setProperty (property, ! (bool) owner.track[property], &p.undo);
@@ -91,14 +102,18 @@ TrackHeader::TrackHeader (ArrangeView& v, juce::ValueTree t)
       mute (*this, ids::mute, "M", Toggle::Glyph::text, theme::mute, "Mute Track"),
       solo (*this, ids::solo, "S", Toggle::Glyph::text, theme::solo, "Solo Track"),
       arm (*this, ids::arm, "R", Toggle::Glyph::dot, theme::record, "Arm Track"),
-      monitor (*this, ids::monitor, "IN", Toggle::Glyph::headphones, theme::monitor, "Monitor Input")
+      monitor (*this, ids::monitor, "IN", Toggle::Glyph::headphones, theme::monitor, "Monitor Input"),
+      freeze (*this, ids::frozen, "F", Toggle::Glyph::snowflake, mixui::freezeColour(), "Freeze Track")
 {
     mute.setTooltip ("Mute");
     solo.setTooltip ("Solo");
     arm.setTooltip ("Arm for recording");
     monitor.setTooltip ("Hear the input through the rig");
-    for (auto* c : { &mute, &solo, &arm, &monitor })
+    freeze.setTooltip ("Freeze: render the track and play the render, for none of its CPU");
+    freeze.onClick = [this] { view.studio.selectTrack ((int) track[ids::id]); mixui::toggleFreeze (view.studio, track); };
+    for (auto* c : { &mute, &solo, &arm, &monitor, &freeze })
         addAndMakeVisible (*c);
+    freeze.setVisible (! daw::Project::isAuxTrack (track));      // a bus has nothing of its own to render
     // An instrument has no input to monitor: what you play always sounds.
     monitor.setVisible (! daw::Project::isInstrumentTrack (track) && ! daw::Project::isAuxTrack (track));
     arm.setVisible (! daw::Project::isAuxTrack (track));     // an aux has nothing to record
@@ -149,6 +164,8 @@ void TrackHeader::valueTreePropertyChanged (juce::ValueTree& tree, const juce::I
         return;
     if (property == ids::name)
         name.setText (track[ids::name].toString(), juce::dontSendNotification);
+    if (property == ids::stack || property == ids::group)
+        resized();
     repaint();
 }
 
@@ -165,9 +182,24 @@ void TrackHeader::updateNameStyle (bool selected)
     name.setColour (juce::Label::textColourId, muted ? theme::dimText : theme::text);
 }
 
+int TrackHeader::indent() const
+{
+    return juce::jmin (2, daw::stacks::depth (view.project(), track)) * 10;
+}
+
+juce::Rectangle<int> TrackHeader::disclosureArea() const
+{
+    return { 6 + indent(), name.getY(), 20, name.getHeight() };
+}
+
+juce::Rectangle<int> TrackHeader::groupBadge() const
+{
+    return { getWidth() - 30, name.getY() + 2, 22, 16 };
+}
+
 void TrackHeader::paint (juce::Graphics& g)
 {
-    const bool selected = view.studio.getSelectedTrackId() == (int) track[ids::id];
+    const bool selected = view.studio.isTrackSelected ((int) track[ids::id]);
     const auto colour = trackColour (track);
     const auto r = getLocalBounds();
     updateNameStyle (selected);
@@ -191,12 +223,30 @@ void TrackHeader::paint (juce::Graphics& g)
     g.setColour (muted ? colour.withSaturation (0.15f).withMultipliedBrightness (0.7f) : colour);
     g.fillRect (juce::Rectangle<int> (0, 0, 3, getHeight() - 1));
 
-    // Track number, faint, beside the name.
+    // Track number, faint, beside the name; a stack main has its disclosure triangle there.
     const int index = view.project().state.indexOf (track);
-    g.setColour (selected ? theme::dimText : theme::faintText);
-    g.setFont (theme::font (11.0f, theme::Weight::medium));
-    g.drawText (juce::String (index + 1), juce::Rectangle<int> (8, name.getY(), 18, name.getHeight()),
-                juce::Justification::centred);
+    if (daw::stacks::isMain (track))
+        mixui::drawDisclosure (g, disclosureArea().toFloat(), ! (bool) track[ids::collapsed],
+                               daw::stacks::isSumming (track), selected ? theme::text : theme::dimText);
+    else
+    {
+        g.setColour (selected ? theme::dimText : theme::faintText);
+        g.setFont (theme::font (11.0f, theme::Weight::medium));
+        g.drawText (juce::String (index + 1), juce::Rectangle<int> (8 + indent(), name.getY(), 18, name.getHeight()),
+                    juce::Justification::centred);
+    }
+
+    // The track's group, as a numbered badge in its colour.
+    if (const int groupId = daw::groups::groupOf (track); groupId > 0)
+        if (auto group = daw::groups::find (view.project(), groupId))
+        {
+            const auto badge = groupBadge().toFloat();
+            g.setColour (group->colour.withAlpha (0.85f));
+            g.fillRoundedRectangle (badge, 4.0f);
+            g.setColour (group->colour.getPerceivedBrightness() > 0.6f ? juce::Colour (0xff141416) : juce::Colours::white);
+            g.setFont (theme::font (10.0f, theme::Weight::semibold));
+            g.drawText ("G" + juce::String (groupId), badge, juce::Justification::centred, false);
+        }
 
     // Automation view: which parameter the lane shows (click to choose).
     if (view.studio.isShowingAutomation())
@@ -226,12 +276,15 @@ void TrackHeader::paint (juce::Graphics& g)
 
 void TrackHeader::resized()
 {
-    constexpr int left = 28;
-    name.setBounds (left - 2, 11, getWidth() - left - 10, 20);
+    const int left = 28 + indent();
+    const int badge = daw::groups::groupOf (track) > 0 ? 26 : 0;
+    name.setBounds (left - 2, 11, getWidth() - left - 10 - badge, 20);
 
     auto row = juce::Rectangle<int> (left, getHeight() - 9 - 20 - 1, getWidth() - left - 10, 20);
-    for (auto* t : { &mute, &solo, &arm, &monitor })
+    for (auto* t : { &mute, &solo, &arm, &monitor, &freeze })
     {
+        if (! t->isVisible() && t != &monitor)      // the input slot stays, so the buttons line up
+            continue;
         t->setBounds (row.removeFromLeft (20));
         row.removeFromLeft (4);
     }
@@ -239,7 +292,11 @@ void TrackHeader::resized()
 
 juce::Rectangle<int> TrackHeader::automationChip() const
 {
-    const int left = (arm.isVisible() ? arm.getRight() : solo.getRight()) + (monitor.isVisible() ? 28 : 6);
+    int left = solo.getRight();
+    for (auto* t : { &arm, &monitor, &freeze })
+        if (t->isVisible())
+            left = t->getRight();
+    left += 6;
     return { left, mute.getY(), juce::jmax (20, getWidth() - 8 - left), mute.getHeight() };
 }
 
@@ -267,7 +324,27 @@ void TrackHeader::mouseDown (const juce::MouseEvent& e)
         return;
     }
     dragging = false;
-    view.studio.selectTrack ((int) track[ids::id]);
+    if (daw::stacks::isMain (track) && disclosureArea().contains (e.getPosition()))
+    {
+        // Collapsing is a view setting, not an edit: it doesn't go on the undo list.
+        track.setProperty (ids::collapsed, ! (bool) track[ids::collapsed], nullptr);
+        return;
+    }
+    if (daw::groups::groupOf (track) > 0 && groupBadge().contains (e.getPosition()))
+    {
+        view.studio.selectTrack ((int) track[ids::id]);
+        mixui::groupMenu (view.studio, track).showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (groupBadge())));
+        return;
+    }
+
+    // Shift-click selects a run of tracks, Cmd-click adds or removes one (for Track Stacks).
+    if (! e.mods.isPopupMenu() && (e.mods.isShiftDown() || e.mods.isCommandDown()))
+    {
+        view.studio.extendTrackSelection ((int) track[ids::id], e.mods.isShiftDown());
+        return;
+    }
+    if (! (e.mods.isPopupMenu() && view.studio.isTrackSelected ((int) track[ids::id])))
+        view.studio.selectTrack ((int) track[ids::id]);
 
     if (e.mods.isPopupMenu())
         view.showTrackMenu (track);

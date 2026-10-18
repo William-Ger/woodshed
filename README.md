@@ -36,10 +36,24 @@ feel familiar), but it's its own program, written from scratch.
 
 **Mixing**
 - Mixer with sends, aux buses and master effects
+- Mastering: EBU R128 loudness meters (momentary, short-term, integrated, loudness range,
+  true peak), correlation and a spectrum, and an assistant that masters the song to a
+  loudness target (streaming, podcast, CD, club) with a matching EQ, bus compression, width
+  and a true-peak limiter
 - 92 effects: dynamics, EQ, drive, amps and cabinets, modulation, pitch (including vocal pitch
   correction), delay, reverb and a drawer full of strange ones
 - Automation for volume, pan, sends and every instrument and effect knob
 - 215 factory guitar rig presets
+
+**Spatial audio and video**
+- A 3D panner on every track (right-click the pan knob, or Track > 3D Panner...): direction,
+  elevation, distance, spread and a little room, all automatable
+- Binaural monitoring for headphones (Track > Binaural Monitoring): interaural time and level
+  differences, head shadow, pinna and elevation cues, distance and air absorption, computed
+  from a model of the head rather than a measured dataset; on speakers, 3D tracks pan in stereo
+- Surround bounces to 5.1 and 7.1.4 WAV files, placed from the tracks' 3D positions
+- Movies (File > Open Movie...): a movie window that follows the transport, a thumbnail strip
+  above the tracks (drag it to move the movie's start), timecode, and Import Audio from Movie
 
 | | |
 |---|---|
@@ -51,8 +65,14 @@ feel familiar), but it's its own program, written from scratch.
 
 Woodshed is young. Things the big DAWs have that it doesn't yet: Live Loops, Flex Time and
 Flex Pitch (time-stretching and editing audio pitch), Smart Tempo, a sampler instrument,
-track stacks, groups and VCAs, punch in/out, track freeze, plug-in delay compensation, a
-mastering assistant, surround and spatial audio, and video. Contributions are very welcome.
+track stacks, groups and VCAs, punch in/out, track freeze and plug-in delay compensation.
+Contributions are very welcome.
+
+Surround is bounce-only: the engine plays in stereo, so while you work you hear 3D tracks
+binaurally on headphones (or panned in stereo), and the 5.1 and 7.1.4 mixes exist only as
+bounced files. Those leave the LFE channel silent and skip the master effects. Movie playback
+uses the system's player on macOS and Windows; on Linux there's no video yet, and the movie's
+sound can be imported only where the system can decode it.
 
 ## Building
 
@@ -91,7 +111,7 @@ build-bench/WoodshedBench_artefacts/Release/WoodshedBench project      # the eng
 build-bench/WoodshedBench_artefacts/Release/WoodshedBench instruments  # every instrument and sound
 ```
 
-`presets`, `drummer`, `score` and `pitchcorrect` test the rest; `demo-midi <folder>` and
+`presets`, `drummer`, `score`, `pitchcorrect` and `spatial` test the rest; `demo-midi <folder>` and
 `render-project <folder> <out.wav>` make and render a short song.
 
 ## Contributing

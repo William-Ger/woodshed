@@ -1,11 +1,13 @@
 #include "MainComponent.h"
 #include "PluginHost.h"
+#include "SpatialPanner.h"
+#include "MixCommands.h"
 
 namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), masteringPanel (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), loopGridView (s), samplerEditor (s), masteringPanel (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -18,8 +20,12 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (stepSequencer);
     addChildComponent (typing);
     addChildComponent (takesEditor);
+    addChildComponent (loopGridView);
+    addChildComponent (samplerEditor);
     addChildComponent (masteringPanel);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
+    movie = std::make_unique<MovieController> (studio);
+    arrange.attachMovie (movie.get());
 
     // Tracks above, the pane below; the divider between them can be dragged.
     layout.setItemLayout (0, 120, -1.0, -0.36);
@@ -40,6 +46,8 @@ MainComponent::MainComponent (Studio& s)
 MainComponent::~MainComponent()
 {
     studio.removeChangeListener (this);
+    arrange.attachMovie (nullptr);
+    movie.reset();
 }
 
 void MainComponent::paint (juce::Graphics& g)
@@ -57,6 +65,8 @@ juce::Component* MainComponent::paneComponent()
         case Studio::Pane::score:  return &scoreView;
         case Studio::Pane::drummer: return &drummer;
         case Studio::Pane::stepSequencer: return &stepSequencer;
+        case Studio::Pane::loopGrid: return &loopGridView;
+        case Studio::Pane::sampler: return &samplerEditor;
         case Studio::Pane::mastering: return &masteringPanel;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
@@ -67,7 +77,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &masteringPanel })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &samplerEditor, &loopGridView, &masteringPanel })
         c->setVisible (c == shown);
 }
 
@@ -120,6 +130,14 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
                   cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions, cmd::showScore,
                   cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
+
+    // Loop Grid.
+    c.addArray ({ cmd::showLoopGrid, cmd::loopGridStopAll, cmd::copyToLoopGrid, cmd::loopGridPerformRecord, cmd::loopGridAddScene });
+    // The Sampler.
+    c.addArray ({ cmd::showSampler, cmd::newSamplerTrack, cmd::convertToSampler, cmd::convertToSamplerSlice });
+    // Spatial audio and video.
+    c.addArray ({ cmd::binauralMonitoring, cmd::spatialPanner, cmd::openMovie, cmd::removeMovie, cmd::importMovieAudio, cmd::showMovie });
+    mixui::getCommands (c);     // Track Stacks, freeze, VCAs, Autopunch
     c.addArray ({ cmd::mastering, cmd::showMastering });                                   // mastering
 }
 
@@ -130,6 +148,8 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
     const auto shift = juce::ModifierKeys::shiftModifier;
     auto& p = studio.project();
     auto& s = p.state;
+    if (mixui::getCommandInfo (studio, id, info))
+        return;
 
     switch (id)
     {
@@ -230,6 +250,36 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::showAutomation:  info.setInfo ("Show Automation", {}, "View", 0); info.addDefaultKeypress ('a', 0);
                                    info.setTicked (studio.isShowingAutomation()); break;
 
+        // Loop Grid ------------------------------------------------------------------
+        case cmd::showLoopGrid:    info.setInfo ("Loop Grid", "Show the Loop Grid: cells to launch, by track and scene", "View", 0);
+                                   info.addDefaultKeypress ('g', 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::loopGrid); break;
+        case cmd::loopGridStopAll: info.setInfo ("Stop All Cells", "Every Loop Grid cell stops on the next launch point", "Transport", 0);
+                                   info.setActive (studio.engine().isPlaying()); break;
+        case cmd::copyToLoopGrid:  info.setInfo ("Copy to Loop Grid", "Each selected region into an empty cell of its track", "Edit", 0);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::loopGridPerformRecord:
+                                   info.setInfo ("Perform Recording", "Write what the Loop Grid plays into the arrange", "Transport", 0);
+                                   info.setTicked (studio.loopGrid().isPerformRecording()); break;
+        case cmd::loopGridAddScene: info.setInfo ("Add Scene", "A new column in the Loop Grid", "View", 0); break;
+        // The Sampler.
+        case cmd::showSampler:     info.setInfo ("Sampler", {}, "View", 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::sampler); break;
+        case cmd::newSamplerTrack: info.setInfo ("New Sampler Track", {}, "Track", 0); break;
+        case cmd::convertToSampler: info.setInfo ("Convert to Sampler Track", {}, "Track", 0);
+                                   info.setActive (SamplerEditor::canConvertSelection (studio)); break;
+        case cmd::convertToSamplerSlice: info.setInfo ("Convert to Sampler Track (Slice)", {}, "Track", 0);
+                                   info.setActive (SamplerEditor::canConvertSelection (studio)); break;
+        // Spatial audio and video ------------------------------------------------
+        case cmd::binauralMonitoring: info.setInfo ("Binaural Monitoring (Headphones)", "3D tracks reach the Stereo Out through binaural cues instead of amplitude panning", "Track", 0);
+                                   info.setTicked (s[daw::ids::spatialOutput].toString() == "binaural"); break;
+        case cmd::spatialPanner:   info.setInfo ("3D Panner...", {}, "Track", 0); info.addDefaultKeypress ('p', cmdKey | juce::ModifierKeys::altModifier);
+                                   info.setActive (studio.getSelectedTrack().isValid()); break;
+        case cmd::openMovie:       info.setInfo ("Open Movie...", {}, "File", 0); info.addDefaultKeypress ('o', cmdKey | juce::ModifierKeys::altModifier); break;
+        case cmd::removeMovie:     info.setInfo ("Remove Movie", {}, "File", 0); info.setActive (movie != nullptr && movie->hasMovie()); break;
+        case cmd::importMovieAudio: info.setInfo ("Import Audio from Movie", {}, "File", 0); info.setActive (movie != nullptr && movie->hasMovie()); break;
+        case cmd::showMovie:       info.setInfo ("Movie", {}, "View", 0); info.setActive (movie != nullptr && movie->hasMovie());
+                                   info.setTicked (movie != nullptr && movie->isWindowShowing()); break;
         // Mastering ---------------------------------------------------------------
         case cmd::mastering:       info.setInfo ("Mastering...", "Bounce the song and master it to a loudness target", "Mix", 0);
                                    info.addDefaultKeypress ('m', cmdKey | juce::ModifierKeys::altModifier);
@@ -246,6 +296,11 @@ bool MainComponent::perform (const InvocationInfo& info)
     auto& p = studio.project();
     auto& s = p.state;
     auto toggle = [&s] (const juce::Identifier& id) { s.setProperty (id, ! (bool) s[id], nullptr); };
+    if (mixui::perform (studio, info.commandID))
+    {
+        studio.commands.commandStatusChanged();
+        return true;
+    }
 
     switch (info.commandID)
     {
@@ -347,6 +402,36 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::pluginManager:   studio.plugins().showManager(); break;
         case cmd::loopRegions:     studio.toggleLoopSelectedRegions(); break;
         case cmd::showAutomation:  studio.setShowingAutomation (! studio.isShowingAutomation()); break;
+
+        // Loop Grid
+        case cmd::showLoopGrid:
+            studio.setPane (studio.getPane() == Studio::Pane::loopGrid ? Studio::Pane::none : Studio::Pane::loopGrid);
+            break;
+        case cmd::loopGridStopAll: studio.loopGrid().stopAll(); break;
+        case cmd::copyToLoopGrid:  studio.copySelectedToLoopGrid(); break;
+        case cmd::loopGridPerformRecord: studio.loopGrid().setPerformRecording (! studio.loopGrid().isPerformRecording()); break;
+        case cmd::loopGridAddScene:
+            p.undo.beginNewTransaction ("Add Scene");
+            loops::addScene (p);
+            break;
+        // The Sampler.
+        case cmd::showSampler:     studio.setPane (studio.getPane() == Studio::Pane::sampler ? Studio::Pane::none : Studio::Pane::sampler); break;
+        case cmd::newSamplerTrack: SamplerEditor::newSamplerTrack (studio); break;
+        case cmd::convertToSampler: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::classic); break;
+        case cmd::convertToSamplerSlice: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::slice); break;
+        // Spatial audio and video ------------------------------------------------
+        case cmd::binauralMonitoring:
+            p.undo.beginNewTransaction ("Monitoring");
+            s.setProperty (daw::ids::spatialOutput, s[daw::ids::spatialOutput].toString() == "binaural" ? "stereo" : "binaural", &p.undo);
+            break;
+        case cmd::spatialPanner:
+            SpatialPanner::show (studio, studio.getSelectedTrack(),
+                                 localAreaToGlobal (arrange.getBounds().withSizeKeepingCentre (40, 40)));
+            break;
+        case cmd::openMovie:       movie->openDialog(); break;
+        case cmd::removeMovie:     movie->remove(); break;
+        case cmd::importMovieAudio: movie->importAudio(); break;
+        case cmd::showMovie:       movie->toggleWindow(); break;
         case cmd::quantize:
             if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
                 pianoRoll.quantizeSelection();
@@ -407,6 +492,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String& m
             m.addCommandItem (cm, cmd::importMidi);
             m.addCommandItem (cm, cmd::exportMidi);
             m.addSeparator();
+            m.addCommandItem (cm, cmd::openMovie);           // spatial and video
+            m.addCommandItem (cm, cmd::importMovieAudio);
+            m.addCommandItem (cm, cmd::removeMovie);
+            m.addSeparator();
             m.addCommandItem (cm, cmd::bounce);
            #if ! JUCE_MAC
             m.addSeparator();
@@ -432,6 +521,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String& m
             m.addCommandItem (cm, cmd::nudgeLeft);
             m.addCommandItem (cm, cmd::nudgeRight);
             m.addCommandItem (cm, cmd::quantize);
+            m.addCommandItem (cm, cmd::copyToLoopGrid);
             break;
         case 2:
             m.addCommandItem (cm, cmd::newTrack);
@@ -439,12 +529,22 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String& m
             m.addCommandItem (cm, cmd::newInstrumentTrack);
             m.addCommandItem (cm, cmd::newDrumTrack);
             m.addCommandItem (cm, cmd::newDrummerTrack);
+            m.addCommandItem (cm, cmd::newSamplerTrack);
+            m.addCommandItem (cm, cmd::convertToSampler);
+            m.addCommandItem (cm, cmd::convertToSamplerSlice);
+            m.addCommandItem (cm, cmd::newVca);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::createTrackStack);
+            m.addCommandItem (cm, cmd::freezeTrack);
             m.addSeparator();
             m.addCommandItem (cm, cmd::duplicateTrack);
             m.addCommandItem (cm, cmd::deleteTrack);
             m.addSeparator();
             m.addCommandItem (cm, cmd::muteTrack);
             m.addCommandItem (cm, cmd::soloTrack);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::spatialPanner);       // spatial and video
+            m.addCommandItem (cm, cmd::binauralMonitoring);
             break;
         case 3:
             m.addCommandItem (cm, cmd::playStop);
@@ -455,10 +555,15 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String& m
             m.addCommandItem (cm, cmd::loopToSelection);
             m.addCommandItem (cm, cmd::toggleClick);
             m.addCommandItem (cm, cmd::toggleCountIn);
+            m.addCommandItem (cm, cmd::toggleAutopunch);
+            m.addCommandItem (cm, cmd::punchToCycle);
             m.addSeparator();
             m.addCommandItem (cm, cmd::createMarker);
             m.addCommandItem (cm, cmd::nextMarker);
             m.addCommandItem (cm, cmd::previousMarker);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::loopGridPerformRecord);
+            m.addCommandItem (cm, cmd::loopGridStopAll);
             break;
         case 4:
             m.addCommandItem (cm, cmd::showRig);
@@ -466,8 +571,11 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String& m
             m.addCommandItem (cm, cmd::showScore);
             m.addCommandItem (cm, cmd::showStepSequencer);
             m.addCommandItem (cm, cmd::showDrummer);
+            m.addCommandItem (cm, cmd::showSampler);
             m.addCommandItem (cm, cmd::showMixer);
+            m.addCommandItem (cm, cmd::showLoopGrid);
             m.addCommandItem (cm, cmd::showAutomation);
+            m.addCommandItem (cm, cmd::showMovie);           // spatial and video
             m.addCommandItem (cm, cmd::hideBottom);
             m.addSeparator();
             m.addCommandItem (cm, cmd::zoomIn);
