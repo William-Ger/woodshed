@@ -58,6 +58,8 @@ namespace woodshed::daw
                   origin), and comp ("from:to:take;..." from the content origin: which take plays
                   where; empty means the last take throughout).
 
+        LOOPGRID   the track's Loop Grid cells (see loops/LoopModel.h; scenes are the PROJECT's loopScenes)
+
       MASTER  the Stereo Out's insert effects: FX children as on a track (mastering EQ, a limiter...)
 
     All positions and lengths are in samples at the project sample rate, except notes (ticks).

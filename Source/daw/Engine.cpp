@@ -215,6 +215,9 @@ void collectNoteEvents (const TrackPlayback& track, TrackRuntime& rt, const Mixe
             push ({ (int) (it->time - b.position), it->on ? NoteEvent::noteOn : NoteEvent::noteOff, it->pitch, it->velocity });
             rt.notesSounding = rt.notesSounding || it->on;
         }
+        // A Loop Grid cell playing on the track replaces the arrange's notes.
+        if (b.loops != nullptr && b.loops->mixMidi (track, ev))
+            rt.notesSounding = true;
         rt.expectedPosition = b.position + n;
     }
     else
@@ -268,6 +271,8 @@ void Mixer::render (const Snapshot& snap, const Block& b)
     const int n = b.numSamples;
     juce::FloatVectorOperations::clear (b.left, n);
     juce::FloatVectorOperations::clear (b.right, n);
+    if (b.loops != nullptr)
+        b.loops->beginBlock (snap, b.position, n, b.playing);
 
     for (auto& track : snap.tracks)
         if (track.aux && track.runtime->busInput.getNumSamples() >= n)
@@ -309,6 +314,8 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         {
             juce::FloatVectorOperations::clear (c, n);
             collectNoteEvents (track, rt, b);
+            if (b.loops != nullptr && b.liveTrackId == rt.id)
+                b.loops->captureMidi (rt, b.liveEvents, b.numLiveEvents);
 
             auto& instrument = *track.instrument;
             for (int k = 0; k < Instrument::maxKnobs; ++k)
@@ -324,32 +331,51 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             // Input monitoring (IN) always adds the live input. Armed tracks also go live while
             // stopped or recording. Takes play whenever the song plays, except on a track that is
             // recording a new one.
-            const bool hearInput = b.monitorInputs && (track.monitor || (track.armed && (! b.playing || b.recording))) && b.inputs != nullptr;
+            // A track recording into a Loop Grid cell hears itself too.
+            const bool loopRecording = b.loops != nullptr && b.loops->hearsInput (rt);
+            const bool hearInput = b.monitorInputs && (track.monitor || (track.armed && (! b.playing || b.recording)) || loopRecording) && b.inputs != nullptr;
             const bool playTakes = b.playing && ! (track.armed && b.recording);
 
-            if (hearInput && juce::isPositiveAndBelow (track.input, b.numInputs) && b.inputs[track.input] != nullptr)
+            const bool hasInput = b.inputs != nullptr && juce::isPositiveAndBelow (track.input, b.numInputs) && b.inputs[track.input] != nullptr;
+            if (hearInput && hasInput)
                 juce::FloatVectorOperations::copy (a, b.inputs[track.input], n);
+            if (b.loops != nullptr && hasInput)
+                b.loops->captureAudio (rt, b.inputs[track.input], n);
 
             if (playTakes)
             {
-                for (auto& r : track.regions)
+                auto playRegions = [&] (juce::int64 blockFrom, juce::int64 blockTo)
                 {
-                    const auto from = juce::jmax (r.start, b.position);
-                    const auto to = juce::jmin (r.start + r.length, b.position + n);
-                    if (from >= to)
-                        continue;
-
-                    const float* src = r.audio->getReadPointer (0);
-                    for (auto t = from; t < to; ++t)
+                    for (auto& r : track.regions)
                     {
-                        const auto intoRegion = t - r.start;
-                        const auto fromEnd = r.start + r.length - 1 - t;
-                        float g = r.gain;
-                        if (intoRegion < r.fadeIn) g *= fadeCurve ((float) intoRegion / (float) r.fadeIn);
-                        if (fromEnd < r.fadeOut)   g *= fadeCurve ((float) fromEnd / (float) r.fadeOut);
-                        a[t - b.position] += src[r.offset + intoRegion] * g;
+                        const auto from = juce::jmax (r.start, blockFrom);
+                        const auto to = juce::jmin (r.start + r.length, blockTo);
+                        if (from >= to)
+                            continue;
+
+                        const float* src = r.audio->getReadPointer (0);
+                        for (auto t = from; t < to; ++t)
+                        {
+                            const auto intoRegion = t - r.start;
+                            const auto fromEnd = r.start + r.length - 1 - t;
+                            float g = r.gain;
+                            if (intoRegion < r.fadeIn) g *= fadeCurve ((float) intoRegion / (float) r.fadeIn);
+                            if (fromEnd < r.fadeOut)   g *= fadeCurve ((float) fromEnd / (float) r.fadeOut);
+                            a[t - b.position] += src[r.offset + intoRegion] * g;
+                        }
                     }
+                };
+
+                // While a Loop Grid cell plays, it replaces the regions.
+                if (b.loops != nullptr && loops::LoopPlayer::isActive (rt))
+                {
+                    for (int i = 0; i < rt.loop.numSegments; ++i)
+                        if (const auto& seg = rt.loop.segments[(size_t) i]; seg.column == loops::TrackLoopState::none)
+                            playRegions (b.position + seg.from, b.position + seg.to);
+                    b.loops->renderAudio (track, a);
                 }
+                else
+                    playRegions (b.position, b.position + n);
             }
 
             juce::FloatVectorOperations::copy (c, a, n);
@@ -467,6 +493,9 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             fx.pedal->processChannel (1, b.right, n);
         }
     }
+
+    if (b.loops != nullptr)
+        b.loops->endBlock (snap, b.position, n);
 }
 
 void Mixer::addClick (const Snapshot& snap, const Block& b, float level)
@@ -1332,6 +1361,8 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         tp.rigOn = (bool) t.getProperty (ids::rigOn, true);
         tp.input = (int) t.getProperty (ids::input, 0);
         tp.aux = Project::isAuxTrack (t);
+        if (! tp.aux)
+            loops::buildCells (project, pool, t, tp.cells);
         if (tp.aux)
             tp.rigOn = false;
 
@@ -1891,6 +1922,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         b.monitorInputs = ! feedbackProtection.load (std::memory_order_relaxed);
         b.left = mixBuffer.getWritePointer (0);
         b.right = mixBuffer.getWritePointer (1);
+        b.loops = &loopPlayer;
 
         // This sub-block's share of the live events, re-based to its start.
         const size_t firstLive = liveIndex;

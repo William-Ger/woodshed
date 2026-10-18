@@ -45,6 +45,7 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
             return nullptr;
         });
     pluginHost = std::make_unique<PluginHost> (*this);
+    loopGridInstance = std::make_unique<loops::LoopGrid> (*engineInstance);
     engineInstance->setPluginFactory ([this] (const juce::String& xml, double rate, int block, juce::String& error)
                                       { return pluginHost->create (xml, rate, block, error); });
     engineInstance->settleRig = [] (juce::AudioProcessor& rig)
@@ -77,6 +78,13 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     else if (testPane == "score") pane = Pane::score;
     else if (testPane == "none") pane = Pane::none;
     else if (testPane == "takes") pane = Pane::takes;
+    else if (testPane == "loopgrid") pane = Pane::loopGrid;
+    // WOODSHED_TEST_GRID=<scene number>: show the Loop Grid and launch that scene.
+    if (const int scene = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_GRID", {}).getIntValue(); scene > 0)
+    {
+        pane = Pane::loopGrid;
+        juce::Timer::callAfterDelay (1500, [this, scene] { loopGridInstance->launchScene (scene - 1); });
+    }
     if (const auto r = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_REGION", {}).getIntValue(); r > 0)
         selectedRegions = { r };
     else if (testPane == "drummer") pane = Pane::drummer;
@@ -101,6 +109,7 @@ Studio::~Studio()
     pluginHost->closeEditors();
     engineInstance->setProject (nullptr);
     currentProject->state.removeListener (this);
+    loopGridInstance.reset();
     engineInstance.reset();
     pluginHost.reset();
     deviceManager.closeAudioDevice();
@@ -943,6 +952,8 @@ juce::ValueTree Studio::getEditorRegion() const
 {
     if (auto r = findRegion (editorRegionId); r.isValid() && daw::Project::isMidiRegion (r))
         return r;
+    if (auto r = loops::findCellRegion (*currentProject, editorRegionId); daw::Project::isMidiRegion (r))
+        return r;       // a Loop Grid cell's notes
 
     for (int id : selectedRegions)
         if (auto r = findRegion (id); r.isValid() && daw::Project::isMidiRegion (r))
@@ -1307,6 +1318,24 @@ void Studio::toggleSelectedTrack (const juce::Identifier& property)
 {
     if (auto t = getSelectedTrack(); t.isValid())
         t.setProperty (property, ! (bool) t[property], nullptr);
+}
+
+//==============================================================================
+void Studio::copySelectedToLoopGrid()
+{
+    auto& p = *currentProject;
+    p.undo.beginNewTransaction ("Copy to Loop Grid");
+    int copied = 0;
+    for (int id : selectedRegions)
+    {
+        const auto region = findRegion (id);
+        auto track = daw::Project::trackOf (region);
+        if (const int column = loops::firstEmptyColumn (track, p.state); column >= 0)
+            copied += loops::copyRegionToCell (p, region, track, column).isValid() ? 1 : 0;
+    }
+    flash (copied == 0 ? juce::String ("Nothing to copy (or no empty cells left)")
+                       : "Copied " + juce::String (copied) + (copied == 1 ? " region" : " regions") + " to the Loop Grid");
+    setPane (Pane::loopGrid);
 }
 
 void Studio::setPane (Pane p)

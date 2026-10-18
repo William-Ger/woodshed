@@ -4,6 +4,7 @@
 #include "../instruments/Instrument.h"
 #include "../engine/Registry.h"
 #include "PluginWrappers.h"
+#include "../loops/LoopPlayer.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -136,6 +137,7 @@ struct TrackRuntime
     float shownLeft = 0.0f, shownRight = 0.0f;                          // message thread: last 30 Hz frame
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> recorder { nullptr };
     std::atomic<LivePeaks*> livePeaks { nullptr };                      // set together with recorder
+    loops::TrackLoopState loop;                                         // the Loop Grid on this track
 };
 
 struct RegionPlayback
@@ -203,6 +205,7 @@ struct TrackPlayback
     bool audible = true;            // mute and solo resolved
     bool armed = false, monitor = false, rigOn = true;
     int input = 0;
+    std::vector<loops::CellPlayback> cells;                             // the Loop Grid's cells, by column
 };
 
 /** An immutable picture of the song for the audio thread. */
@@ -243,6 +246,8 @@ struct Mixer
         int liveTrackId = -1;
         const NoteEvent* liveEvents = nullptr;     // offsets within this block, in order
         int numLiveEvents = 0;
+
+        loops::LoopPlayer* loops = nullptr;         // the Loop Grid (live playback only; bounces leave it out)
     };
 
     static void render (const Snapshot&, const Block&);
@@ -372,6 +377,14 @@ public:
     std::function<void (juce::AudioProcessor&)> settleRig;
 
     AudioPool& getAudioPool()                               { return pool; }
+    /** The Loop Grid's audio-thread side (see loops::LoopGrid for the message thread's). */
+    loops::LoopPlayer& getLoopPlayer()                      { return loopPlayer; }
+    /** A track's runtime (its Loop Grid state, for drawing), or null. Message thread. */
+    std::shared_ptr<TrackRuntime> getRuntime (int trackId) const
+    {
+        auto it = runtimes.find (trackId);
+        return it != runtimes.end() ? it->second : nullptr;
+    }
     juce::AudioDeviceManager& getDeviceManager()            { return deviceManager; }
 
     /** Builds a snapshot of `project` using the given runtimes (by track id); used by tests too. */
@@ -500,6 +513,8 @@ private:
     std::atomic<int> playbackLatency { 0 };
     int publishedLatencyKey = 0;
     juce::TimeSliceThread writerThread { "Woodshed recorder" };
+
+    loops::LoopPlayer loopPlayer;
 
     std::unique_ptr<juce::Thread> bounceThread;
     std::atomic<float> bounceProgress { 0.0f };

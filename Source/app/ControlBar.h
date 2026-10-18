@@ -150,7 +150,8 @@ private:
     Readout readout { *this };
 
     Segment rigPane   { "Rig", icons::rig(), "Show the selected track's rig (B)" },
-            mixerPane { "Mixer", icons::mixer(), "Show the mixer (X)" };
+            mixerPane { "Mixer", icons::mixer(), "Show the mixer (X)" },
+            loopsPane { "Loops", icons::loopGrid(), "Show the Loop Grid (G)" };
 
     IconButton tuner    { icons::tuningFork(), theme::accent, "Tuner", 17.0f },
                settings { icons::gear(), theme::accent, "Settings (Cmd+,)", 17.0f };

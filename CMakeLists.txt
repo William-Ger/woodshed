@@ -49,6 +49,13 @@ set(WOODSHED_DAW_SOURCES
     Source/daw/Drummer.cpp
     Source/daw/StepPattern.cpp)
 
+# --- loopgrid ---
+# The Loop Grid (clip launching): its model, the engine's audio-thread player and the controller.
+list(APPEND WOODSHED_DAW_SOURCES
+    Source/loops/LoopModel.cpp
+    Source/loops/LoopPlayer.cpp
+    Source/loops/LoopGrid.cpp)
+# --- end loopgrid ---
 # --- mixing (track stacks, groups and VCAs, delay compensation, freeze, punch) ---
 list(APPEND WOODSHED_DAW_SOURCES Source/daw/Stacks.cpp Source/daw/Groups.cpp Source/daw/Freeze.cpp)
 # --- end mixing ---
@@ -132,6 +139,9 @@ if(NOT WOODSHED_BENCH_ONLY)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
 
+    # --- loopgrid ---
+    target_sources(WoodshedStudio PRIVATE Source/app/LoopGridView.cpp)
+    # --- end loopgrid ---
     # --- mixing ---
     target_sources(WoodshedStudio PRIVATE Source/app/MixCommands.cpp)
     # --- end mixing ---
@@ -238,6 +248,9 @@ target_sources(WoodshedBench PRIVATE tools/bench/SamplerTest.cpp Source/instrume
 target_sources(WoodshedBench PRIVATE tools/bench/MixTest.cpp)
 # --- end mixing ---
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+# --- loopgrid ---
+target_sources(WoodshedBench PRIVATE tools/bench/LoopGridTest.cpp)
+# --- end loopgrid ---
 target_link_libraries(WoodshedBench
     PRIVATE
         juce::juce_dsp

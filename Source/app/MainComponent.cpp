@@ -6,7 +6,7 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), samplerEditor (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), loopGridView (s), samplerEditor (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -19,6 +19,7 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (stepSequencer);
     addChildComponent (typing);
     addChildComponent (takesEditor);
+    addChildComponent (loopGridView);
     addChildComponent (samplerEditor);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
@@ -58,6 +59,7 @@ juce::Component* MainComponent::paneComponent()
         case Studio::Pane::score:  return &scoreView;
         case Studio::Pane::drummer: return &drummer;
         case Studio::Pane::stepSequencer: return &stepSequencer;
+        case Studio::Pane::loopGrid: return &loopGridView;
         case Studio::Pane::sampler: return &samplerEditor;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
@@ -68,7 +70,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &samplerEditor })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &samplerEditor, &loopGridView })
         c->setVisible (c == shown);
 }
 
@@ -121,6 +123,9 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
                   cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions, cmd::showScore,
                   cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
+
+    // Loop Grid.
+    c.addArray ({ cmd::showLoopGrid, cmd::loopGridStopAll, cmd::copyToLoopGrid, cmd::loopGridPerformRecord, cmd::loopGridAddScene });
     // The Sampler.
     c.addArray ({ cmd::showSampler, cmd::newSamplerTrack, cmd::convertToSampler, cmd::convertToSamplerSlice });
     mixui::getCommands (c);     // Track Stacks, freeze, VCAs, Autopunch
@@ -235,6 +240,18 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::showAutomation:  info.setInfo ("Show Automation", {}, "View", 0); info.addDefaultKeypress ('a', 0);
                                    info.setTicked (studio.isShowingAutomation()); break;
 
+        // Loop Grid ------------------------------------------------------------------
+        case cmd::showLoopGrid:    info.setInfo ("Loop Grid", "Show the Loop Grid: cells to launch, by track and scene", "View", 0);
+                                   info.addDefaultKeypress ('g', 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::loopGrid); break;
+        case cmd::loopGridStopAll: info.setInfo ("Stop All Cells", "Every Loop Grid cell stops on the next launch point", "Transport", 0);
+                                   info.setActive (studio.engine().isPlaying()); break;
+        case cmd::copyToLoopGrid:  info.setInfo ("Copy to Loop Grid", "Each selected region into an empty cell of its track", "Edit", 0);
+                                   info.setActive (! studio.getSelectedRegions().isEmpty()); break;
+        case cmd::loopGridPerformRecord:
+                                   info.setInfo ("Perform Recording", "Write what the Loop Grid plays into the arrange", "Transport", 0);
+                                   info.setTicked (studio.loopGrid().isPerformRecording()); break;
+        case cmd::loopGridAddScene: info.setInfo ("Add Scene", "A new column in the Loop Grid", "View", 0); break;
         // The Sampler.
         case cmd::showSampler:     info.setInfo ("Sampler", {}, "View", 0);
                                    info.setTicked (studio.getPane() == Studio::Pane::sampler); break;
@@ -360,6 +377,17 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::loopRegions:     studio.toggleLoopSelectedRegions(); break;
         case cmd::showAutomation:  studio.setShowingAutomation (! studio.isShowingAutomation()); break;
 
+        // Loop Grid
+        case cmd::showLoopGrid:
+            studio.setPane (studio.getPane() == Studio::Pane::loopGrid ? Studio::Pane::none : Studio::Pane::loopGrid);
+            break;
+        case cmd::loopGridStopAll: studio.loopGrid().stopAll(); break;
+        case cmd::copyToLoopGrid:  studio.copySelectedToLoopGrid(); break;
+        case cmd::loopGridPerformRecord: studio.loopGrid().setPerformRecording (! studio.loopGrid().isPerformRecording()); break;
+        case cmd::loopGridAddScene:
+            p.undo.beginNewTransaction ("Add Scene");
+            loops::addScene (p);
+            break;
         // The Sampler.
         case cmd::showSampler:     studio.setPane (studio.getPane() == Studio::Pane::sampler ? Studio::Pane::none : Studio::Pane::sampler); break;
         case cmd::newSamplerTrack: SamplerEditor::newSamplerTrack (studio); break;
@@ -437,6 +465,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::nudgeLeft);
             m.addCommandItem (cm, cmd::nudgeRight);
             m.addCommandItem (cm, cmd::quantize);
+            m.addCommandItem (cm, cmd::copyToLoopGrid);
             break;
         case 2:
             m.addCommandItem (cm, cmd::newTrack);
@@ -473,6 +502,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::createMarker);
             m.addCommandItem (cm, cmd::nextMarker);
             m.addCommandItem (cm, cmd::previousMarker);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::loopGridPerformRecord);
+            m.addCommandItem (cm, cmd::loopGridStopAll);
             break;
         case 4:
             m.addCommandItem (cm, cmd::showRig);
@@ -482,6 +514,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::showDrummer);
             m.addCommandItem (cm, cmd::showSampler);
             m.addCommandItem (cm, cmd::showMixer);
+            m.addCommandItem (cm, cmd::showLoopGrid);
             m.addCommandItem (cm, cmd::showAutomation);
             m.addCommandItem (cm, cmd::hideBottom);
             m.addSeparator();
