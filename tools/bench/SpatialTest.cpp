@@ -672,7 +672,17 @@ int writeSpatialDemoProject (const juce::File& folder)
     track.setProperty (ids::autoParam, "spatial:azimuth", nullptr);
     project->state.setProperty (ids::spatialOutput, "binaural", nullptr);
     project->state.setProperty (ids::selectedTrack, track[ids::id], nullptr);
-    const bool ok = project->save();
+    bool ok = project->save();
     std::cout << (ok ? "wrote " : "couldn't write ") << project->projectFile().getFullPathName() << "\n";
+
+    // Renders through the engine's bounce (render-project doesn't prepare the 3D panners, so it
+    // would hear the stereo fallback): binaural for headphones, and the 7.1.4 mix.
+    BounceOptions o;
+    const auto binauralFile = folder.getChildFile ("Circling binaural.wav");
+    ok = bounce (*project, binauralFile, length, o) && ok;
+    o.surround = "7.1.4";
+    const auto surroundFile = folder.getChildFile ("Circling 7.1.4.wav");
+    ok = bounce (*project, surroundFile, length, o) && ok;
+    std::cout << "wrote " << binauralFile.getFullPathName() << "\nwrote " << surroundFile.getFullPathName() << "\n";
     return ok ? 0 : 1;
 }

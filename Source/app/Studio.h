@@ -25,6 +25,12 @@ namespace cmd
         importMidi, exportMidi, pluginManager, loopRegions, showScore,
         newDrummerTrack, showDrummer, showStepSequencer, visitWebsite
     };
+
+    // Spatial audio and video (MainComponent: the "spatial and video" cases).
+    enum : juce::CommandID
+    {
+        binauralMonitoring = 0x3500, spatialPanner, openMovie, removeMovie, importMovieAudio, showMovie
+    };
 }
 
 /**

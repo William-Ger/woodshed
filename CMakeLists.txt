@@ -127,6 +127,22 @@ if(NOT WOODSHED_BENCH_ONLY)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
 
+    # --- spatial and video ---
+    # The 3D panner's popover, the movie window and the arrange view's movie strip. Movie
+    # playback is juce_video (macOS: AVFoundation, AVKit and CoreMedia, which the module links
+    # itself; Windows: DirectShow), so it's only linked there; Linux shows a notice instead.
+    target_sources(WoodshedStudio PRIVATE
+        Source/app/SpatialPanner.cpp
+        Source/app/Movie.cpp
+        Source/video/MovieMedia_other.cpp)
+    if(APPLE)
+        target_sources(WoodshedStudio PRIVATE Source/video/MovieMedia_mac.mm)
+    endif()
+    if(APPLE OR WIN32)
+        target_link_libraries(WoodshedStudio PRIVATE juce::juce_video)
+    endif()
+    # --- end spatial and video ---
+
     # The studio's typefaces: Inter and JetBrains Mono (both SIL Open Font License; see art/fonts).
     file(GLOB WOODSHED_FONTS CONFIGURE_DEPENDS art/fonts/*.ttf)
     juce_add_binary_data(WoodshedFonts HEADER_NAME FontData.h NAMESPACE FontData SOURCES ${WOODSHED_FONTS})

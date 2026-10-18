@@ -419,9 +419,18 @@ public:
         stems.setToggleState (false, juce::dontSendNotification);
         format.onChange = [this] { if (format.getSelectedId() == 3 && bits.getSelectedId() == 3) bits.setSelectedId (2); };
 
-        for (auto* c : std::initializer_list<juce::Component*> { &format, &bits, &range, &normalize, &stems, &bounce, &cancel })
+        // Surround: a multichannel WAV panned from the tracks' 3D positions.
+        channels.addItemList ({ "Stereo", "5.1 surround (WAV, 6 channels)", "7.1.4 surround (WAV, 12 channels)" }, 1);
+        const auto surround = props.getValue ("bounceSurround");
+        channels.setSelectedId (surround == "5.1" ? 2 : surround == "7.1.4" ? 3 : 1, juce::dontSendNotification);
+        channels.setTooltip ("Surround bounces place each track by its 3D position (stereo tracks across the front). "
+                             "The LFE stays silent and the master effects are left out.");
+        channels.onChange = [this] { format.setEnabled (channels.getSelectedId() == 1); if (channels.getSelectedId() != 1) format.setSelectedId (1); };
+        channels.onChange();
+
+        for (auto* c : std::initializer_list<juce::Component*> { &format, &bits, &range, &channels, &normalize, &stems, &bounce, &cancel })
             addAndMakeVisible (c);
-        for (auto* l : { &formatLabel, &bitsLabel, &rangeLabel })
+        for (auto* l : { &formatLabel, &bitsLabel, &rangeLabel, &channelsLabel })
         {
             l->setFont (theme::font (12.0f, theme::Weight::medium));
             l->setColour (juce::Label::textColourId, theme::dimText);
@@ -436,6 +445,8 @@ public:
             o.bits = bits.getSelectedId() == 1 ? 16 : bits.getSelectedId() == 3 ? 32 : 24;
             o.normalize = normalize.getToggleState();
             o.stems = stems.getToggleState();
+            o.surround = channels.getSelectedId() == 2 ? "5.1" : channels.getSelectedId() == 3 ? "7.1.4" : "";
+            props.setValue ("bounceSurround", o.surround);
             props.setValue ("bounceFormat", o.format);
             props.setValue ("bounceBits", o.bits);
             props.setValue ("bounceNormalize", o.normalize);
@@ -446,7 +457,7 @@ public:
             callback (o, cycle);
         };
         cancel.onClick = [this] { if (auto* w = findParentComponentOfClass<juce::DialogWindow>()) w->exitModalState (0); };
-        setSize (380, 250);
+        setSize (380, 286);
     }
 
     void paint (juce::Graphics& g) override { g.fillAll (theme::panel); }
@@ -458,6 +469,7 @@ public:
         auto line = row(); formatLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); format.setBounds (line);
         line = row(); bitsLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); bits.setBounds (line);
         line = row(); rangeLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); range.setBounds (line);
+        line = row(); channelsLabel.setBounds (line.removeFromLeft (90)); line.removeFromLeft (10); channels.setBounds (line);
         line = r.removeFromTop (24); line.removeFromLeft (100); normalize.setBounds (line);
         line = r.removeFromTop (24); line.removeFromLeft (100); stems.setBounds (line);
         auto buttons = getLocalBounds().reduced (20, 16).removeFromBottom (30);
@@ -469,8 +481,8 @@ public:
 private:
     juce::PropertiesFile& props;
     std::function<void (daw::BounceOptions, bool)> onBounce;
-    juce::ComboBox format, bits, range;
-    juce::Label formatLabel { {}, "Format" }, bitsLabel { {}, "Resolution" }, rangeLabel { {}, "Range" };
+    juce::ComboBox format, bits, range, channels;
+    juce::Label formatLabel { {}, "Format" }, bitsLabel { {}, "Resolution" }, rangeLabel { {}, "Range" }, channelsLabel { {}, "Channels" };
     juce::ToggleButton normalize { "Normalize (peak at -0.1 dB)" }, stems { "All tracks as separate files (stems)" };
     juce::TextButton bounce { "Bounce" }, cancel { "Cancel" };
 };
@@ -492,8 +504,8 @@ void Studio::bounceDialog()
             auto& st = currentProject->state;
             const auto from = cycle ? (juce::int64) st[daw::ids::loopStart] : (juce::int64) 0;
             const auto to = cycle ? (juce::int64) st[daw::ids::loopEnd] : end;
-            const auto extension = options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
-            const auto name = currentProject->folder.getFileName();
+            const auto extension = options.surround.isNotEmpty() ? ".wav" : options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
+            const auto name = currentProject->folder.getFileName() + (options.surround.isNotEmpty() ? " " + options.surround : juce::String());
             auto suggested = juce::File::getSpecialLocation (juce::File::userMusicDirectory)
                                  .getChildFile (options.stems ? name + " stems" : name + extension);
             chooser = std::make_unique<juce::FileChooser> (options.stems ? "Choose a folder for the stems" : "Bounce the song to a file", suggested,

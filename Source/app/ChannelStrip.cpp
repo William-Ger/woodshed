@@ -1,6 +1,7 @@
 #include "ChannelStrip.h"
 #include "InstrumentPanel.h"
 #include "Icons.h"
+#include "SpatialPanner.h"
 
 namespace woodshed::app
 {
@@ -247,7 +248,23 @@ void Fader::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDet
 PanKnob::PanKnob (Studio& s, juce::ValueTree t)
     : Bound (s, std::move (t), ids::pan, "Pan")
 {
-    setTooltip ("Pan. Drag up or right, double-click to centre.");
+    setTooltip ("Pan. Drag up or right, double-click to centre. Right-click for the 3D panner.");
+}
+
+bool PanKnob::isSpatial() const   { return (bool) tree[ids::spatial]; }
+
+void PanKnob::showSpatialMenu()
+{
+    // Spatial audio: the 3D panner instead of the stereo pan.
+    juce::PopupMenu m;
+    m.addItem ("3D Panner...", [this] { SpatialPanner::show (studio, tree, getScreenBounds()); });
+    m.addItem (isSpatial() ? "Use Stereo Pan" : "Use 3D Position", [this]
+    {
+        studio.project().undo.beginNewTransaction (isSpatial() ? "Stereo Pan" : "3D Position");
+        tree.setProperty (ids::spatial, ! isSpatial(), &studio.project().undo);
+        repaint();
+    });
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 
 float PanKnob::value() const      { return juce::jlimit (-1.0f, 1.0f, (float) (double) tree.getProperty (prop, 0.0)); }
@@ -281,6 +298,26 @@ void PanKnob::paint (juce::Graphics& g)
     const float v = value();
     const bool hot = isMouseOverOrDragging();
     const auto centre = knobArea.getCentre();
+
+    // A 3D track: a top view with the source's direction instead of the knob.
+    if (isSpatial())
+    {
+        const float r = knobArea.getWidth() * 0.5f - 1.5f;
+        g.setColour (well);
+        g.fillEllipse (knobArea.reduced (1.5f));
+        g.setColour (hot ? theme::accent : theme::accent.withAlpha (0.7f));
+        g.drawEllipse (knobArea.reduced (1.5f), 1.5f);
+        const float az = (float) (double) tree.getProperty (ids::azimuth, 0.0) * juce::MathConstants<float>::pi / 180.0f;
+        const float reach = r * (0.35f + 0.55f * SpatialPanner::radiusFor ((float) (double) tree.getProperty (ids::distance, 1.0)));
+        g.setColour (theme::text);
+        g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ centre.x + reach * std::sin (az), centre.y - reach * std::cos (az) }));
+        g.setColour (theme::dimText);
+        g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre (centre));
+        g.setFont (theme::readout (10.0f, theme::Weight::medium));
+        g.drawText ("3D", textArea, sideways ? juce::Justification::centredLeft : juce::Justification::centred, false);
+        return;
+    }
+
     const float ringR = knobArea.getWidth() * 0.5f - 1.5f;
     const float bodyR = ringR - 4.0f;
     constexpr float sweep = juce::MathConstants<float>::pi * 0.75f;
@@ -325,8 +362,18 @@ void PanKnob::paint (juce::Graphics& g)
     g.drawText (text, textArea, sideways ? juce::Justification::centredLeft : juce::Justification::centred, false);
 }
 
-void PanKnob::mouseDown (const juce::MouseEvent&)
+void PanKnob::mouseDown (const juce::MouseEvent& e)
 {
+    if (e.mods.isPopupMenu())
+    {
+        showSpatialMenu();
+        return;
+    }
+    if (isSpatial())
+    {
+        SpatialPanner::show (studio, tree, getScreenBounds());
+        return;
+    }
     beginGesture();
     dragStart = value();
     repaint();
@@ -334,6 +381,8 @@ void PanKnob::mouseDown (const juce::MouseEvent&)
 
 void PanKnob::mouseDrag (const juce::MouseEvent& e)
 {
+    if (e.mods.isPopupMenu() || isSpatial())
+        return;
     const auto offset = e.getOffsetFromDragStart();
     const float scale = e.mods.isShiftDown() ? 0.002f : 0.012f;
     setValue (dragStart + (float) (offset.x - offset.y) * scale);
@@ -341,6 +390,8 @@ void PanKnob::mouseDrag (const juce::MouseEvent& e)
 
 void PanKnob::mouseDoubleClick (const juce::MouseEvent&)
 {
+    if (isSpatial())
+        return;
     beginGesture();
     setValue (0.0f);
 }
@@ -352,6 +403,8 @@ void PanKnob::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelD
         Component::mouseWheelMove (e, w);
         return;
     }
+    if (isSpatial())
+        return;
     beginWheelGesture();
     setValue (value() + w.deltaY * (w.isReversed ? -1.0f : 1.0f) * 0.5f);
 }

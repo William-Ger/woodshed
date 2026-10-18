@@ -96,6 +96,8 @@ namespace mixer
     private:
         float value() const;
         void setValue (float);
+        bool isSpatial() const;
+        void showSpatialMenu();
         float dragStart = 0.0f;
     };
 
