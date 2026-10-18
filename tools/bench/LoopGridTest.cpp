@@ -201,7 +201,8 @@ int runLoopGridTest()
 
     std::cout << "launch on the bar, replacing the arrange\n";
     {
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.engine.setPosition (30000);
         live.engine.play();
         live.runTo (40000);
@@ -225,7 +226,8 @@ int runLoopGridTest()
 
     std::cout << "quantize choices and the queued state\n";
     {
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         lg::setGridQuantize (*project, lg::Quantize::quarter);
         live.engine.setPosition (10000);
         live.engine.play();
@@ -246,7 +248,8 @@ int runLoopGridTest()
 
     std::cout << "a cell's own quantize, and none\n";
     {
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.engine.setPosition (10000);
         live.engine.play();
         live.runTo (11000);
@@ -272,7 +275,8 @@ int runLoopGridTest()
 
     std::cout << "scene launch\n";
     {
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.grid.launchCell ((int) a[ids::id], 0);         // A plays column 0 from the start
         live.runTo (150000);
         std::vector<lg::LoopEvent> before;
@@ -303,7 +307,8 @@ int runLoopGridTest()
         project->addNote (region, { 48, 100, 0, 8 * 3840 });
         lg::setGridQuantize (*project, lg::Quantize::bar);
 
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.engine.setPosition (0);
         live.engine.play();
         live.runTo (50000);
@@ -331,7 +336,8 @@ int runLoopGridTest()
         project->addNote (lg::contentOf (cell), { 60, 110, 0, 4 * 960 });       // the whole bar, every pass
         lg::setGridQuantize (*project, lg::Quantize::none);
 
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.grid.launchCell ((int) organ[ids::id], 0);
         live.runTo (bar + bar / 2);
         const auto playingLevel = rms (live.left, 100000 - (size_t) live.origin, 140000 - (size_t) live.origin);
@@ -350,7 +356,8 @@ int runLoopGridTest()
     std::cout << "perform recording\n";
     {
         a.setProperty (ids::pan, 0.0, nullptr);
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.grid.setPerformRecording (true);
         live.grid.launchCell ((int) a[ids::id], 0);         // from the start (the transport starts on the bar)
         live.runTo (450000);
@@ -371,7 +378,8 @@ int runLoopGridTest()
     }
     {
         // The arrange now plays what the grid played.
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.engine.setPosition (0);
         live.engine.play();
         live.runTo (6 * bar);
@@ -390,7 +398,8 @@ int runLoopGridTest()
         for (auto t : { a, b, c })
             t.setProperty (ids::mute, true, nullptr);
 
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         const auto latency = live.engine.getRecordLatencySamples();
         std::vector<float> input ((size_t) (8 * bar), 0.0f);
         input[20000] = 0.5f;                                // during the take
@@ -418,7 +427,8 @@ int runLoopGridTest()
     {
         // The saved cell, played from its file.
         auto rec = project->track (project->numTracks() - 1);
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.grid.launchCell ((int) rec[ids::id], 2);
         live.runTo (2 * bar);
         const auto latency = (juce::int64) lg::contentOf (lg::cellAt (rec, 2))[ids::offset];
@@ -429,7 +439,8 @@ int runLoopGridTest()
     {
         // What you hear is `latency` late, so the take loops from `latency` samples into it.
         auto rec = project->track (project->numTracks() - 1);
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         constexpr int latency = 300;
         std::vector<float> input ((size_t) (4 * bar), 0.0f);
         input[20000] = 0.5f;
@@ -492,7 +503,8 @@ int runLoopGridTest()
         for (auto t : { b, c })
             t.setProperty (ids::mute, true, nullptr);
         a.setProperty (ids::mute, false, nullptr);
-        Live live (*project);
+        auto owner = std::make_unique<Live> (*project);     // on the heap: an Engine is big, and MSVC gives every scope its own stack space
+        auto& live = *owner;
         live.grid.launchCell ((int) a[ids::id], 0);
         live.runTo (5 * bar);
         const auto loud = peaks (live.left, live.origin, 0.4f);

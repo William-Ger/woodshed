@@ -302,6 +302,11 @@ target_sources(WoodshedBench PRIVATE tools/bench/SamplerTest.cpp Source/instrume
 target_sources(WoodshedBench PRIVATE tools/bench/MixTest.cpp)
 # --- end mixing ---
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+# The tests build whole engines on the stack; Windows' default 1 MB stack is too small for that
+# (macOS and Linux give 8 MB), so match them.
+if(MSVC)
+    target_link_options(WoodshedBench PRIVATE /STACK:8388608)
+endif()
 # --- loopgrid ---
 target_sources(WoodshedBench PRIVATE tools/bench/LoopGridTest.cpp)
 # --- end loopgrid ---
