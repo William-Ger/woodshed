@@ -709,11 +709,17 @@ void Engine::record()
     const auto& grid = project->grid();
     auto from = getPosition();
 
+    // Autopunch (below) wins over the cycle: it records its range once.
+    const auto punchIn = (juce::int64) project->state.getProperty (ids::punchIn, 0);
+    const auto punchOut = (juce::int64) project->state.getProperty (ids::punchOut, 0);
+    punching = (bool) project->state[ids::punchOn] && punchOut > punchIn;
+    punchDone = false;
+
     // Cycle recording: with the cycle on, recording loops it, a take per pass. It starts at the
     // cycle's start if the playhead is outside the cycle.
     const auto loopStart = (juce::int64) project->state.getProperty (ids::loopStart, 0);
     const auto loopEnd = (juce::int64) project->state.getProperty (ids::loopEnd, 0);
-    cycleRecording = (bool) project->state[ids::loopOn] && loopEnd > loopStart;
+    cycleRecording = (bool) project->state[ids::loopOn] && loopEnd > loopStart && ! punching.load();
     if (cycleRecording.load())
     {
         cycleStart = loopStart;
@@ -729,13 +735,8 @@ void Engine::record()
     // Autopunch: only the range between the punch locators records (a little either side, for the
     // crossfades); the song plays up to it as a pre-roll, from the playhead if that's before the
     // range, else from a bar before it.
-    const auto punchIn = (juce::int64) project->state.getProperty (ids::punchIn, 0);
-    const auto punchOut = (juce::int64) project->state.getProperty (ids::punchOut, 0);
-    punching = (bool) project->state[ids::punchOn] && punchOut > punchIn;
-    punchDone = false;
     if (punching.load())
     {
-        cycleRecording = false;
         punchFrom = juce::jmax ((juce::int64) 0, punchIn - punchCrossfade / 2);
         punchTo = punchOut + punchCrossfade / 2;
         from = punchFrom.load();

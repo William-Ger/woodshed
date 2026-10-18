@@ -209,6 +209,9 @@ bool Project::saveAs (const juce::File& newFolder)
     // Copy the recordings this project uses; region paths are relative, so they stay valid.
     if (audioFolder().isDirectory() && ! audioFolder().copyDirectoryTo (newFolder.getChildFile ("Audio")))
         return false;
+    // Frozen tracks' renders too.
+    if (const auto frozen = folder.getChildFile ("Freeze"); frozen.isDirectory() && ! frozen.copyDirectoryTo (newFolder.getChildFile ("Freeze")))
+        return false;
 
     folder = newFolder;
     state.setProperty (ids::name, newFolder.getFileName(), nullptr);

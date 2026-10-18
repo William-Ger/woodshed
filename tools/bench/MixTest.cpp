@@ -574,6 +574,20 @@ int runMixTest (const juce::StringArray&)
                 regions.add (r);
         check (regions.size() == 1 && (juce::int64) old[ids::length] == 100000, "undo puts the old region back whole");
 
+        // With the cycle on somewhere else, Autopunch still records its range, from the playhead.
+        project->state.setProperty (ids::loopOn, true, nullptr);
+        project->state.setProperty (ids::loopStart, 70000, nullptr);
+        project->state.setProperty (ids::loopEnd, 90000, nullptr);
+        engine.setPosition (0);
+        engine.record();
+        runEngine (engine, block);
+        check (engine.getRecordStart() == 30000 - 240 && engine.getPosition() == block,
+               "Autopunch wins over the cycle: no jump to the cycle, the take starts at the punch-in");
+        engine.stop();
+        runEngine (engine, block * 4);
+        engine.service();           // nothing reached the range: no take
+        project->state.setProperty (ids::loopOn, false, nullptr);
+
         // Quick punch: record pressed while playing starts the take where the playhead is.
         project->state.setProperty (ids::punchOn, false, nullptr);
         engine.setPosition (0);
