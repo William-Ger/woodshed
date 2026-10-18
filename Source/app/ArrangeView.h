@@ -7,6 +7,9 @@
 namespace woodshed::app
 {
 
+class MovieController;
+class MovieStrip;
+
 namespace arrange
 {
     class TrackHeader;
@@ -86,6 +89,10 @@ public:
     void showTrackMenu (juce::ValueTree track);
     void addTrackAfterSelection();
 
+    /** The movie's thumbnail strip under the ruler, shown while the project has a movie
+        (nullptr takes it away; do that before the controller goes). */
+    void attachMovie (MovieController*);
+
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void scrollBarMoved (juce::ScrollBar*, double newRangeStart) override;
@@ -122,6 +129,8 @@ private:
 
     std::unique_ptr<arrange::Ruler> ruler;
     std::unique_ptr<arrange::Lanes> lanes;
+    std::unique_ptr<MovieStrip> movieStrip;
+    int movieStripHeight() const;
     juce::Component headerArea;
     std::vector<std::unique_ptr<arrange::TrackHeader>> headers;
     /** The + in the header bar: a borderless icon button. */

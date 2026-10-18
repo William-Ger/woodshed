@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "PluginHost.h"
+#include "SpatialPanner.h"
 #include "MixCommands.h"
 
 namespace woodshed::app
@@ -22,6 +23,8 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (loopGridView);
     addChildComponent (samplerEditor);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
+    movie = std::make_unique<MovieController> (studio);
+    arrange.attachMovie (movie.get());
 
     // Tracks above, the pane below; the divider between them can be dragged.
     layout.setItemLayout (0, 120, -1.0, -0.36);
@@ -42,6 +45,8 @@ MainComponent::MainComponent (Studio& s)
 MainComponent::~MainComponent()
 {
     studio.removeChangeListener (this);
+    arrange.attachMovie (nullptr);
+    movie.reset();
 }
 
 void MainComponent::paint (juce::Graphics& g)
@@ -128,6 +133,8 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
     c.addArray ({ cmd::showLoopGrid, cmd::loopGridStopAll, cmd::copyToLoopGrid, cmd::loopGridPerformRecord, cmd::loopGridAddScene });
     // The Sampler.
     c.addArray ({ cmd::showSampler, cmd::newSamplerTrack, cmd::convertToSampler, cmd::convertToSamplerSlice });
+    // Spatial audio and video.
+    c.addArray ({ cmd::binauralMonitoring, cmd::spatialPanner, cmd::openMovie, cmd::removeMovie, cmd::importMovieAudio, cmd::showMovie });
     mixui::getCommands (c);     // Track Stacks, freeze, VCAs, Autopunch
 }
 
@@ -260,6 +267,16 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
                                    info.setActive (SamplerEditor::canConvertSelection (studio)); break;
         case cmd::convertToSamplerSlice: info.setInfo ("Convert to Sampler Track (Slice)", {}, "Track", 0);
                                    info.setActive (SamplerEditor::canConvertSelection (studio)); break;
+        // Spatial audio and video ------------------------------------------------
+        case cmd::binauralMonitoring: info.setInfo ("Binaural Monitoring (Headphones)", "3D tracks reach the Stereo Out through binaural cues instead of amplitude panning", "Track", 0);
+                                   info.setTicked (s[daw::ids::spatialOutput].toString() == "binaural"); break;
+        case cmd::spatialPanner:   info.setInfo ("3D Panner...", {}, "Track", 0); info.addDefaultKeypress ('p', cmdKey | juce::ModifierKeys::altModifier);
+                                   info.setActive (studio.getSelectedTrack().isValid()); break;
+        case cmd::openMovie:       info.setInfo ("Open Movie...", {}, "File", 0); info.addDefaultKeypress ('o', cmdKey | juce::ModifierKeys::altModifier); break;
+        case cmd::removeMovie:     info.setInfo ("Remove Movie", {}, "File", 0); info.setActive (movie != nullptr && movie->hasMovie()); break;
+        case cmd::importMovieAudio: info.setInfo ("Import Audio from Movie", {}, "File", 0); info.setActive (movie != nullptr && movie->hasMovie()); break;
+        case cmd::showMovie:       info.setInfo ("Movie", {}, "View", 0); info.setActive (movie != nullptr && movie->hasMovie());
+                                   info.setTicked (movie != nullptr && movie->isWindowShowing()); break;
         default: break;
     }
 }
@@ -393,6 +410,19 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::newSamplerTrack: SamplerEditor::newSamplerTrack (studio); break;
         case cmd::convertToSampler: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::classic); break;
         case cmd::convertToSamplerSlice: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::slice); break;
+        // Spatial audio and video ------------------------------------------------
+        case cmd::binauralMonitoring:
+            p.undo.beginNewTransaction ("Monitoring");
+            s.setProperty (daw::ids::spatialOutput, s[daw::ids::spatialOutput].toString() == "binaural" ? "stereo" : "binaural", &p.undo);
+            break;
+        case cmd::spatialPanner:
+            SpatialPanner::show (studio, studio.getSelectedTrack(),
+                                 localAreaToGlobal (arrange.getBounds().withSizeKeepingCentre (40, 40)));
+            break;
+        case cmd::openMovie:       movie->openDialog(); break;
+        case cmd::removeMovie:     movie->remove(); break;
+        case cmd::importMovieAudio: movie->importAudio(); break;
+        case cmd::showMovie:       movie->toggleWindow(); break;
         case cmd::quantize:
             if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
                 pianoRoll.quantizeSelection();
@@ -440,6 +470,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::importMidi);
             m.addCommandItem (cm, cmd::exportMidi);
             m.addSeparator();
+            m.addCommandItem (cm, cmd::openMovie);           // spatial and video
+            m.addCommandItem (cm, cmd::importMovieAudio);
+            m.addCommandItem (cm, cmd::removeMovie);
+            m.addSeparator();
             m.addCommandItem (cm, cmd::bounce);
            #if ! JUCE_MAC
             m.addSeparator();
@@ -486,6 +520,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addSeparator();
             m.addCommandItem (cm, cmd::muteTrack);
             m.addCommandItem (cm, cmd::soloTrack);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::spatialPanner);       // spatial and video
+            m.addCommandItem (cm, cmd::binauralMonitoring);
             break;
         case 3:
             m.addCommandItem (cm, cmd::playStop);
@@ -516,6 +553,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::showMixer);
             m.addCommandItem (cm, cmd::showLoopGrid);
             m.addCommandItem (cm, cmd::showAutomation);
+            m.addCommandItem (cm, cmd::showMovie);           // spatial and video
             m.addCommandItem (cm, cmd::hideBottom);
             m.addSeparator();
             m.addCommandItem (cm, cmd::zoomIn);

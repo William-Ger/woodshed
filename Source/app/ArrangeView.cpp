@@ -3,6 +3,7 @@
 #include "ArrangeLanes.h"
 #include "ArrangeRuler.h"
 #include "Icons.h"
+#include "Movie.h"
 #include "../daw/Stacks.h"
 #include "MixCommands.h"
 
@@ -43,6 +44,7 @@ ArrangeView::ArrangeView (Studio& s) : studio (s)
 ArrangeView::~ArrangeView()
 {
     stopTimer();
+    movieStrip.reset();
     studio.removeChangeListener (this);
     waveforms.removeChangeListener (this);
     attached.removeListener (this);
@@ -250,15 +252,38 @@ void ArrangeView::AddButton::paintButton (juce::Graphics& g, bool highlighted, b
     icons::draw (g, icons::plus(), r.withSizeKeepingCentre (14.0f, 14.0f), highlighted ? theme::text : theme::dimText, 1.8f);
 }
 
+void ArrangeView::attachMovie (MovieController* movie)
+{
+    movieStrip.reset();
+    if (movie != nullptr)
+    {
+        movieStrip = std::make_unique<MovieStrip> (*this, *movie);
+        addChildComponent (*movieStrip);
+    }
+    resized();
+}
+
+int ArrangeView::movieStripHeight() const
+{
+    return movieStrip != nullptr && movieStrip->isWanted() ? MovieStrip::height : 0;
+}
+
 void ArrangeView::resized()
 {
     auto r = getLocalBounds();
     auto left = r.removeFromLeft (headerWidth);
     auto corner = left.removeFromTop (rulerHeight).withTrimmedBottom (arrange::Ruler::markerHeight);
     addButton.setBounds (corner.removeFromRight (36).withSizeKeepingCentre (24, 24).translated (2, 0));
+    const int stripHeight = movieStripHeight();
+    left.removeFromTop (stripHeight);
     headerArea.setBounds (left.withTrimmedBottom (scrollBarSize).withTrimmedRight (1));
 
     auto top = r.removeFromTop (rulerHeight);
+    if (movieStrip != nullptr)
+    {
+        movieStrip->setVisible (stripHeight > 0);
+        movieStrip->setBounds (0, r.removeFromTop (stripHeight).getY(), getWidth(), stripHeight);
+    }
     hScroll.setBounds (r.removeFromBottom (scrollBarSize));
 
     const int contentHeight = visibleRows() * trackHeight + trackHeight / 2;

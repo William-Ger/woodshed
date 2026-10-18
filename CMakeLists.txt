@@ -56,6 +56,13 @@ list(APPEND WOODSHED_DAW_SOURCES
     Source/loops/LoopPlayer.cpp
     Source/loops/LoopGrid.cpp)
 # --- end loopgrid ---
+# --- spatial ---
+# 3D panning (binaural and stereo) and the surround bounce's speaker layouts; part of the engine.
+set(WOODSHED_SPATIAL_SOURCES
+    Source/spatial/Spatial.cpp)
+list(APPEND WOODSHED_DAW_SOURCES ${WOODSHED_SPATIAL_SOURCES})
+# --- end spatial ---
+
 # --- mixing (track stacks, groups and VCAs, delay compensation, freeze, punch) ---
 list(APPEND WOODSHED_DAW_SOURCES Source/daw/Stacks.cpp Source/daw/Groups.cpp Source/daw/Freeze.cpp)
 # --- end mixing ---
@@ -142,6 +149,22 @@ if(NOT WOODSHED_BENCH_ONLY)
     # --- loopgrid ---
     target_sources(WoodshedStudio PRIVATE Source/app/LoopGridView.cpp)
     # --- end loopgrid ---
+    # --- spatial and video ---
+    # The 3D panner's popover, the movie window and the arrange view's movie strip. Movie
+    # playback is juce_video (macOS: AVFoundation, AVKit and CoreMedia, which the module links
+    # itself; Windows: DirectShow), so it's only linked there; Linux shows a notice instead.
+    target_sources(WoodshedStudio PRIVATE
+        Source/app/SpatialPanner.cpp
+        Source/app/Movie.cpp
+        Source/video/MovieMedia_other.cpp)
+    if(APPLE)
+        target_sources(WoodshedStudio PRIVATE Source/video/MovieMedia_mac.mm)
+    endif()
+    if(APPLE OR WIN32)
+        target_link_libraries(WoodshedStudio PRIVATE juce::juce_video)
+    endif()
+    # --- end spatial and video ---
+
     # --- mixing ---
     target_sources(WoodshedStudio PRIVATE Source/app/MixCommands.cpp)
     # --- end mixing ---
@@ -262,3 +285,7 @@ target_link_libraries(WoodshedBench
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+# --- spatial ---
+target_sources(WoodshedBench PRIVATE tools/bench/SpatialTest.cpp)
+# --- end spatial ---

@@ -641,6 +641,13 @@ std::vector<Project::AutoParam> Project::automatableParams (const juce::ValueTre
     std::vector<AutoParam> list;
     list.push_back ({ "volume", "Volume", -60.0f, 6.0f, (float) (double) track.getProperty (ids::volume, 0.0), "dB" });
     list.push_back ({ "pan", "Pan", -1.0f, 1.0f, (float) (double) track.getProperty (ids::pan, 0.0), {} });
+    if ((bool) track[ids::spatial])
+    {
+        list.push_back ({ "spatial:azimuth", "3D Azimuth", -180.0f, 180.0f, (float) (double) track.getProperty (ids::azimuth, 0.0), juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")) });
+        list.push_back ({ "spatial:elevation", "3D Elevation", -90.0f, 90.0f, (float) (double) track.getProperty (ids::elevation, 0.0), juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")) });
+        list.push_back ({ "spatial:distance", "3D Distance", 0.25f, 50.0f, (float) (double) track.getProperty (ids::distance, 1.0), "m", 0.3f });
+        list.push_back ({ "spatial:spread", "3D Spread", 0.0f, 1.0f, (float) (double) track.getProperty (ids::spread, 0.0), {} });
+    }
 
     if (isInstrumentTrack (track))
     {

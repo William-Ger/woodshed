@@ -5,6 +5,7 @@
 #include "../engine/Registry.h"
 #include "PluginWrappers.h"
 #include "../loops/LoopPlayer.h"
+#include "../spatial/Spatial.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -32,13 +33,16 @@ private:
 };
 
 /** How to bounce: the file format ("wav", "aiff" or "flac"), bits (16, 24, or 32 for float),
-    normalizing the peak to -0.1 dBFS, and stems (a file per track instead of the mix). */
+    normalizing the peak to -0.1 dBFS, and stems (a file per track instead of the mix).
+    surround: "5.1" or "7.1.4" for a multichannel WAV panned from the tracks' 3D positions
+    (stereo tracks as a front pair; no LFE content, master effects skipped); empty for stereo. */
 struct BounceOptions
 {
     juce::String format { "wav" };
     int bits = 24;
     bool normalize = false;
     bool stems = false;
+    juce::String surround;
 };
 
 /** Makes the guitar rig that sits on every audio track (the pedalboard, amp and cab). */
@@ -133,6 +137,7 @@ struct TrackRuntime
     juce::AudioBuffer<float> busInput;                                  // aux tracks: the sends they receive
     DelayRing preFader, postFader;                                      // delay compensation (audio thread)
     juce::SmoothedValue<float> gainLeft, gainRight;
+    std::unique_ptr<spatial::Panner> panner;                            // 3D tracks and surround bounces
     std::atomic<float> peakLeft { 0.0f }, peakRight { 0.0f };          // audio thread accumulates
     float shownLeft = 0.0f, shownRight = 0.0f;                          // message thread: last 30 Hz frame
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> recorder { nullptr };
@@ -196,12 +201,15 @@ struct TrackPlayback
     /** An automation line and what it drives. */
     struct AutoLine
     {
-        enum Target { volume, pan, instrumentKnob, insertKnob, sendLevel } target = volume;
-        int insert = 0, knob = 0;           // insertKnob: index into `inserts`; knobs: knob index; sendLevel: index into `sends`
+        enum Target { volume, pan, instrumentKnob, insertKnob, sendLevel, spatialParam } target = volume;
+        int insert = 0, knob = 0;           // insertKnob: index into `inserts`; knobs: knob index; sendLevel: index into `sends`;
+                                            // spatialParam: 0 azimuth, 1 elevation, 2 distance, 3 spread
         std::vector<AutoPoint> points;      // at least one, in time order
     };
     std::vector<AutoLine> automation;
     float gain = 1.0f, pan = 0.0f;
+    bool spatial = false;           // placed in 3D (`position`) instead of panned
+    spatial::Position position;
     bool audible = true;            // mute and solo resolved
     bool armed = false, monitor = false, rigOn = true;
     int input = 0;
@@ -217,6 +225,7 @@ struct Snapshot
     float masterGain = 1.0f;
     bool click = true, loopOn = false;
     juce::int64 loopStart = 0, loopEnd = 0;
+    spatial::Monitoring monitoring = spatial::Monitoring::stereo;     // how 3D tracks reach the stereo master
     /** How late the mix reaches the output once every path is lined up (the longest path plus the
         master's inserts). The click and recordings are moved by the same amount. */
     int latency = 0;
@@ -241,6 +250,11 @@ struct Mixer
         bool monitorInputs = true;      // false: feedback protection, the live input isn't heard
         float* left = nullptr;
         float* right = nullptr;         // cleared, then the mix is added
+
+        // A surround bounce: every track pans into these channels (cleared first) instead of left
+        // and right, and the master effects are skipped.
+        const spatial::SpeakerLayout* surround = nullptr;
+        float* const* surroundOut = nullptr;
 
         // Notes played live (a MIDI keyboard or musical typing), for one track.
         int liveTrackId = -1;

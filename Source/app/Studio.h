@@ -32,6 +32,12 @@ namespace cmd
     enum : juce::CommandID { showLoopGrid = 0x3300, loopGridStopAll, copyToLoopGrid, loopGridPerformRecord, loopGridAddScene };
     // The Sampler (SamplerEditor.cpp).
     enum : juce::CommandID { showSampler = 0x3000, newSamplerTrack, convertToSampler, convertToSamplerSlice };
+    // Spatial audio and video (MainComponent: the "spatial and video" cases).
+    enum : juce::CommandID
+    {
+        binauralMonitoring = 0x3500, spatialPanner, openMovie, removeMovie, importMovieAudio, showMovie
+    };
+
     // Mixing and recording: Track Stacks, groups and VCAs, freeze, Autopunch (MixCommands.cpp).
     enum : juce::CommandID
     {

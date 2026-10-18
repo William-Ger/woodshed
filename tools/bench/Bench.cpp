@@ -6,6 +6,7 @@
 //   woodshed-bench presets [file.json ...] [--wav guitar.wav] [--render outDir]
 //   woodshed-bench project      (multitrack engine checks; see ProjectTest.cpp)
 //   woodshed-bench score        (Score editor notation layout checks; see ScoreTest.cpp)
+//   woodshed-bench spatial      (3D panner, surround bounce and movie sync checks; see SpatialTest.cpp)
 //   woodshed-bench instruments [type ...] [--render dir] [--analyse]   (see InstrumentTest.cpp)
 //   woodshed-bench pitchcorrect [--wav guitar.wav] [--render outDir]   (PLUMB accuracy in cents)
 //   woodshed-bench loopgrid     (Loop Grid clip launching checks; see LoopGridTest.cpp)
@@ -894,6 +895,8 @@ int runLoopGridTest();
 int writeLoopGridDemoProject (const juce::File&);
 int runSamplerTest (const juce::StringArray&);          // SamplerTest.cpp
 int writeSamplerDemoProject (const juce::File&);
+int runSpatialTest();
+int writeSpatialDemoProject (const juce::File&, const juce::File& movie);
 
 int main (int argc, char* argv[])
 {
@@ -971,6 +974,10 @@ int main (int argc, char* argv[])
 
     if (args[0] == "sampler")          return runSamplerTest (args);
     if (args[0] == "demo-sampler" && args.size() > 1) return writeSamplerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+    if (args[0] == "spatial") return runSpatialTest();
+    if (args[0] == "demo-spatial" && args.size() > 1)
+        return writeSpatialDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]),
+                                        args.size() > 2 ? juce::File::getCurrentWorkingDirectory().getChildFile (args[2]) : juce::File());
 
     if (args[0] == "demo-drummer" && args.size() > 1)
         return writeDrummerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
@@ -1001,6 +1008,7 @@ int main (int argc, char* argv[])
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
                      " | loopgrid | demo-loopgrid <folder>"
+                     " | spatial | demo-spatial <folder> [movie]"
                      " | mix"
                      " | demo-midi <folder> | demo-drummer <folder> | demo-mix <folder> | render-project <folder> <out.wav>"
                      " | sampler | demo-sampler <folder>\n";

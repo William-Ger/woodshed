@@ -13,6 +13,7 @@
 #include "TakesEditor.h"
 #include "LoopGridView.h"
 #include "SamplerEditor.h"
+#include "Movie.h"
 
 namespace woodshed::app
 {
@@ -58,6 +59,7 @@ private:
     TakesEditor takesEditor;
     LoopGridView loopGridView;
     SamplerEditor samplerEditor;
+    std::unique_ptr<MovieController> movie;         // spatial and video
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */
     juce::Component* paneComponent();
