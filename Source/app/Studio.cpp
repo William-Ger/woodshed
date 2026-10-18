@@ -2,6 +2,7 @@
 #include "Theme.h"
 #include "SettingsWindow.h"
 #include "PluginHost.h"
+#include "MixCommands.h"
 #include "../PluginProcessor.h"
 #include "../daw/MidiFiles.h"
 #include "../daw/Drummer.h"
@@ -291,7 +292,10 @@ void Studio::adopt (std::unique_ptr<daw::Project> next)
     if (currentProject != nullptr)
         currentProject->state.removeListener (this);
 
+    groupLinker.reset();
+    trackSelection.clear();
     currentProject = std::move (next);
+    groupLinker = std::make_unique<daw::groups::Linker> (*currentProject);
 
     // An empty project follows the interface's rate; one with recordings keeps its own.
     const double deviceRate = deviceManager.getCurrentAudioDevice() != nullptr
@@ -539,6 +543,23 @@ juce::ValueTree Studio::getSelectedTrack() const
 
 void Studio::selectTrack (int trackId)
 {
+    // A track in a group that links selection brings the rest of its group along.
+    {
+        juce::Array<int> others;
+        const auto track = currentProject->trackById (trackId);
+        if (const int g = daw::groups::groupOf (track); g > 0)
+            if (auto group = daw::groups::find (*currentProject, g); group.has_value() && group->select)
+                for (auto& t : daw::groups::members (*currentProject, g))
+                    if ((int) t[daw::ids::id] != trackId)
+                        others.add ((int) t[daw::ids::id]);
+        if (others != trackSelection)
+        {
+            trackSelection = others;
+            if (trackId == getSelectedTrackId())
+                sendChangeMessage();
+        }
+    }
+
     if (trackId == getSelectedTrackId())
         return;
 
@@ -560,6 +581,40 @@ void Studio::selectTrack (int trackId)
     }
 
     currentProject->state.setProperty (daw::ids::selectedTrack, trackId, nullptr);
+    sendChangeMessage();
+}
+
+juce::Array<int> Studio::getSelectedTrackIds() const
+{
+    juce::Array<int> list;
+    for (int i = 0; i < currentProject->numTracks(); ++i)
+        if (const int id = (int) currentProject->track (i)[daw::ids::id]; isTrackSelected (id))
+            list.add (id);
+    return list;
+}
+
+void Studio::extendTrackSelection (int trackId, bool range)
+{
+    const int anchor = getSelectedTrackId();
+    if (anchor < 0 || anchor == trackId)
+    {
+        selectTrack (trackId);
+        return;
+    }
+
+    if (range)
+    {
+        auto& p = *currentProject;
+        const int from = p.state.indexOf (p.trackById (anchor)), to = p.state.indexOf (p.trackById (trackId));
+        trackSelection.clear();
+        for (int i = juce::jmin (from, to); i <= juce::jmax (from, to); ++i)
+            if (const int id = (int) p.track (i)[daw::ids::id]; id != anchor)
+                trackSelection.add (id);
+    }
+    else if (trackSelection.contains (trackId))
+        trackSelection.removeFirstMatchingValue (trackId);
+    else
+        trackSelection.add (trackId);
     sendChangeMessage();
 }
 
@@ -985,7 +1040,7 @@ bool Studio::isDrumTrack (const juce::ValueTree& track)
 
 juce::ValueTree Studio::createDrummerRegion (juce::ValueTree track, juce::int64 at, int bars)
 {
-    if (! daw::Project::isInstrumentTrack (track))
+    if (! daw::Project::isInstrumentTrack (track) || mixui::blockedByFreeze (*this, track))
         return {};
     auto& p = *currentProject;
     const auto& grid = p.grid();
@@ -1029,7 +1084,7 @@ juce::ValueTree Studio::createMidiRegion (juce::ValueTree track, juce::int64 at)
 
 void Studio::quantizeNotes (juce::ValueTree region, const juce::Array<juce::ValueTree>& notes, int gridTicks, float strength)
 {
-    if (! region.isValid() || gridTicks <= 0)
+    if (! region.isValid() || gridTicks <= 0 || mixui::blockedByFreeze (*this, daw::Project::trackOf (region)))
         return;
 
     juce::Array<juce::ValueTree> targets (notes);
@@ -1105,6 +1160,8 @@ void Studio::deleteSelectedRegions()
 {
     if (selectedRegions.isEmpty())
         return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
 
     currentProject->undo.beginNewTransaction ("Delete");
     for (int id : selectedRegions)
@@ -1124,8 +1181,10 @@ void Studio::splitSelectedAtPlayhead()
             targets.add (r);
 
     // Nothing selected: split whatever is under the playhead on the selected track.
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
     if (targets.isEmpty())
-        if (auto t = getSelectedTrack(); t.isValid())
+        if (auto t = getSelectedTrack(); t.isValid() && ! mixui::blockedByFreeze (*this, t))
             for (auto r : t)
                 if (r.hasType (daw::ids::REGION))
                     targets.add (r);
@@ -1150,6 +1209,8 @@ void Studio::cutSelectedRegions()
 {
     if (selectedRegions.isEmpty())
         return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
     copySelectedRegions();
     currentProject->undo.beginNewTransaction ("Cut");
     for (int id : selectedRegions)
@@ -1167,6 +1228,8 @@ void Studio::paste()
         addTrack();
 
     const auto selected = getSelectedTrack();
+    if (mixui::blockedByFreeze (*this, selected))
+        return;
     const int firstTrack = selected.isValid() ? p.trackList().indexOf (selected) : 0;
     p.undo.beginNewTransaction ("Paste");
     setSelectedRegions (p.pasteRegions (clipboard, engineInstance->getPosition(), juce::jmax (0, firstTrack)));
@@ -1176,6 +1239,8 @@ void Studio::repeatSelectedRegions()
 {
     if (selectedRegions.isEmpty())
         return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
+        return;
     currentProject->undo.beginNewTransaction ("Repeat");
     setSelectedRegions (currentProject->repeatRegions (selectedRegions));
 }
@@ -1183,6 +1248,8 @@ void Studio::repeatSelectedRegions()
 void Studio::nudgeSelectedRegions (int direction)
 {
     if (selectedRegions.isEmpty())
+        return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
         return;
     const auto grid = currentProject->grid();
     const auto step = (juce::int64) std::llround (grid.samplesPerBeat() * grid.beatUnit / 16.0);   // a 16th note in any meter
@@ -1201,6 +1268,8 @@ void Studio::toggleMuteSelectedRegions()
             allMuted = allMuted && (bool) r[daw::ids::mute];
         }
     if (regions.isEmpty())
+        return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
         return;
 
     currentProject->undo.beginNewTransaction (allMuted ? "Unmute Regions" : "Mute Regions");
@@ -1222,6 +1291,8 @@ void Studio::toggleLoopSelectedRegions()
             allLooped = allLooped && (bool) r[daw::ids::loop];
         }
     if (regions.isEmpty())
+        return;
+    if (mixui::blockedByFreeze (*this, selectedRegions))
         return;
     currentProject->undo.beginNewTransaction (allLooped ? "Unloop Regions" : "Loop Regions");
     for (auto& r : regions)

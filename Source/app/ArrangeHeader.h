@@ -41,12 +41,15 @@ private:
     class Toggle final : public juce::Component, public juce::SettableTooltipClient
     {
     public:
-        enum class Glyph { text, dot, headphones };
+        enum class Glyph { text, dot, headphones, snowflake };
         Toggle (TrackHeader&, const juce::Identifier&, juce::String label, Glyph, juce::Colour on, juce::String undoName);
         void paint (juce::Graphics&) override;
         void mouseDown (const juce::MouseEvent&) override;
         void mouseEnter (const juce::MouseEvent&) override  { repaint(); }
         void mouseExit (const juce::MouseEvent&) override   { repaint(); }
+
+        /** Instead of flipping the property (freeze renders first). */
+        std::function<void()> onClick;
 
     private:
         TrackHeader& owner;
@@ -63,10 +66,15 @@ private:
     /** Name weight and colour follow selection and mute. */
     void updateNameStyle (bool selected);
 
+    // Track Stacks: members sit indented under their main, which has a disclosure triangle.
+    int indent() const;
+    juce::Rectangle<int> disclosureArea() const;
+    juce::Rectangle<int> groupBadge() const;
+
     ArrangeView& view;
     juce::ValueTree track;
     juce::Label name;
-    Toggle mute, solo, arm, monitor;
+    Toggle mute, solo, arm, monitor, freeze;
     bool dragging = false, styledSelected = false, styledMuted = false, styled = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TrackHeader)

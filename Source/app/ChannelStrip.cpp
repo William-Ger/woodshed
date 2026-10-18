@@ -1,4 +1,5 @@
 #include "ChannelStrip.h"
+#include "MixCommands.h"
 #include "InstrumentPanel.h"
 #include "Icons.h"
 
@@ -606,7 +607,7 @@ void SendSlot::showAddMenu()
     for (int i = 0; i < p.numTracks(); ++i)
     {
         auto t = p.track (i);
-        if (! daw::Project::isAuxTrack (t) || t == track)
+        if (! daw::stacks::isSendTarget (t) || t == track)     // not a stack main or a VCA
             continue;
         const int busId = (int) t[ids::id];
         m.addItem (t[ids::name].toString(), [this, busId]
@@ -649,7 +650,7 @@ void SendSlot::showSendMenu()
     for (int i = 0; i < p.numTracks(); ++i)
     {
         auto t = p.track (i);
-        if (! daw::Project::isAuxTrack (t) || t == track)
+        if (! daw::stacks::isSendTarget (t) || t == track)     // not a stack main or a VCA
             continue;
         to.addItem (t[ids::name].toString(), true, (int) s[ids::bus] == (int) t[ids::id], [this, s, busId = (int) t[ids::id]]() mutable
         {
@@ -873,6 +874,9 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
         instrumentSlot->setTooltip ("This track's instrument: click to edit its sound");
         instrumentSlot->text = [this]
         {
+            if (daw::stacks::isVca (tree))      return juce::String ("VCA");
+            if (daw::stacks::isFolder (tree))   return juce::String ("Folder Stack");
+            if (daw::stacks::isSumming (tree))  return juce::String ("Summing Stack");
             if (auxTrack)
                 return juce::String ("Aux Bus");
             const auto inst = tree.getChildWithName (ids::INSTRUMENT);
@@ -894,9 +898,21 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
         fxSlot->lit = [this] { return ! daw::Project::inserts (tree).isEmpty(); };
         fxSlot->onClick = [this] { showInserts(); };
 
-        if (auxTrack)
+        // A VCA or a folder stack's main is only a fader: no effects, pan or sends.
+        scalerOnly = daw::stacks::isVca (tree) || daw::stacks::isFolder (tree);
+        if (scalerOnly)
         {
-            instrumentSlot->setTooltip ("An aux bus: tracks reach it through their sends. Click to edit its effects.");
+            instrumentSlot->setTooltip (daw::stacks::isVca (tree) ? "A VCA: its fader moves its tracks' levels by the same dB; no audio passes through it"
+                                                                   : "A folder stack's main: its fader and mute scale the tracks in the stack");
+            for (auto& slot : sendSlots)
+                slot->setVisible (false);
+            for (auto* c : std::initializer_list<juce::Component*> { instrumentSlot.get(), mute.get(), solo.get() })
+                addAndMakeVisible (c);
+        }
+        else if (auxTrack)
+        {
+            instrumentSlot->setTooltip (daw::stacks::isSumming (tree) ? "A summing stack's main: its tracks play through its effects and fader"
+                                                                       : "An aux bus: tracks reach it through their sends. Click to edit its effects.");
             for (auto* c : std::initializer_list<juce::Component*> { instrumentSlot.get(), fxSlot.get(), mute.get(), solo.get(), pan.get() })
                 addAndMakeVisible (c);
         }
@@ -907,6 +923,25 @@ ChannelStrip::ChannelStrip (Studio& s, juce::ValueTree t, bool isMaster)
             for (auto* c : std::initializer_list<juce::Component*> { input.get(), rig.get(), mute.get(), solo.get(), arm.get(),
                                                                      monitor.get(), openRig.get(), pan.get(), fxSlot.get() })
                 addAndMakeVisible (c);
+    }
+
+    if (! master)
+    {
+        // Groups and VCAs: a small chip in the name plate.
+        groupSlot = std::make_unique<mixer::SlotButton>();
+        groupSlot->setTooltip ("Group and VCA: grouped tracks move together; a VCA scales its tracks");
+        groupSlot->text = [this]
+        {
+            const int g = daw::groups::groupOf (tree);
+            return g > 0 ? juce::String (g) : tree.hasProperty (ids::vca) ? juce::String ("V") : juce::String ("-");
+        };
+        groupSlot->lit = [this] { return daw::groups::groupOf (tree) > 0 || tree.hasProperty (ids::vca); };
+        groupSlot->onClick = [this]
+        {
+            select();
+            mixui::groupMenu (studio, tree).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (groupSlot.get()));
+        };
+        addAndMakeVisible (*groupSlot);
     }
 
     if (master)
@@ -1043,7 +1078,8 @@ void ChannelStrip::paint (juce::Graphics& g)
         const auto name = master ? juce::String ("Stereo Out") : tree[ids::name].toString();
         g.setColour (selected ? theme::accent : theme::text);
         g.setFont (theme::font (12.0f, selected || master ? theme::Weight::semibold : theme::Weight::medium));
-        g.drawFittedText (name, plate.toNearestInt().reduced (6, 0), juce::Justification::centred, 1, 0.85f);
+        g.drawFittedText (name, plate.toNearestInt().reduced (6, 0).withTrimmedRight (groupSlot != nullptr ? 18 : 0),
+                          juce::Justification::centred, 1, 0.85f);
     }
 
     if (master)
@@ -1083,6 +1119,8 @@ void ChannelStrip::resized()
     r.removeFromBottom (4);
     nameArea = juce::Rectangle<int> (0, r.getBottom() - 22, getWidth(), 22);
     r.removeFromBottom (22 + m.gap);
+    if (groupSlot != nullptr)
+        groupSlot->setBounds (nameArea.getRight() - 24, nameArea.getY() + 4, 20, 17);
 
     // Readouts above the name.
     if (m.readouts)
@@ -1116,7 +1154,9 @@ void ChannelStrip::resized()
             sendSlots[1]->setBounds (c.getX(), ioBottom - m.chipH, c.getWidth(), m.chipH);
             sendSlots[0]->setBounds (c.getX(), ioBottom - m.chipH * 2 - 4, c.getWidth(), m.chipH);
         }
-        if (instrumentTrack || auxTrack)
+        if (scalerOnly)
+            instrumentSlot->setBounds (c.removeFromTop (m.chipH));
+        else if (instrumentTrack || auxTrack)
         {
             if (m.tall)
             {

@@ -3,6 +3,7 @@
 #include "Studio.h"
 #include "Theme.h"
 #include "Icons.h"
+#include "MixCommands.h"
 
 namespace woodshed::app
 {
@@ -143,7 +144,8 @@ private:
                play       { icons::play(), theme::accent, "Play / stop (Space)" },
                stop       { icons::stop(), theme::text, "Stop (again: go to start)", 14.0f },
                record     { icons::record(), theme::record, "Record (R)" },
-               loop       { icons::loop(), theme::loop, "Loop (C)", 18.0f };
+               loop       { icons::loop(), theme::loop, "Loop (C)", 18.0f },
+               punch      { mixui::punchIcon(), mixui::punchColour(), "Autopunch: record only between the punch locators (Option-P)", 17.0f };
 
     Readout readout { *this };
 

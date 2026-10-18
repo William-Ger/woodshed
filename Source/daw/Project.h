@@ -16,10 +16,19 @@ namespace woodshed::daw
              loopOn (bool), loopStart, loopEnd (samples), masterVolume (dB), selectedTrack (id),
              tempoChanges ("tick:bpm;..." after the start), meterChanges ("bar:beats/unit;..." after bar 1),
              markers (JSON array of { id, name, position }; a property, so the children stay tracks)
+             groups (JSON array of { id 1..32, name, colour, volume, mute, solo, arm, select }: the track
+             groups and what each links), punchOn (bool), punchIn, punchOut (samples: Autopunch's range)
       TRACK  id (int, unique), name, colour (ARGB int), volume (dB), pan (-1..1),
              mute, solo, arm, monitor (bool), input (0-based interface channel), rigOn (bool),
              kind ("audio" when absent, "instrument", or "aux": a bus that plays the sends it receives
              through its inserts and fader; it has no regions or input)
+             stack (a stack main's id: this track is in that Track Stack), group (1..32, 0 or absent for
+             none), vca (a VCA's id: that VCA's fader scales this one), frozen (bool) and freezeFile (path
+             relative to the project folder: the track plays this pre-fader render instead of itself)
+             An aux may have busRole: "summing" (a summing stack's main: its members play through it),
+             "folder" (a folder stack's main: no audio of its own; its fader and mute scale its members)
+             or "vca" (a VCA: no audio; its volume, automated or not, is a dB offset on its tracks'
+             faders). Stack mains have collapsed (bool: the arrange hides the members).
         RIG        state (XML string of the track's rig: its board, amp, cab and knobs); audio tracks
         INSTRUMENT type (InstrumentRegistry id), patch (name), knobs (comma-separated real values in
                    the instrument's knob order); instrument tracks. Or type "plugin": an Audio Unit or
@@ -68,6 +77,7 @@ namespace ids
     WOODSHED_ID (knobs) WOODSHED_ID (on) WOODSHED_ID (pitch) WOODSHED_ID (velocity)
     WOODSHED_ID (tempoChanges) WOODSHED_ID (meterChanges) WOODSHED_ID (loop) WOODSHED_ID (transpose) WOODSHED_ID (comp) WOODSHED_ID (plugin) WOODSHED_ID (MASTER) WOODSHED_ID (SEND) WOODSHED_ID (bus) WOODSHED_ID (level) WOODSHED_ID (pre)
     WOODSHED_ID (AUTOMATION) WOODSHED_ID (param) WOODSHED_ID (points) WOODSHED_ID (autoParam) WOODSHED_ID (showAutomation)
+    WOODSHED_ID (stack) WOODSHED_ID (busRole) WOODSHED_ID (collapsed) WOODSHED_ID (group) WOODSHED_ID (groups) WOODSHED_ID (vca) WOODSHED_ID (frozen) WOODSHED_ID (freezeFile) WOODSHED_ID (punchOn) WOODSHED_ID (punchIn) WOODSHED_ID (punchOut)
 #undef WOODSHED_ID
 }
 
