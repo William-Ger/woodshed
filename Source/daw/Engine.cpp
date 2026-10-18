@@ -971,6 +971,8 @@ void Engine::syncTrackDevices (TrackRuntime& rt, const juce::ValueTree& track, d
                                       [&] (const InsertRuntime& r) { return r.id == id && r.type == pedalType; });
         if (existing != rt.inserts.end())
         {
+            if (! pedalType.startsWith ("plugin:"))
+                existing->pedal->setState (fx[ids::state].toString());     // settings that aren't knobs
             next.push_back (*existing);
             continue;
         }
@@ -989,6 +991,7 @@ void Engine::syncTrackDevices (TrackRuntime& rt, const juce::ValueTree& track, d
         else if (auto* pt = Registry::get().find (pedalType))
         {
             std::shared_ptr<Pedal> pedal = pt->create();
+            pedal->setState (fx[ids::state].toString());
             pedal->prepare (rate, block);
             next.push_back ({ id, pedalType, std::move (pedal) });
         }
@@ -1584,6 +1587,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
             masterL = juce::jmax (masterL, std::abs (b.left[i]));
             masterR = juce::jmax (masterR, std::abs (b.right[i]));
         }
+        outputTap.push (b.left, b.right, n);
 
         if (numOutputs >= 2)
         {

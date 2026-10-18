@@ -80,6 +80,7 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
         selectedRegions = { r };
     else if (testPane == "drummer") pane = Pane::drummer;
     else if (testPane == "steps") pane = Pane::stepSequencer;
+    else if (testPane == "mastering") pane = Pane::mastering;
     automationShown = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_AUTOMATION", {}) == "1";
     if (juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_PLAY", {}) == "1")
         juce::Timer::callAfterDelay (1500, [this] { engineInstance->play(); });

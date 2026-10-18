@@ -15,6 +15,7 @@ Registry::Registry()
     registerReverbPedals (*this);
     registerGlitchPedals (*this);
     registerWeirdPedals (*this);
+    registerMasteringPedals (*this);
 }
 
 const Registry& Registry::get()

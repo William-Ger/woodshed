@@ -885,6 +885,8 @@ int runDrummerTest (const juce::StringArray&);
 int writeDrummerDemoProject (const juce::File&);
 int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
+int runMasteringTest();                                         // MasteringTest.cpp
+int writeMasteringDemoProject (const juce::File&);
 
 int main (int argc, char* argv[])
 {
@@ -936,6 +938,11 @@ int main (int argc, char* argv[])
     if (args[0] == "project")
         return runProjectTest();
 
+    if (args[0] == "mastering")
+        return runMasteringTest();
+    if (args[0] == "demo-mastering" && args.size() > 1)
+        return writeMasteringDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+
     if (args[0] == "score")
         return runScoreTest();
 
@@ -981,6 +988,7 @@ int main (int argc, char* argv[])
                      " | presets [file.json ...] [--wav file] [--render dir]"
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
+                     " | mastering | demo-mastering <folder>"
                      " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>\n";
         return 2;
     }

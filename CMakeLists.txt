@@ -37,6 +37,14 @@ set(WOODSHED_ENGINE_SOURCES
     Source/instruments/Orchestral.cpp
     Source/instruments/Plucked.cpp)
 
+# --- mastering ---
+# Loudness metering and the mastering processor (a Registry pedal, so the rig plug-in has it too).
+list(APPEND WOODSHED_ENGINE_SOURCES
+    Source/mastering/Loudness.cpp
+    Source/mastering/MasteringProcessor.cpp
+    Source/mastering/Assistant.cpp)
+# --- end mastering ---
+
 # The multitrack engine (song model, playback, recording, bounce); no UI.
 set(WOODSHED_DAW_SOURCES
     Source/daw/Project.cpp
@@ -119,6 +127,10 @@ if(NOT WOODSHED_BENCH_ONLY)
     if(APPLE)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
+
+    # --- mastering ---
+    target_sources(WoodshedStudio PRIVATE Source/app/MasteringPanel.cpp)
+    # --- end mastering ---
 
     # The studio's typefaces: Inter and JetBrains Mono (both SIL Open Font License; see art/fonts).
     file(GLOB WOODSHED_FONTS CONFIGURE_DEPENDS art/fonts/*.ttf)
@@ -215,6 +227,9 @@ endif()
 juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
 target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp tools/bench/ScoreTest.cpp tools/bench/DrummerTest.cpp
     ${WOODSHED_SCORE_SOURCES} ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
+# --- mastering ---
+target_sources(WoodshedBench PRIVATE tools/bench/MasteringTest.cpp)
+# --- end mastering ---
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(WoodshedBench
     PRIVATE

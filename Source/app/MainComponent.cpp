@@ -5,7 +5,7 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), masteringPanel (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -18,6 +18,7 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (stepSequencer);
     addChildComponent (typing);
     addChildComponent (takesEditor);
+    addChildComponent (masteringPanel);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
     // Tracks above, the pane below; the divider between them can be dragged.
@@ -56,6 +57,7 @@ juce::Component* MainComponent::paneComponent()
         case Studio::Pane::score:  return &scoreView;
         case Studio::Pane::drummer: return &drummer;
         case Studio::Pane::stepSequencer: return &stepSequencer;
+        case Studio::Pane::mastering: return &masteringPanel;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
         default:                   return nullptr;
@@ -65,7 +67,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &masteringPanel })
         c->setVisible (c == shown);
 }
 
@@ -118,6 +120,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
                   cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions, cmd::showScore,
                   cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
+    c.addArray ({ cmd::mastering, cmd::showMastering });                                   // mastering
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -226,6 +229,13 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::pluginManager:   info.setInfo ("Plug-in Manager...", {}, "View", 0); break;
         case cmd::showAutomation:  info.setInfo ("Show Automation", {}, "View", 0); info.addDefaultKeypress ('a', 0);
                                    info.setTicked (studio.isShowingAutomation()); break;
+
+        // Mastering ---------------------------------------------------------------
+        case cmd::mastering:       info.setInfo ("Mastering...", "Bounce the song and master it to a loudness target", "Mix", 0);
+                                   info.addDefaultKeypress ('m', cmdKey | juce::ModifierKeys::altModifier);
+                                   info.setActive (! studio.engine().isBouncing()); break;
+        case cmd::showMastering:   info.setInfo ("Mastering and Loudness Meters", {}, "Mix", 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::mastering); break;
         default: break;
     }
 }
@@ -345,6 +355,12 @@ bool MainComponent::perform (const InvocationInfo& info)
                     if (auto r = studio.findRegion (id); daw::Project::isMidiRegion (r))
                         studio.quantizeNotes (r, {}, studio.getQuantizeTicks());
             break;
+
+        // Mastering ---------------------------------------------------------------
+        case cmd::mastering:       studio.setPane (Studio::Pane::mastering); masteringPanel.analyse(); break;
+        case cmd::showMastering:
+            studio.setPane (studio.getPane() == Studio::Pane::mastering ? Studio::Pane::none : Studio::Pane::mastering);
+            break;
         default:                   return false;
     }
 
@@ -355,13 +371,20 @@ bool MainComponent::perform (const InvocationInfo& info)
 //==============================================================================
 juce::StringArray MainComponent::getMenuBarNames()
 {
-    return { "File", "Edit", "Track", "Transport", "View" };
+    return { "File", "Edit", "Track", "Transport", "View", "Mix" };
 }
 
-juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
+juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String& menuName)
 {
     juce::PopupMenu m;
     auto* cm = &studio.commands;
+
+    if (menuName == "Mix")
+    {
+        m.addCommandItem (cm, cmd::mastering);          // mastering
+        m.addCommandItem (cm, cmd::showMastering);
+        return m;
+    }
 
     switch (index)
     {

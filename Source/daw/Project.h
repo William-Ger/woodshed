@@ -26,7 +26,8 @@ namespace woodshed::daw
                    VST3, with plugin (its PluginDescription as XML) and state (base64)
         FX         id, type (pedal Registry id), on (bool), knobs (comma-separated real values in the
                    pedal's knob order); the track's insert effects in signal order, after the rig or
-                   instrument. Or type "plugin" with plugin and state, as for INSTRUMENT
+                   instrument; state (optional: a pedal's settings that aren't knobs, e.g. the
+                   mastering processor's EQ curve). Or type "plugin" with plugin and state, as for INSTRUMENT
         SEND       bus (an aux track's id), level (dB), pre (bool: before the fader and pan); the
                    track's signal, also sent to that aux
         AUTOMATION param ("volume" in dB, "pan" -1..1, "inst:<knob index>" or "fx:<FX id>:<knob index>"
