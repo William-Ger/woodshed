@@ -8,7 +8,7 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), loopGridView (s), samplerEditor (s), pitchEditor (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), pitchEditor (s), loopGridView (s), samplerEditor (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
