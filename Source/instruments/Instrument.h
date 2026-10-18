@@ -64,6 +64,10 @@ public:
     virtual void update() {}
     virtual void render (float* left, float* right, int numSamples, const NoteEvent* events, int numEvents) = 0;
 
+    /** How many samples late the output comes (lookahead, oversampling); the mixer delays the
+        other tracks to match. */
+    virtual int getLatencySamples() const                       { return 0; }
+
     float knob (int index) const                                { return knobValues[(size_t) index]; }
     void setKnob (int index, float realValue)                   { knobValues[(size_t) index] = realValue; }
 

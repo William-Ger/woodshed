@@ -1,5 +1,6 @@
 #include "ArrangeRuler.h"
 #include "ArrangeView.h"
+#include "MixCommands.h"
 
 namespace woodshed::app::arrange
 {
@@ -69,6 +70,20 @@ void Ruler::paint (juce::Graphics& g)
                 for (float hx : { range.getX() + 3.0f, range.getRight() - 5.0f })
                     g.fillRoundedRectangle (juce::Rectangle<float> (hx, range.getY() + 2.5f, 2.0f, range.getHeight() - 5.0f), 1.0f);
             }
+        }
+    }
+
+    // Autopunch: the punch range as a red band along the bottom of the strip.
+    if ((bool) state[ids::punchOn])
+    {
+        const auto band = punchBand();
+        if (band.getWidth() > 0.0f && band.getRight() > -10.0f && band.getX() < width + 10.0f)
+        {
+            g.setColour (mixui::punchColour().withAlpha (0.75f));
+            g.fillRoundedRectangle (band, 1.5f);
+            g.setColour (mixui::punchColour());
+            for (float hx : { band.getX(), band.getRight() - 2.0f })
+                g.fillRect (juce::Rectangle<float> (hx, band.getY() - 3.0f, 2.0f, band.getHeight() + 3.0f));
         }
     }
 
@@ -274,6 +289,18 @@ Ruler::Mode Ruler::loopModeAt (juce::Point<int> p) const
         return markerAt (p) != 0 ? Mode::markerDrag : Mode::markerEmpty;
 
     auto& state = view.project().state;
+    if ((bool) state[ids::punchOn])
+    {
+        const auto band = punchBand();
+        if ((float) p.y >= band.getY() - 4.0f && band.getWidth() > 0.0f)
+        {
+            const float grab = juce::jmin (6.0f, band.getWidth() / 3.0f);
+            if (std::abs ((float) p.x - band.getX()) <= grab)     return Mode::punchStart;
+            if (std::abs ((float) p.x - band.getRight()) <= grab) return Mode::punchEnd;
+            if ((float) p.x > band.getX() && (float) p.x < band.getRight()) return Mode::punchMove;
+        }
+    }
+
     const auto loopStart = (juce::int64) state[ids::loopStart];
     const auto loopEnd = (juce::int64) state[ids::loopEnd];
     if (loopEnd <= loopStart)
@@ -292,8 +319,11 @@ void Ruler::mouseMove (const juce::MouseEvent& e)
     switch (loopModeAt (e.getPosition()))
     {
         case Mode::loopStart:
-        case Mode::loopEnd:   setMouseCursor (juce::MouseCursor::LeftRightResizeCursor); break;
+        case Mode::loopEnd:
+        case Mode::punchStart:
+        case Mode::punchEnd:  setMouseCursor (juce::MouseCursor::LeftRightResizeCursor); break;
         case Mode::loopMove:
+        case Mode::punchMove:
         case Mode::markerDrag: setMouseCursor (juce::MouseCursor::PointingHandCursor); break;
         case Mode::none:
         case Mode::scrub:
@@ -322,13 +352,35 @@ void Ruler::setLoop (juce::int64 start, juce::int64 end, bool turnOn)
         p.state.setProperty (ids::loopOn, true, &p.undo);
 }
 
+juce::Rectangle<float> Ruler::punchBand() const
+{
+    const auto& state = view.project().state;
+    const auto strip = getLocalBounds().withTrimmedTop (numbersHeight).withTrimmedBottom (markerHeight + 1).toFloat();
+    const float x1 = view.xForSample ((double) (juce::int64) state[ids::punchIn]);
+    const float x2 = view.xForSample ((double) (juce::int64) state[ids::punchOut]);
+    return { x1, strip.getBottom() - 4.0f, juce::jmax (0.0f, x2 - x1), 3.0f };
+}
+
+void Ruler::setPunch (juce::int64 start, juce::int64 end)
+{
+    auto& p = view.project();
+    if (! changed)
+    {
+        p.undo.beginNewTransaction ("Set Punch Locators");
+        changed = true;
+    }
+    p.state.setProperty (ids::punchIn, start, &p.undo);
+    p.state.setProperty (ids::punchOut, end, &p.undo);
+}
+
 void Ruler::mouseDown (const juce::MouseEvent& e)
 {
     changed = false;
     mode = loopModeAt (e.getPosition());
     auto& state = view.project().state;
-    originalStart = (juce::int64) state[ids::loopStart];
-    originalEnd = (juce::int64) state[ids::loopEnd];
+    const bool punch = mode == Mode::punchMove || mode == Mode::punchStart || mode == Mode::punchEnd;
+    originalStart = (juce::int64) state[punch ? ids::punchIn : ids::loopStart];
+    originalEnd = (juce::int64) state[punch ? ids::punchOut : ids::loopEnd];
     anchor = view.snap (view.sampleAtX (e.x), ! e.mods.isCommandDown());
     view.setUserGesture (true);
 
@@ -495,6 +547,24 @@ void Ruler::mouseDrag (const juce::MouseEvent& e)
 
         case Mode::loopEnd:
             setLoop (originalStart, juce::jmax (at, originalStart + minLength), false);
+            break;
+
+        case Mode::punchMove:
+        {
+            if (! changed && std::abs (e.getDistanceFromDragStartX()) < 3)
+                break;
+            const auto delta = juce::jmax (-originalStart, at - anchor);
+            if (delta != 0 || changed)
+                setPunch (originalStart + delta, originalEnd + delta);
+            break;
+        }
+
+        case Mode::punchStart:
+            setPunch (juce::jmin (at, originalEnd - minLength), originalEnd);
+            break;
+
+        case Mode::punchEnd:
+            setPunch (originalStart, juce::jmax (at, originalStart + minLength));
             break;
 
         case Mode::markerDrag:

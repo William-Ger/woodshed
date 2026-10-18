@@ -4,6 +4,8 @@
 #include "ArrangeRuler.h"
 #include "Icons.h"
 #include "Movie.h"
+#include "../daw/Stacks.h"
+#include "MixCommands.h"
 
 namespace woodshed::app
 {
@@ -87,6 +89,7 @@ void ArrangeView::rebuildHeaders()
     }
 
     headers = std::move (next);
+    updateRows();
     resized();
     repaint();
 }
@@ -94,7 +97,11 @@ void ArrangeView::rebuildHeaders()
 void ArrangeView::layoutHeaders()
 {
     for (size_t i = 0; i < headers.size(); ++i)
+    {
+        const bool shown = i < rowOfTrack.size() && rowOfTrack[i] >= 0;
+        headers[i]->setVisible (shown);
         headers[i]->setBounds (0, yForTrack ((int) i), headerArea.getWidth(), trackHeight);
+    }
 }
 
 void ArrangeView::contentChanged()
@@ -142,8 +149,16 @@ void ArrangeView::valueTreePropertyChanged (juce::ValueTree& tree, const juce::I
         contentChanged();
     else if (tree.hasType (ids::TRACK))
     {
+        // Track Stacks: collapsing (or a track joining or leaving one) changes the rows.
+        if (property == ids::collapsed || property == ids::stack || property == ids::busRole)
+        {
+            updateRows();
+            resized();
+            for (auto& h : headers)
+                h->repaint();
+        }
         lanes->repaint();
-        if (property == ids::autoParam)
+        if (property == ids::autoParam || property == ids::group || property == ids::frozen || property == ids::vca)
             for (auto& h : headers)
                 h->repaint();
     }
@@ -169,6 +184,7 @@ void ArrangeView::valueTreeChildOrderChanged (juce::ValueTree& parent, int, int)
 {
     if (parent == attached)
     {
+        updateRows();
         layoutHeaders();
         for (auto& h : headers)
             h->repaint();      // track numbers
@@ -270,7 +286,7 @@ void ArrangeView::resized()
     }
     hScroll.setBounds (r.removeFromBottom (scrollBarSize));
 
-    const int contentHeight = project().numTracks() * trackHeight + trackHeight / 2;
+    const int contentHeight = visibleRows() * trackHeight + trackHeight / 2;
     const bool needV = contentHeight > r.getHeight();
     vScroll.setVisible (needV);
     if (needV)
@@ -305,8 +321,31 @@ int ArrangeView::trackIndexAtY (int y) const
 {
     if (y + scrollY < 0)
         return -1;
-    const int index = (y + scrollY) / trackHeight;
-    return index < project().numTracks() ? index : -1;
+    const auto row = (size_t) ((y + scrollY) / trackHeight);
+    return row < trackAtRow.size() ? trackAtRow[row] : -1;
+}
+
+int ArrangeView::yForTrack (int index) const
+{
+    if (index < 0)
+        return index * trackHeight - scrollY;
+    if ((size_t) index >= rowOfTrack.size())
+        return (visibleRows() + index - (int) rowOfTrack.size()) * trackHeight - scrollY;
+    const int row = rowOfTrack[(size_t) index];
+    return row >= 0 ? row * trackHeight - scrollY : -1000000;
+}
+
+void ArrangeView::updateRows()
+{
+    auto& p = project();
+    rowOfTrack.assign ((size_t) p.numTracks(), -1);
+    trackAtRow.clear();
+    for (int i = 0; i < p.numTracks(); ++i)
+        if (! daw::stacks::isHidden (p, p.track (i)))
+        {
+            rowOfTrack[(size_t) i] = (int) trackAtRow.size();
+            trackAtRow.push_back (i);
+        }
 }
 
 juce::int64 ArrangeView::snap (double sample, bool enabled) const
@@ -400,7 +439,7 @@ void ArrangeView::updateScrollBars()
     hScroll.setRangeLimits (0.0, total, juce::dontSendNotification);
     hScroll.setCurrentRange (viewStart, getViewLength(), juce::dontSendNotification);
 
-    const int contentHeight = project().numTracks() * trackHeight + trackHeight / 2;
+    const int contentHeight = visibleRows() * trackHeight + trackHeight / 2;
     vScroll.setRangeLimits (0.0, (double) juce::jmax (contentHeight, lanesHeight()), juce::dontSendNotification);
     vScroll.setCurrentRange ((double) scrollY, (double) lanesHeight(), juce::dontSendNotification);
 }
@@ -447,7 +486,7 @@ void ArrangeView::scrollPixels (double dx, double dy)
 
     if (! juce::exactlyEqual (dy, 0.0))
     {
-        const int contentHeight = project().numTracks() * trackHeight + trackHeight / 2;
+        const int contentHeight = visibleRows() * trackHeight + trackHeight / 2;
         const int newY = juce::jlimit (0, juce::jmax (0, contentHeight - lanesHeight()), scrollY + juce::roundToInt (dy));
         if (newY != scrollY)
         {
@@ -514,7 +553,7 @@ void ArrangeView::handleWheel (const juce::MouseEvent& e, const juce::MouseWheel
     if (e.mods.isShiftDown() && juce::exactlyEqual (dx, 0.0))
         std::swap (dx, dy);
 
-    const int contentHeight = project().numTracks() * trackHeight + trackHeight / 2;
+    const int contentHeight = visibleRows() * trackHeight + trackHeight / 2;
     if (contentHeight <= lanesHeight() && juce::exactlyEqual (dx, 0.0))
         std::swap (dx, dy);          // nothing to scroll vertically: the wheel scrolls in time
 
@@ -580,7 +619,8 @@ void ArrangeView::dragTrackTo (const juce::ValueTree& track, int yInView)
         return;
 
     const int y = yInView - lanes->getY() + scrollY;
-    const int target = juce::jlimit (0, p.numTracks() - 1, y / trackHeight);
+    const int row = juce::jlimit (0, juce::jmax (0, visibleRows() - 1), y / trackHeight);
+    const int target = row < visibleRows() ? trackAtRow[(size_t) row] : p.numTracks() - 1;
     if (target == current)
         return;
 
@@ -678,6 +718,7 @@ void ArrangeView::showTrackMenu (juce::ValueTree track)
         v.studio.selectTrack ((int) t[ids::id]);
         v.studio.showNewTrackMenu();
     }));
+    mixui::addTrackMenuItems (m, studio, track);       // stacks, groups, VCA, freeze
 
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }

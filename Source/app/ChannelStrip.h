@@ -274,6 +274,8 @@ private:
     std::unique_ptr<mixer::IconButton> openRig;
     std::unique_ptr<mixer::SlotButton> instrumentSlot, fxSlot;
     std::unique_ptr<mixer::SendSlot> sendSlots[2];
+    std::unique_ptr<mixer::SlotButton> groupSlot;           // the track's group and VCA, in the name plate
+    bool scalerOnly = false;                                // a VCA or folder stack main: a fader, no audio
     bool instrumentTrack = false, auxTrack = false;
     void showInserts();
     std::unique_ptr<mixer::PanKnob> pan;

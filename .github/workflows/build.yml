@@ -39,7 +39,7 @@ jobs:
           [ -f "$BENCH.exe" ] && BENCH="$BENCH.exe"
           RUN=""
           [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
-          for suite in run project instruments drummer score pitchcorrect presets spatial; do
+          for suite in run project instruments drummer score pitchcorrect presets mix spatial; do
             echo "::group::woodshed-bench $suite"
             $RUN "$BENCH" $suite
             echo "::endgroup::"

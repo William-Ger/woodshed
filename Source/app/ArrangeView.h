@@ -66,9 +66,13 @@ public:
     double gridStepBeats() const;
     double labelStepBeats() const;
 
-    int yForTrack (int index) const                         { return index * trackHeight - scrollY; }
+    /** A track's top. Tracks inside a collapsed Track Stack aren't shown: they sit far above the
+        view. An index past the last track gives the bottom of the shown ones. */
+    int yForTrack (int index) const;
     /** Track index under a lane y, or -1 below the last track. */
     int trackIndexAtY (int y) const;
+    /** How many tracks are shown (not inside a collapsed stack). */
+    int visibleRows() const                                 { return (int) trackAtRow.size(); }
 
     void scrollPixels (double dx, double dy);
     void zoomAround (float x, double factor);
@@ -101,6 +105,8 @@ private:
     void valueTreeRedirected (juce::ValueTree&) override;
 
     void attachToProject();
+    /** Which track shows on which row, after tracks or stacks change. */
+    void updateRows();
     void rebuildHeaders();
     void layoutHeaders();
     void updateScrollBars();
@@ -116,6 +122,7 @@ private:
 
     double viewStart = 0.0, samplesPerPixel = 1000.0;
     int scrollY = 0;
+    std::vector<int> rowOfTrack, trackAtRow;        // -1: hidden in a collapsed stack
     bool fitPending = true, keepFitted = true, userGesture = false, reorderStarted = false, wasRecording = false;
     float lastPlayheadX = -1000.0f;
     juce::int64 lastRecordedLength = -1;
