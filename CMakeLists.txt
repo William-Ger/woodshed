@@ -45,6 +45,13 @@ set(WOODSHED_DAW_SOURCES
     Source/daw/Drummer.cpp
     Source/daw/StepPattern.cpp)
 
+# --- spatial ---
+# 3D panning (binaural and stereo) and the surround bounce's speaker layouts; part of the engine.
+set(WOODSHED_SPATIAL_SOURCES
+    Source/spatial/Spatial.cpp)
+list(APPEND WOODSHED_DAW_SOURCES ${WOODSHED_SPATIAL_SOURCES})
+# --- end spatial ---
+
 # The Score editor's notation layout and drawing (no Component code); shared with the bench.
 set(WOODSHED_SCORE_SOURCES
     Source/app/ScoreLayout.cpp
@@ -227,3 +234,7 @@ target_link_libraries(WoodshedBench
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+# --- spatial ---
+target_sources(WoodshedBench PRIVATE tools/bench/SpatialTest.cpp)
+# --- end spatial ---

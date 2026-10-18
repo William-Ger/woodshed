@@ -170,6 +170,9 @@ void Mixer::render (const Snapshot& snap, const Block& b)
     const int n = b.numSamples;
     juce::FloatVectorOperations::clear (b.left, n);
     juce::FloatVectorOperations::clear (b.right, n);
+    if (b.surround != nullptr && b.surroundOut != nullptr)
+        for (int ch = 0; ch < b.surround->size(); ++ch)
+            juce::FloatVectorOperations::clear (b.surroundOut[ch], n);
 
     for (auto& track : snap.tracks)
         if (track.aux && track.runtime->busInput.getNumSamples() >= n)
@@ -253,19 +256,41 @@ void Mixer::render (const Snapshot& snap, const Block& b)
 
         runInserts (track, a, c, n, b.position);
 
-        // Volume and pan follow their automation lines, if they have them.
+        // Volume and pan (or the 3D position) follow their automation lines, if they have them.
         float gain = track.gain, pan = track.pan;
+        auto position = track.position;
         for (auto& line : track.automation)
         {
             if (line.target == TrackPlayback::AutoLine::volume) gain = dbToGain ((double) Project::evaluate (line.points, b.position));
             else if (line.target == TrackPlayback::AutoLine::pan) pan = Project::evaluate (line.points, b.position);
+            else if (line.target == TrackPlayback::AutoLine::spatialParam)
+            {
+                const float v = Project::evaluate (line.points, b.position);
+                if (line.knob == 0)      position.azimuth = v;
+                else if (line.knob == 1) position.elevation = v;
+                else if (line.knob == 2) position.distance = v;
+                else if (line.knob == 3) position.spread = v;
+            }
         }
 
-        // Constant-power pan, unity in the middle.
+        // 3D tracks, and every track in a surround bounce, go through the panner after the fader.
+        // Without one (a runtime nobody prepared) a 3D track falls back to its stereo pan.
+        auto* panner = rt.panner != nullptr && rt.panner->isPrepared() ? rt.panner.get() : nullptr;
+        const bool surround = b.surround != nullptr && b.surroundOut != nullptr;
+        const bool panned3d = panner != nullptr && (track.spatial || surround);
+        if (track.spatial && panner == nullptr)
+        {
+            pan = spatial::stereoPanFor (position.azimuth, position.elevation);
+            gain *= spatial::distanceGain (position.distance);
+        }
+        if (surround && ! track.spatial)
+            position = spatial::fromStereoPan (pan);
+
+        // Constant-power pan, unity in the middle (or just the fader, before the panner).
         const float angle = (juce::jlimit (-1.0f, 1.0f, pan) + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
         const float g = track.audible ? gain : 0.0f;
-        rt.gainLeft.setTargetValue (g * std::cos (angle) * juce::MathConstants<float>::sqrt2);
-        rt.gainRight.setTargetValue (g * std::sin (angle) * juce::MathConstants<float>::sqrt2);
+        rt.gainLeft.setTargetValue (panned3d ? g : g * std::cos (angle) * juce::MathConstants<float>::sqrt2);
+        rt.gainRight.setTargetValue (panned3d ? g : g * std::sin (angle) * juce::MathConstants<float>::sqrt2);
 
         // Sends: their levels, automated or not, and the pre-fader ones before the fader.
         std::array<float, 32> sendGains {};
@@ -292,29 +317,64 @@ void Mixer::render (const Snapshot& snap, const Block& b)
                 sendTo (i);
 
         float peakL = 0.0f, peakR = 0.0f;
-        for (int i = 0; i < n; ++i)
+        if (panned3d)
         {
-            const float l = a[i] * rt.gainLeft.getNextValue();
-            const float r = c[i] * rt.gainRight.getNextValue();
-            a[i] = l;
-            c[i] = r;
-            b.left[i] += l;
-            b.right[i] += r;
-            peakL = juce::jmax (peakL, std::abs (l));
-            peakR = juce::jmax (peakR, std::abs (r));
-        }
+            // The fader, then the post-fader sends (before the panner: a bus places itself),
+            // then the position.
+            for (int i = 0; i < n; ++i)
+            {
+                a[i] *= rt.gainLeft.getNextValue();
+                c[i] *= rt.gainRight.getNextValue();
+            }
+            for (size_t i = 0; i < numSends; ++i)
+                if (! track.sends[i].pre)
+                    sendTo (i);
 
-        for (size_t i = 0; i < numSends; ++i)
-            if (! track.sends[i].pre)
-                sendTo (i);
+            panner->setTarget (position);
+            if (surround)
+                panner->renderSurround (a, c, n, *b.surround, b.surroundOut);
+            else
+                panner->render (a, c, n, snap.monitoring);
+
+            for (int i = 0; i < n; ++i)
+            {
+                if (! surround)
+                {
+                    b.left[i] += a[i];
+                    b.right[i] += c[i];
+                }
+                peakL = juce::jmax (peakL, std::abs (a[i]));
+                peakR = juce::jmax (peakR, std::abs (c[i]));
+            }
+        }
+        else
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                const float l = a[i] * rt.gainLeft.getNextValue();
+                const float r = c[i] * rt.gainRight.getNextValue();
+                a[i] = l;
+                c[i] = r;
+                b.left[i] += l;
+                b.right[i] += r;
+                peakL = juce::jmax (peakL, std::abs (l));
+                peakR = juce::jmax (peakR, std::abs (r));
+            }
+
+            for (size_t i = 0; i < numSends; ++i)
+                if (! track.sends[i].pre)
+                    sendTo (i);
+        }
 
         rt.peakLeft.store (juce::jmax (rt.peakLeft.load (std::memory_order_relaxed), peakL), std::memory_order_relaxed);
         rt.peakRight.store (juce::jmax (rt.peakRight.load (std::memory_order_relaxed), peakR), std::memory_order_relaxed);
     }
 
-    // The Stereo Out's effects, on the whole mix.
+    // The Stereo Out's effects, on the whole mix (not on a surround bounce: they're stereo).
     for (auto& fx : snap.masterInserts)
     {
+        if (b.surround != nullptr)
+            break;
         if (! fx.on || fx.pedal == nullptr)
             continue;
         for (int k = 0; k < Pedal::maxKnobs; ++k)
@@ -907,6 +967,9 @@ void Engine::prepareRig (TrackRuntime& rt)
     rt.busInput.setSize (2, blockSize, false, true, true);
     rt.gainLeft.reset (sampleRate, 0.03);
     rt.gainRight.reset (sampleRate, 0.03);
+    if (rt.panner == nullptr)
+        rt.panner = std::make_unique<spatial::Panner>();
+    rt.panner->prepare (sampleRate);
 
     if (rt.rig != nullptr)
     {
@@ -1088,6 +1151,7 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
     snap->loopOn = (bool) s.getProperty (ids::loopOn, false);
     snap->loopStart = (juce::int64) s.getProperty (ids::loopStart, 0);
     snap->loopEnd = (juce::int64) s.getProperty (ids::loopEnd, 0);
+    snap->monitoring = s[ids::spatialOutput].toString() == "binaural" ? spatial::Monitoring::binaural : spatial::Monitoring::stereo;
 
     bool anySolo = false;
     for (auto t : s)
@@ -1114,6 +1178,12 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         tp.aux = Project::isAuxTrack (t);
         if (tp.aux)
             tp.rigOn = false;
+        tp.spatial = (bool) t[ids::spatial];
+        tp.position.azimuth = (float) (double) t.getProperty (ids::azimuth, 0.0);
+        tp.position.elevation = (float) (double) t.getProperty (ids::elevation, 0.0);
+        tp.position.distance = (float) (double) t.getProperty (ids::distance, 1.0);
+        tp.position.spread = (float) (double) t.getProperty (ids::spread, 0.0);
+        tp.position.room = (float) (double) t.getProperty (ids::room, 0.0);
 
         const auto& rt = *it->second;
         for (auto& fx : rt.inserts)
@@ -1155,6 +1225,14 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
             const auto param = node[ids::param].toString();
             if (param == "volume")            line.target = TrackPlayback::AutoLine::volume;
             else if (param == "pan")          line.target = TrackPlayback::AutoLine::pan;
+            else if (param.startsWith ("spatial:"))
+            {
+                const auto which = param.fromFirstOccurrenceOf (":", false, false);
+                line.target = TrackPlayback::AutoLine::spatialParam;
+                line.knob = juce::StringArray { "azimuth", "elevation", "distance", "spread" }.indexOf (which);
+                if (line.knob < 0)
+                    continue;
+            }
             else if (param.startsWith ("inst:"))
             {
                 line.target = TrackPlayback::AutoLine::instrumentKnob;
@@ -1619,20 +1697,26 @@ namespace
 {
 std::unique_ptr<juce::AudioFormatWriter> makeWriter (const juce::File& file, const BounceOptions& options, double rate)
 {
+    // Surround is always a WAV, with its speakers in the header's channel mask.
+    const auto* layout = spatial::SpeakerLayout::find (options.surround);
     std::unique_ptr<juce::AudioFormat> format;
-    if (options.format == "aiff")       format = std::make_unique<juce::AiffAudioFormat>();
+    if (layout != nullptr)              format = std::make_unique<juce::WavAudioFormat>();
+    else if (options.format == "aiff")  format = std::make_unique<juce::AiffAudioFormat>();
     else if (options.format == "flac")  format = std::make_unique<juce::FlacAudioFormat>();
     else                                format = std::make_unique<juce::WavAudioFormat>();
 
     int bits = options.bits;
-    if (options.format == "flac")
+    if (options.format == "flac" && layout == nullptr)
         bits = juce::jmin (bits, 24);
 
     file.deleteFile();
     std::unique_ptr<juce::OutputStream> stream (file.createOutputStream());
     if (stream == nullptr)
         return nullptr;
-    return format->createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (rate).withNumChannels (2)
+    auto channels = juce::AudioFormatWriterOptions{}.withNumChannels (2);
+    if (layout != nullptr)
+        channels = channels.withChannelLayout (layout->channels);
+    return format->createWriterFor (stream, channels.withSampleRate (rate)
                                                                              .withBitsPerSample (bits)
                                                                              .withSampleFormat (bits == 32 ? juce::AudioFormatWriterOptions::SampleFormat::floatingPoint
                                                                                                            : juce::AudioFormatWriterOptions::SampleFormat::integral));
@@ -1668,12 +1752,14 @@ private:
     {
         const auto tail = (juce::int64) (sampleRate * bounceTailSeconds);
         const auto total = juce::jmax ((juce::int64) 1, end + tail - start);
-        juce::AudioBuffer<float> out (2, bounceBlock);
+        const auto* layout = spatial::SpeakerLayout::find (options.surround);
+        const int channels = layout != nullptr ? layout->size() : 2;
+        juce::AudioBuffer<float> out (channels, bounceBlock), stereo (2, bounceBlock);
 
         // Normalising needs the whole thing first; otherwise it streams to the file.
         juce::AudioBuffer<float> whole;
         if (options.normalize)
-            whole.setSize (2, (int) juce::jmin (total, (juce::int64) std::numeric_limits<int>::max() / 2));
+            whole.setSize (channels, (int) juce::jmin (total, (juce::int64) std::numeric_limits<int>::max() / channels));
 
         auto writer = makeWriter (job.file, options, sampleRate);
         if (writer == nullptr)
@@ -1687,15 +1773,17 @@ private:
             b.position = pos;
             b.numSamples = n;
             b.playing = true;
-            b.left = out.getWritePointer (0);
-            b.right = out.getWritePointer (1);
+            b.left = (layout != nullptr ? stereo : out).getWritePointer (0);
+            b.right = (layout != nullptr ? stereo : out).getWritePointer (1);
+            b.surround = layout;
+            b.surroundOut = layout != nullptr ? out.getArrayOfWritePointers() : nullptr;
             Mixer::render (*job.snap, b);
             out.applyGain (0, n, job.snap->masterGain);
             if (options.normalize)
             {
                 const auto at = (int) (pos - start);
                 if (at + n <= whole.getNumSamples())
-                    for (int ch = 0; ch < 2; ++ch)
+                    for (int ch = 0; ch < channels; ++ch)
                         whole.copyFrom (ch, at, out, ch, 0, n);
             }
             else
@@ -1736,6 +1824,8 @@ std::unique_ptr<Snapshot> Engine::makeBounceSnapshot (int onlyTrackId, bool with
         rt->busInput.setSize (2, bounceBlock);
         rt->gainLeft.reset (sampleRate, 0.03);
         rt->gainRight.reset (sampleRate, 0.03);
+        rt->panner = std::make_unique<spatial::Panner>();
+        rt->panner->prepare (sampleRate);
         syncTrackDevices (*rt, t, sampleRate, bounceBlock);
 
         if (makeRig && ! Project::isInstrumentTrack (t) && ! Project::isAuxTrack (t))
@@ -1784,7 +1874,8 @@ void Engine::startBounce (const juce::File& target, juce::int64 start, juce::int
     }
 
     syncRigStates();
-    const auto extension = options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
+    const auto extension = spatial::SpeakerLayout::find (options.surround) != nullptr ? ".wav"
+                         : options.format == "aiff" ? ".aif" : options.format == "flac" ? ".flac" : ".wav";
 
     std::vector<BounceThread::Job> jobs;
     if (options.stems)
