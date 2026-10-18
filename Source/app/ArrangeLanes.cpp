@@ -972,7 +972,11 @@ void Lanes::mouseDrag (const juce::MouseEvent& e)
 
 void Lanes::mouseUp (const juce::MouseEvent& e)
 {
-    switch (gesture)
+    // Regions dragged off the lanes onto the Loop Grid are copied into a cell there instead.
+    const bool toLoopGrid = gesture == Gesture::move && ! getLocalBounds().contains (e.getPosition())
+                            && view.studio.dropRegionsOnLoopGrid && view.studio.dropRegionsOnLoopGrid (e.getScreenPosition(), view.studio.getSelectedRegions());
+
+    switch (toLoopGrid ? Gesture::none : gesture)
     {
         case Gesture::move:      commitMove (e.mods.isAltDown()); break;
         case Gesture::trimLeft:

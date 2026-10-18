@@ -254,10 +254,17 @@ juce::ValueTree moveCell (daw::Project& p, juce::ValueTree cell, juce::ValueTree
     return moved;
 }
 
-juce::Array<int> placeInArrange (daw::Project& p, const juce::ValueTree& cell, juce::int64 from, juce::int64 to)
+juce::Array<int> placeInArrange (daw::Project& p, const juce::ValueTree& cell, juce::int64 from, juce::int64 to,
+                                 juce::ValueTree onTrack)
 {
     juce::Array<int> made;
     auto track = trackOfCell (cell);
+    if (onTrack.isValid())
+    {
+        if (daw::Project::isAuxTrack (onTrack) || isMidiCell (cell) != daw::Project::isInstrumentTrack (onTrack))
+            return made;
+        track = onTrack;
+    }
     const auto pass = cellLength (p.grid(), cell);
     if (! track.isValid() || pass <= 0 || to <= from)
         return made;

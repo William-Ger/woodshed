@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../daw/Engine.h"
+#include "../loops/LoopGrid.h"
 #include <juce_audio_utils/juce_audio_utils.h>
 
 namespace woodshed::app
@@ -25,6 +26,9 @@ namespace cmd
         importMidi, exportMidi, pluginManager, loopRegions, showScore,
         newDrummerTrack, showDrummer, showStepSequencer, visitWebsite
     };
+
+    // Loop Grid (clip launching).
+    enum : juce::CommandID { showLoopGrid = 0x3300, loopGridStopAll, copyToLoopGrid, loopGridPerformRecord, loopGridAddScene };
 }
 
 /**
@@ -169,9 +173,18 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer };
+    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer, loopGrid };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
+
+    // Loop Grid -----------------------------------------------------------------------
+    /** Launching cells and scenes, recording into cells, perform recording. */
+    loops::LoopGrid& loopGrid()                             { return *loopGridInstance; }
+    /** Copies each selected region into the first empty cell of its track's grid (one undo step). */
+    void copySelectedToLoopGrid();
+    /** Set by the Loop Grid while it's shown: regions dragged off the arrange and let go at a
+        screen position. True if it took them (then the arrange doesn't move them). */
+    std::function<bool (juce::Point<int> screenPos, const juce::Array<int>& regionIds)> dropRegionsOnLoopGrid;
 
     /** A short message for the status line (saved, bounced, errors). */
     void flash (const juce::String& message);
@@ -201,6 +214,7 @@ private:
 
     juce::ApplicationProperties& appSettings;
     std::unique_ptr<daw::Engine> engineInstance;
+    std::unique_ptr<loops::LoopGrid> loopGridInstance;
     std::unique_ptr<PluginHost> pluginHost;
     std::unique_ptr<daw::Project> currentProject;
     std::unique_ptr<juce::FileChooser> chooser;

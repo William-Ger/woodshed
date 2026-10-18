@@ -276,6 +276,15 @@ Icon pianoRoll()
     return filled (p);
 }
 
+Icon loopGrid()
+{
+    juce::Path p;
+    for (int row = 0; row < 3; ++row)
+        for (int col = 0; col < 3; ++col)
+            p.addRoundedRectangle (4.0f + (float) col * 5.6f, 4.0f + (float) row * 5.6f, 4.4f, 4.4f, 1.0f);
+    return filled (p);
+}
+
 void draw (juce::Graphics& g, const Icon& icon, juce::Rectangle<float> area, juce::Colour colour, float strokeWidth)
 {
     const float side = juce::jmin (area.getWidth(), area.getHeight());

@@ -517,7 +517,7 @@ ControlBar::ControlBar (Studio& s) : studio (s)
     for (auto* b : { &toStart, &barBack, &barForward, &play, &stop, &record, &loop })
         addAndMakeVisible (b);
     addAndMakeVisible (readout);
-    for (auto* b : { &rigPane, &mixerPane })
+    for (auto* b : { &rigPane, &mixerPane, &loopsPane })
         addAndMakeVisible (b);
     for (auto* b : { &tuner, &settings })
         addAndMakeVisible (b);
@@ -543,6 +543,7 @@ ControlBar::ControlBar (Studio& s) : studio (s)
 
     rigPane.onClick   = [this] { invoke (cmd::showRig); };
     mixerPane.onClick = [this] { invoke (cmd::showMixer); };
+    loopsPane.onClick = [this] { invoke (cmd::showLoopGrid); };
     tuner.onClick     = [this] { invoke (cmd::showTuner); };
     settings.onClick  = [this] { invoke (cmd::audioSettings); };
 
@@ -695,10 +696,11 @@ void ControlBar::resized()
     {
         return juce::roundToInt (juce::GlyphArrangement::getStringWidth (segFont, b.getButtonText())) + 15 + 6 + 24;
     };
-    const int mixW = segWidth (mixerPane), rigW = segWidth (rigPane);
-    place (mixerPane, right - mixW, mixW);
+    const int mixW = segWidth (mixerPane), rigW = segWidth (rigPane), loopsW = segWidth (loopsPane);
+    place (loopsPane, right - loopsW, loopsW);
+    place (mixerPane, loopsPane.getX() - mixW, mixW);
     place (rigPane, mixerPane.getX() - rigW, rigW);
-    segmentTrack = rigPane.getBounds().getUnion (mixerPane.getBounds());
+    segmentTrack = rigPane.getBounds().getUnion (loopsPane.getBounds());
     right = segmentTrack.getX() - 16;
 
     // Centre: transport then readout, centred on the window when there's room.
@@ -805,6 +807,7 @@ void ControlBar::refreshTransport()
 
     rigPane.setSelected (studio.getPane() == Studio::Pane::rig);
     mixerPane.setSelected (studio.getPane() == Studio::Pane::mixer);
+    loopsPane.setSelected (studio.getPane() == Studio::Pane::loopGrid);
 }
 
 void ControlBar::refreshStatus()

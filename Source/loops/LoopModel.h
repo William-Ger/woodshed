@@ -84,9 +84,11 @@ void removeCell (daw::Project&, juce::ValueTree cell);
     track and a MIDI cell to an instrument track. Returns the cell at the target. */
 juce::ValueTree moveCell (daw::Project&, juce::ValueTree cell, juce::ValueTree toTrack, int column, bool copy);
 
-/** The cell played on its track over [from, to) as arrange regions: one per pass (the last
-    trimmed), so the arrange plays what the grid played. Returns the new regions' ids. */
-juce::Array<int> placeInArrange (daw::Project&, const juce::ValueTree& cell, juce::int64 from, juce::int64 to);
+/** The cell played over [from, to) as arrange regions on its track (or `onTrack`, of the same
+    kind): one per pass (the last trimmed), so the arrange plays what the grid played. Returns
+    the new regions' ids. */
+juce::Array<int> placeInArrange (daw::Project&, const juce::ValueTree& cell, juce::int64 from, juce::int64 to,
+                                 juce::ValueTree onTrack = {});
 
 /** The first column with no cell on the track, or -1. */
 int firstEmptyColumn (const juce::ValueTree& track, const juce::ValueTree& projectState);
