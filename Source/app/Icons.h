@@ -40,6 +40,7 @@ namespace woodshed::icons
     Icon keyboard();      // a few piano keys: instrument tracks
     Icon waveform();      // audio tracks
     Icon pianoRoll();     // the note editor: bars on a grid
+    Icon loopGrid();      // the Loop Grid: a grid of cells
 
     /** Draws an icon centred in `area`, scaled to fit, in `colour`. */
     void draw (juce::Graphics&, const Icon&, juce::Rectangle<float> area, juce::Colour colour, float strokeWidth = 1.6f);

@@ -2,6 +2,8 @@
 
 #include "../engine/Pedal.h"
 
+namespace juce { class ValueTree; }
+
 namespace woodshed
 {
 
@@ -64,8 +66,17 @@ public:
     virtual void update() {}
     virtual void render (float* left, float* right, int numSamples, const NoteEvent* events, int numEvents) = 0;
 
+    /** How many samples late the output comes (lookahead, oversampling); the mixer delays the
+        other tracks to match. */
+    virtual int getLatencySamples() const                       { return 0; }
+
     float knob (int index) const                                { return knobValues[(size_t) index]; }
     void setKnob (int index, float realValue)                   { knobValues[(size_t) index] = realValue; }
+
+    /** State beyond the knobs (the Sampler's zones and samples): the track's INSTRUMENT node and
+        the project folder its files are relative to. Called on the message thread whenever a
+        snapshot of the song is built, so return quickly when nothing changed. */
+    virtual void syncState (const juce::ValueTree& /*instrumentNode*/, const juce::File& /*projectFolder*/) {}
 
 protected:
     /** Allocate buffers here. sampleRate and maxBlock are valid. */
@@ -309,5 +320,6 @@ void registerSynthInstruments (InstrumentRegistry&);
 void registerKeyboardInstruments (InstrumentRegistry&);
 void registerDrumInstruments (InstrumentRegistry&);
 void registerOrchestralInstruments (InstrumentRegistry&);
+void registerSamplerInstruments (InstrumentRegistry&);       // Sampler.cpp
 
 } // namespace woodshed

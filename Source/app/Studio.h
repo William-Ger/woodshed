@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../daw/Engine.h"
+#include "../loops/LoopGrid.h"
+#include "../daw/Groups.h"
 #include <juce_audio_utils/juce_audio_utils.h>
 
 namespace woodshed::app
@@ -31,6 +33,22 @@ namespace cmd
     {
         flexTrack = 0x3100, flexMono, flexPoly, flexRhythmic, flexSpeed, quantizeAudio, followTempo, resetTiming,
         detectTempo, conformTempo, showPitchEdit, importTempoAsk, importTempoAlways, importTempoNever, conformImports
+    };
+
+    // Loop Grid (clip launching).
+    enum : juce::CommandID { showLoopGrid = 0x3300, loopGridStopAll, copyToLoopGrid, loopGridPerformRecord, loopGridAddScene };
+    // The Sampler (SamplerEditor.cpp).
+    enum : juce::CommandID { showSampler = 0x3000, newSamplerTrack, convertToSampler, convertToSamplerSlice };
+    // Spatial audio and video (MainComponent: the "spatial and video" cases).
+    enum : juce::CommandID
+    {
+        binauralMonitoring = 0x3500, spatialPanner, openMovie, removeMovie, importMovieAudio, showMovie
+    };
+
+    // Mixing and recording: Track Stacks, groups and VCAs, freeze, Autopunch (MixCommands.cpp).
+    enum : juce::CommandID
+    {
+        createTrackStack = 0x3200, freezeTrack, newVca, toggleAutopunch, punchToCycle
     };
 }
 
@@ -94,6 +112,13 @@ public:
     const juce::Array<int>& getSelectedRegions() const      { return selectedRegions; }
     void setSelectedRegions (const juce::Array<int>& regionIds);
     juce::ValueTree findRegion (int regionId) const;
+    /** Tracks selected together (Shift-click or Cmd-click in the headers, or a track group):
+        the selected track and any others. For Track Stacks. */
+    juce::Array<int> getSelectedTrackIds() const;
+    bool isTrackSelected (int trackId) const                { return trackId == getSelectedTrackId() || trackSelection.contains (trackId); }
+    /** Adds a track to the selection or takes it out (Cmd-click), or selects the run of tracks
+        from the selected one to it (Shift-click). */
+    void extendTrackSelection (int trackId, bool range);
 
     // Edits that several views trigger.
     /** An audio track after the selected one: through the guitar rig, or straight (a voice or
@@ -179,9 +204,18 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer, pitchEdit };
+    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer, sampler, loopGrid, pitchEdit };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
+
+    // Loop Grid -----------------------------------------------------------------------
+    /** Launching cells and scenes, recording into cells, perform recording. */
+    loops::LoopGrid& loopGrid()                             { return *loopGridInstance; }
+    /** Copies each selected region into the first empty cell of its track's grid (one undo step). */
+    void copySelectedToLoopGrid();
+    /** Set by the Loop Grid while it's shown: regions dragged off the arrange and let go at a
+        screen position. True if it took them (then the arrange doesn't move them). */
+    std::function<bool (juce::Point<int> screenPos, const juce::Array<int>& regionIds)> dropRegionsOnLoopGrid;
 
     /** A short message for the status line (saved, bounced, errors). */
     void flash (const juce::String& message);
@@ -211,6 +245,7 @@ private:
 
     juce::ApplicationProperties& appSettings;
     std::unique_ptr<daw::Engine> engineInstance;
+    std::unique_ptr<loops::LoopGrid> loopGridInstance;
     std::unique_ptr<PluginHost> pluginHost;
     std::unique_ptr<daw::Project> currentProject;
     std::unique_ptr<juce::FileChooser> chooser;
@@ -218,6 +253,8 @@ private:
 
     juce::ListenerList<ProjectSwapListener> swapListeners;
     juce::Array<int> selectedRegions;
+    juce::Array<int> trackSelection;                        // besides the selected track
+    std::unique_ptr<daw::groups::Linker> groupLinker;       // grouped tracks move together
     juce::ValueTree clipboard;
     Pane pane = Pane::rig;
     int editorRegionId = -1, takeFolderId = -1, pitchEditRegionId = -1;

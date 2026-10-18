@@ -35,7 +35,11 @@ set(WOODSHED_ENGINE_SOURCES
     Source/instruments/Synths.cpp
     Source/instruments/Drums.cpp
     Source/instruments/Orchestral.cpp
-    Source/instruments/Plucked.cpp)
+    Source/instruments/Plucked.cpp
+    # --- sampler ---
+    Source/instruments/Sampler.cpp
+    # --- end sampler ---
+    )
 
 # The multitrack engine (song model, playback, recording, bounce); no UI.
 set(WOODSHED_DAW_SOURCES
@@ -62,6 +66,23 @@ set(WOODSHED_FLEX_APP_SOURCES
     Source/app/PitchEditor.cpp
     Source/app/FlexCommands.cpp)
 # --- end flex ---
+# --- loopgrid ---
+# The Loop Grid (clip launching): its model, the engine's audio-thread player and the controller.
+list(APPEND WOODSHED_DAW_SOURCES
+    Source/loops/LoopModel.cpp
+    Source/loops/LoopPlayer.cpp
+    Source/loops/LoopGrid.cpp)
+# --- end loopgrid ---
+# --- spatial ---
+# 3D panning (binaural and stereo) and the surround bounce's speaker layouts; part of the engine.
+set(WOODSHED_SPATIAL_SOURCES
+    Source/spatial/Spatial.cpp)
+list(APPEND WOODSHED_DAW_SOURCES ${WOODSHED_SPATIAL_SOURCES})
+# --- end spatial ---
+
+# --- mixing (track stacks, groups and VCAs, delay compensation, freeze, punch) ---
+list(APPEND WOODSHED_DAW_SOURCES Source/daw/Stacks.cpp Source/daw/Groups.cpp Source/daw/Freeze.cpp)
+# --- end mixing ---
 
 # The Score editor's notation layout and drawing (no Component code); shared with the bench.
 set(WOODSHED_SCORE_SOURCES
@@ -128,6 +149,10 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/MusicalTyping.cpp
         Source/app/PluginHost.cpp
         Source/app/TakesEditor.cpp
+        # --- sampler ---
+        Source/app/SamplerEditor.cpp
+        Source/instruments/SamplerTrack.cpp
+        # --- end sampler ---
         Source/app/StudioLookAndFeel.cpp
         Source/app/WindowStyle_other.cpp
         ${WOODSHED_RIG_SOURCES}
@@ -137,6 +162,29 @@ if(NOT WOODSHED_BENCH_ONLY)
     if(APPLE)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
+
+    # --- loopgrid ---
+    target_sources(WoodshedStudio PRIVATE Source/app/LoopGridView.cpp)
+    # --- end loopgrid ---
+    # --- spatial and video ---
+    # The 3D panner's popover, the movie window and the arrange view's movie strip. Movie
+    # playback is juce_video (macOS: AVFoundation, AVKit and CoreMedia, which the module links
+    # itself; Windows: DirectShow), so it's only linked there; Linux shows a notice instead.
+    target_sources(WoodshedStudio PRIVATE
+        Source/app/SpatialPanner.cpp
+        Source/app/Movie.cpp
+        Source/video/MovieMedia_other.cpp)
+    if(APPLE)
+        target_sources(WoodshedStudio PRIVATE Source/video/MovieMedia_mac.mm)
+    endif()
+    if(APPLE OR WIN32)
+        target_link_libraries(WoodshedStudio PRIVATE juce::juce_video)
+    endif()
+    # --- end spatial and video ---
+
+    # --- mixing ---
+    target_sources(WoodshedStudio PRIVATE Source/app/MixCommands.cpp)
+    # --- end mixing ---
 
     # The studio's typefaces: Inter and JetBrains Mono (both SIL Open Font License; see art/fonts).
     file(GLOB WOODSHED_FONTS CONFIGURE_DEPENDS art/fonts/*.ttf)
@@ -233,7 +281,16 @@ endif()
 juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
 target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp tools/bench/ScoreTest.cpp tools/bench/DrummerTest.cpp
     ${WOODSHED_SCORE_SOURCES} ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
+# --- sampler ---
+target_sources(WoodshedBench PRIVATE tools/bench/SamplerTest.cpp Source/instruments/SamplerTrack.cpp)
+# --- end sampler ---
+# --- mixing ---
+target_sources(WoodshedBench PRIVATE tools/bench/MixTest.cpp)
+# --- end mixing ---
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+# --- loopgrid ---
+target_sources(WoodshedBench PRIVATE tools/bench/LoopGridTest.cpp)
+# --- end loopgrid ---
 target_link_libraries(WoodshedBench
     PRIVATE
         juce::juce_dsp
@@ -252,3 +309,6 @@ if(NOT WOODSHED_BENCH_ONLY)
     target_sources(WoodshedStudio PRIVATE ${WOODSHED_FLEX_APP_SOURCES})
 endif()
 # --- end flex ---
+# --- spatial ---
+target_sources(WoodshedBench PRIVATE tools/bench/SpatialTest.cpp)
+# --- end spatial ---

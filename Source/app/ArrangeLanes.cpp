@@ -3,6 +3,8 @@
 #include "ArrangeView.h"
 #include "ChannelStrip.h"
 #include "FlexCommands.h"
+#include "SamplerEditor.h"
+#include "MixCommands.h"
 
 namespace woodshed::app::arrange
 {
@@ -851,6 +853,10 @@ void Lanes::mouseDown (const juce::MouseEvent& e)
         studio.setSelectedRegions ({ id });
     }
 
+    // A frozen track's regions can be selected, not moved or trimmed (unfreeze first).
+    if (hit.trackIndex >= 0 && mixui::blockedByFreeze (studio, view.project().track (hit.trackIndex)))
+        return;
+
     grabbed = hit.region;
     grabbedTrack = hit.trackIndex;
     grabbedPart = hit.part;
@@ -987,7 +993,11 @@ void Lanes::mouseUp (const juce::MouseEvent& e)
         flex.mouseUp (e);
         return;
     }
-    switch (gesture)
+    // Regions dragged off the lanes onto the Loop Grid are copied into a cell there instead.
+    const bool toLoopGrid = gesture == Gesture::move && ! getLocalBounds().contains (e.getPosition())
+                            && view.studio.dropRegionsOnLoopGrid && view.studio.dropRegionsOnLoopGrid (e.getScreenPosition(), view.studio.getSelectedRegions());
+
+    switch (toLoopGrid ? Gesture::none : gesture)
     {
         case Gesture::move:      commitMove (e.mods.isAltDown()); break;
         case Gesture::trimLeft:
@@ -1426,6 +1436,13 @@ void Lanes::showRegionMenu()
                     studio.quantizeNotes (studio.findRegion (id), {}, t);
             });
         m.addSubMenu ("Quantize Notes", q);
+    }
+    // Audio regions: play them from a Sampler track.
+    if (SamplerEditor::canConvertSelection (studio))
+    {
+        m.addSeparator();
+        m.addItem ("Convert to Sampler Track", [&studio] { SamplerEditor::convertSelectedRegion (studio, sampler::Mode::classic); });
+        m.addItem ("Convert to Sampler Track (Slice)", [&studio] { SamplerEditor::convertSelectedRegion (studio, sampler::Mode::slice); });
     }
     m.addSeparator();
     m.addItem ("Delete", [&studio] { studio.deleteSelectedRegions(); });

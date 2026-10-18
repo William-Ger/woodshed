@@ -17,6 +17,7 @@ class ParamGrid final : public juce::Component
 {
 public:
     ParamGrid();
+    ~ParamGrid() override;
 
     /** Rebuilds the controls (only when the specs actually change). */
     void setSpecs (const std::vector<KnobSpec>&, juce::Colour accent);

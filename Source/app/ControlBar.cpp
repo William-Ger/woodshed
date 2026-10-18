@@ -514,10 +514,10 @@ void ControlBar::MasterLook::drawLinearSlider (juce::Graphics& g, int x, int y, 
 //==============================================================================
 ControlBar::ControlBar (Studio& s) : studio (s)
 {
-    for (auto* b : { &toStart, &barBack, &barForward, &play, &stop, &record, &loop })
+    for (auto* b : { &toStart, &barBack, &barForward, &play, &stop, &record, &loop, &punch })
         addAndMakeVisible (b);
     addAndMakeVisible (readout);
-    for (auto* b : { &rigPane, &mixerPane })
+    for (auto* b : { &rigPane, &mixerPane, &loopsPane })
         addAndMakeVisible (b);
     for (auto* b : { &tuner, &settings })
         addAndMakeVisible (b);
@@ -537,12 +537,14 @@ ControlBar::ControlBar (Studio& s) : studio (s)
     };
     record.onClick     = [this] { invoke (cmd::record); };
     loop.onClick       = [this] { invoke (cmd::toggleLoop); };
+    punch.onClick      = [this] { invoke (cmd::toggleAutopunch); };
 
     readout.click.onClick   = [this] { invoke (cmd::toggleClick); };
     readout.countIn.onClick = [this] { invoke (cmd::toggleCountIn); };
 
     rigPane.onClick   = [this] { invoke (cmd::showRig); };
     mixerPane.onClick = [this] { invoke (cmd::showMixer); };
+    loopsPane.onClick = [this] { invoke (cmd::showLoopGrid); };
     tuner.onClick     = [this] { invoke (cmd::showTuner); };
     settings.onClick  = [this] { invoke (cmd::audioSettings); };
 
@@ -695,10 +697,11 @@ void ControlBar::resized()
     {
         return juce::roundToInt (juce::GlyphArrangement::getStringWidth (segFont, b.getButtonText())) + 15 + 6 + 24;
     };
-    const int mixW = segWidth (mixerPane), rigW = segWidth (rigPane);
-    place (mixerPane, right - mixW, mixW);
+    const int mixW = segWidth (mixerPane), rigW = segWidth (rigPane), loopsW = segWidth (loopsPane);
+    place (loopsPane, right - loopsW, loopsW);
+    place (mixerPane, loopsPane.getX() - mixW, mixW);
     place (rigPane, mixerPane.getX() - rigW, rigW);
-    segmentTrack = rigPane.getBounds().getUnion (mixerPane.getBounds());
+    segmentTrack = rigPane.getBounds().getUnion (loopsPane.getBounds());
     right = segmentTrack.getX() - 16;
 
     // Centre: transport then readout, centred on the window when there's room.
@@ -707,7 +710,7 @@ void ControlBar::resized()
     int available = right - (left + minTitle + 16);
 
     bool showBarButtons = true;
-    int transportW = 7 * bw + 5 * gap + 9;
+    int transportW = 8 * bw + 6 * gap + 9;
     int readoutW = Readout::preferredWidth;
     if (transportW + 12 + readoutW > available)
         readoutW = juce::jmax (Readout::minimumWidth, available - transportW - 12);
@@ -733,7 +736,8 @@ void ControlBar::resized()
     }
     x += 7;
     place (loop, x, bw);
-    x = loop.getRight() + 12;
+    place (punch, loop.getRight() + gap, bw);
+    x = punch.getRight() + 12;
     readout.setBounds (x, midY - 20, readoutW, 40);
 
     titleBounds = { left, 0, juce::jmax (0, toStart.getX() - 16 - left), h };
@@ -784,6 +788,7 @@ void ControlBar::refreshFromProject()
 {
     const auto& s = studio.project().state;
     loop.setLit ((bool) s.getProperty (daw::ids::loopOn, false));
+    punch.setLit ((bool) s.getProperty (daw::ids::punchOn, false));
     master.setValue ((double) s.getProperty (daw::ids::masterVolume, 0.0), juce::dontSendNotification);
     master.setTooltip ("Master volume: " + formatDb (master.getValue()) + " (double-click: 0 dB)");
     readout.projectChanged();
@@ -805,6 +810,7 @@ void ControlBar::refreshTransport()
 
     rigPane.setSelected (studio.getPane() == Studio::Pane::rig);
     mixerPane.setSelected (studio.getPane() == Studio::Pane::mixer);
+    loopsPane.setSelected (studio.getPane() == Studio::Pane::loopGrid);
 }
 
 void ControlBar::refreshStatus()
@@ -860,7 +866,7 @@ void ControlBar::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Id
 
     using namespace daw::ids;
     if (id == tempo || id == beatsPerBar || id == beatUnit || id == click || id == countIn
-        || id == loopOn || id == masterVolume || id == name || id == sampleRate)
+        || id == loopOn || id == masterVolume || id == name || id == sampleRate || id == punchOn)
         refreshFromProject();
 }
 

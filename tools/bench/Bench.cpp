@@ -7,8 +7,12 @@
 //   woodshed-bench project      (multitrack engine checks; see ProjectTest.cpp)
 //   woodshed-bench flex         (Time Stretch, Pitch Edit, Tempo Detect; see FlexTest.cpp)
 //   woodshed-bench score        (Score editor notation layout checks; see ScoreTest.cpp)
+//   woodshed-bench spatial      (3D panner, surround bounce and movie sync checks; see SpatialTest.cpp)
 //   woodshed-bench instruments [type ...] [--render dir] [--analyse]   (see InstrumentTest.cpp)
 //   woodshed-bench pitchcorrect [--wav guitar.wav] [--render outDir]   (PLUMB accuracy in cents)
+//   woodshed-bench loopgrid     (Loop Grid clip launching checks; see LoopGridTest.cpp)
+//   woodshed-bench sampler      (the Sampler instrument; see SamplerTest.cpp)
+//   woodshed-bench mix          (stacks, groups, VCAs, delay compensation, freeze, punch; see MixTest.cpp)
 //
 // Each pedal runs alone at 48 kHz in 64-sample blocks, through the same Chain
 // code the app uses. A pedal fails if it produces NaN/inf, makes noise from
@@ -878,6 +882,8 @@ void printKnobs (const juce::StringArray& only)
 } // namespace
 
 int runProjectTest();
+int runMixTest (const juce::StringArray&);
+int writeMixDemoProject (const juce::File& folder);
 int runScoreTest();
 int renderScoreSamples (const juce::File&);
 int runInstrumentTest (const juce::StringArray& args);
@@ -887,6 +893,12 @@ int writeDrummerDemoProject (const juce::File&);
 int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
 int runFlexTest(); int writeFlexDemoProject (const juce::File&);
+int runLoopGridTest();
+int writeLoopGridDemoProject (const juce::File&);
+int runSamplerTest (const juce::StringArray&);          // SamplerTest.cpp
+int writeSamplerDemoProject (const juce::File&);
+int runSpatialTest();
+int writeSpatialDemoProject (const juce::File&, const juce::File& movie);
 
 int main (int argc, char* argv[])
 {
@@ -937,6 +949,8 @@ int main (int argc, char* argv[])
 
     if (args[0] == "project")
         return runProjectTest();
+    if (args[0] == "mix")
+        return runMixTest (args);
 
     if (args[0] == "flex" || args[0] == "demo-flex") { return args[0] == "flex" ? runFlexTest() : writeFlexDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])); }
 
@@ -962,8 +976,20 @@ int main (int argc, char* argv[])
         return runDrummerTest (args);
     }
 
+    if (args[0] == "sampler")          return runSamplerTest (args);
+    if (args[0] == "demo-sampler" && args.size() > 1) return writeSamplerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+    if (args[0] == "spatial") return runSpatialTest();
+    if (args[0] == "demo-spatial" && args.size() > 1)
+        return writeSpatialDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]),
+                                        args.size() > 2 ? juce::File::getCurrentWorkingDirectory().getChildFile (args[2]) : juce::File());
+
     if (args[0] == "demo-drummer" && args.size() > 1)
         return writeDrummerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+
+    if (args[0] == "loopgrid") return runLoopGridTest();
+    if (args[0] == "demo-loopgrid" && args.size() > 1) return writeLoopGridDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+    if (args[0] == "demo-mix" && args.size() > 1)
+        return writeMixDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
 
     if (args[0] == "demo-midi" && args.size() > 1)
         return writeMidiDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
@@ -985,8 +1011,11 @@ int main (int argc, char* argv[])
                      " | presets [file.json ...] [--wav file] [--render dir]"
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
-                     " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>"
-                     " | flex | demo-flex <folder>\n";
+                     " | loopgrid | demo-loopgrid <folder>"
+                     " | spatial | demo-spatial <folder> [movie]"
+                     " | mix"
+                     " | demo-midi <folder> | demo-drummer <folder> | demo-mix <folder> | render-project <folder> <out.wav>"
+                     " | sampler | demo-sampler <folder> | flex | demo-flex <folder>\n";
         return 2;
     }
 

@@ -119,6 +119,8 @@ ParamGrid::ParamGrid()
     setInterceptsMouseClicks (false, true);
 }
 
+ParamGrid::~ParamGrid() = default;      // here, where Cell is complete, so other panes can hold a ParamGrid
+
 void ParamGrid::setSpecs (const std::vector<KnobSpec>& specs, juce::Colour newAccent)
 {
     juce::StringArray idsNow;
