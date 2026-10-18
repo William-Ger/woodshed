@@ -100,6 +100,46 @@ private:
 };
 
 //==============================================================================
+/** The master output for meters (the Mastering pane's loudness meter): the audio thread copies
+    every block in while it's enabled, one reader drains it on the message thread. Preallocated,
+    so the audio thread never allocates; when the reader falls behind, audio is dropped. */
+struct OutputTap
+{
+    static constexpr int capacity = 1 << 15;
+
+    OutputTap() : left ((size_t) capacity), right ((size_t) capacity) {}
+
+    std::atomic<bool> enabled { false };
+
+    /** Audio thread. */
+    void push (const float* l, const float* r, int n) noexcept
+    {
+        if (! enabled.load (std::memory_order_relaxed))
+            return;
+        const auto scope = fifo.write (juce::jmin (n, fifo.getFreeSpace()));
+        std::copy (l, l + scope.blockSize1, left.data() + scope.startIndex1);
+        std::copy (r, r + scope.blockSize1, right.data() + scope.startIndex1);
+        std::copy (l + scope.blockSize1, l + scope.blockSize1 + scope.blockSize2, left.data() + scope.startIndex2);
+        std::copy (r + scope.blockSize1, r + scope.blockSize1 + scope.blockSize2, right.data() + scope.startIndex2);
+    }
+
+    /** Message thread: up to `max` samples into l and r; returns how many. */
+    int pull (float* l, float* r, int max) noexcept
+    {
+        const auto scope = fifo.read (juce::jmin (max, fifo.getNumReady()));
+        std::copy (left.data() + scope.startIndex1, left.data() + scope.startIndex1 + scope.blockSize1, l);
+        std::copy (right.data() + scope.startIndex1, right.data() + scope.startIndex1 + scope.blockSize1, r);
+        std::copy (left.data() + scope.startIndex2, left.data() + scope.startIndex2 + scope.blockSize2, l + scope.blockSize1);
+        std::copy (right.data() + scope.startIndex2, right.data() + scope.startIndex2 + scope.blockSize2, r + scope.blockSize1);
+        return scope.blockSize1 + scope.blockSize2;
+    }
+
+private:
+    juce::AbstractFifo fifo { capacity };
+    std::vector<float> left, right;
+};
+
+//==============================================================================
 /** A stereo history of a track's signal for delay compensation: written once per block, read
     back at any delay up to its capacity less the block. Fixed size, so the audio thread never
     allocates; one that was never allocated reads as no delay. */
@@ -356,6 +396,8 @@ public:
     struct Levels { float left = 0.0f, right = 0.0f; };
     Levels takeTrackLevels (int trackId);
     Levels takeMasterLevels();
+    /** The master output, sample by sample, for loudness meters (enable it to fill it). */
+    OutputTap& getOutputTap()                               { return outputTap; }
 
     /** Feedback protection: while on, no track plays its live input (recording still works).
         For a computer's own microphone and speakers, which would howl. */
@@ -505,6 +547,7 @@ private:
     std::atomic<float> clickLevel { 0.3f };
     std::atomic<bool> feedbackProtection { false };
     Levels masterShown;
+    OutputTap outputTap;
     std::atomic<juce::uint64> callbackCount { 0 };
 
     // Live MIDI in, and what the audio thread records of it for the message thread.

@@ -50,6 +50,9 @@ namespace cmd
     {
         createTrackStack = 0x3200, freezeTrack, newVca, toggleAutopunch, punchToCycle
     };
+
+    // Mastering (Source/mastering, MasteringPanel): the Mix menu's Mastering... and the pane.
+    enum : juce::CommandID { mastering = 0x3400, showMastering };
 }
 
 /**
@@ -204,7 +207,7 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer, sampler, loopGrid, pitchEdit };
+    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer, sampler, loopGrid, pitchEdit, mastering };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
 

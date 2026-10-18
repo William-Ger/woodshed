@@ -11,6 +11,7 @@
 #include "StepSequencer.h"
 #include "MusicalTyping.h"
 #include "TakesEditor.h"
+#include "MasteringPanel.h"
 #include "PitchEditor.h"
 #include "LoopGridView.h"
 #include "SamplerEditor.h"
@@ -61,6 +62,7 @@ private:
     PitchEditor pitchEditor;
     LoopGridView loopGridView;
     SamplerEditor samplerEditor;
+    MasteringPanel masteringPanel;
     std::unique_ptr<MovieController> movie;         // spatial and video
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */

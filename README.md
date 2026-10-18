@@ -42,6 +42,10 @@ feel familiar), but it's its own program, written from scratch.
 
 **Mixing**
 - Mixer with sends, aux buses and master effects
+- Mastering: EBU R128 loudness meters (momentary, short-term, integrated, loudness range,
+  true peak), correlation and a spectrum, and an assistant that masters the song to a
+  loudness target (streaming, podcast, CD, club) with a matching EQ, bus compression, width
+  and a true-peak limiter
 - 92 effects: dynamics, EQ, drive, amps and cabinets, modulation, pitch (including vocal pitch
   correction), delay, reverb and a drawer full of strange ones
 - Automation for volume, pan, sends and every instrument and effect knob
@@ -67,7 +71,7 @@ feel familiar), but it's its own program, written from scratch.
 
 Woodshed is young. Things the big DAWs have that it doesn't yet: Live Loops, a sampler
 instrument, track stacks, groups and VCAs, punch in/out, track freeze, plug-in delay
-compensation and a mastering assistant. Contributions are very welcome.
+compensation. Contributions are very welcome.
 
 Surround is bounce-only: the engine plays in stereo, so while you work you hear 3D tracks
 binaurally on headphones (or panned in stereo), and the 5.1 and 7.1.4 mixes exist only as

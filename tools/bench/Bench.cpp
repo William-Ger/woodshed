@@ -892,6 +892,8 @@ int runDrummerTest (const juce::StringArray&);
 int writeDrummerDemoProject (const juce::File&);
 int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
+int runMasteringTest();                                         // MasteringTest.cpp
+int writeMasteringDemoProject (const juce::File&);
 int runFlexTest(); int writeFlexDemoProject (const juce::File&);
 int runLoopGridTest();
 int writeLoopGridDemoProject (const juce::File&);
@@ -952,6 +954,10 @@ int main (int argc, char* argv[])
     if (args[0] == "mix")
         return runMixTest (args);
 
+    if (args[0] == "mastering")
+        return runMasteringTest();
+    if (args[0] == "demo-mastering" && args.size() > 1)
+        return writeMasteringDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
     if (args[0] == "flex" || args[0] == "demo-flex") { return args[0] == "flex" ? runFlexTest() : writeFlexDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])); }
 
     if (args[0] == "score")
@@ -1014,6 +1020,7 @@ int main (int argc, char* argv[])
                      " | loopgrid | demo-loopgrid <folder>"
                      " | spatial | demo-spatial <folder> [movie]"
                      " | mix"
+                     " | mastering | demo-mastering <folder>"
                      " | demo-midi <folder> | demo-drummer <folder> | demo-mix <folder> | render-project <folder> <out.wav>"
                      " | sampler | demo-sampler <folder> | flex | demo-flex <folder>\n";
         return 2;

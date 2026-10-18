@@ -41,6 +41,14 @@ set(WOODSHED_ENGINE_SOURCES
     # --- end sampler ---
     )
 
+# --- mastering ---
+# Loudness metering and the mastering processor (a Registry pedal, so the rig plug-in has it too).
+list(APPEND WOODSHED_ENGINE_SOURCES
+    Source/mastering/Loudness.cpp
+    Source/mastering/MasteringProcessor.cpp
+    Source/mastering/Assistant.cpp)
+# --- end mastering ---
+
 # The multitrack engine (song model, playback, recording, bounce); no UI.
 set(WOODSHED_DAW_SOURCES
     Source/daw/Project.cpp
@@ -163,6 +171,9 @@ if(NOT WOODSHED_BENCH_ONLY)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
 
+    # --- mastering ---
+    target_sources(WoodshedStudio PRIVATE Source/app/MasteringPanel.cpp)
+    # --- end mastering ---
     # --- loopgrid ---
     target_sources(WoodshedStudio PRIVATE Source/app/LoopGridView.cpp)
     # --- end loopgrid ---
@@ -281,6 +292,9 @@ endif()
 juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
 target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp tools/bench/ScoreTest.cpp tools/bench/DrummerTest.cpp
     ${WOODSHED_SCORE_SOURCES} ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
+# --- mastering ---
+target_sources(WoodshedBench PRIVATE tools/bench/MasteringTest.cpp)
+# --- end mastering ---
 # --- sampler ---
 target_sources(WoodshedBench PRIVATE tools/bench/SamplerTest.cpp Source/instruments/SamplerTrack.cpp)
 # --- end sampler ---

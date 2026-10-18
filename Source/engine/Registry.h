@@ -47,5 +47,6 @@ void registerReverbPedals (Registry&);
 void registerAmpCabPedals (Registry&);
 void registerGlitchPedals (Registry&);
 void registerWeirdPedals (Registry&);
+void registerMasteringPedals (Registry&);     // Source/mastering
 
 } // namespace woodshed

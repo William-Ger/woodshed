@@ -120,6 +120,11 @@ public:
 
     virtual int getLatencySamples() const                       { return 0; }
 
+    /** Message thread: settings that aren't knobs (an insert's FX node `state`), for the few
+        pedals that have any, e.g. the mastering processor's matching EQ curve. Pass them to
+        the audio thread lock-free. */
+    virtual void setState (const juce::String&)                 {}
+
     float knob (int index) const                                { return knobValues[(size_t) index]; }
     void setKnob (int index, float realValue)                   { knobValues[(size_t) index] = realValue; }
 
