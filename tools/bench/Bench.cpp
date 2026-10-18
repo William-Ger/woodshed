@@ -879,6 +879,7 @@ void printKnobs (const juce::StringArray& only)
 
 int runProjectTest();
 int runMixTest (const juce::StringArray&);
+int writeMixDemoProject (const juce::File& folder);
 int runScoreTest();
 int renderScoreSamples (const juce::File&);
 int runInstrumentTest (const juce::StringArray& args);
@@ -965,6 +966,9 @@ int main (int argc, char* argv[])
     if (args[0] == "demo-drummer" && args.size() > 1)
         return writeDrummerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
 
+    if (args[0] == "demo-mix" && args.size() > 1)
+        return writeMixDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+
     if (args[0] == "demo-midi" && args.size() > 1)
         return writeMidiDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
 
@@ -986,7 +990,7 @@ int main (int argc, char* argv[])
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
                      " | mix"
-                     " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>\n";
+                     " | demo-midi <folder> | demo-drummer <folder> | demo-mix <folder> | render-project <folder> <out.wav>\n";
         return 2;
     }
 

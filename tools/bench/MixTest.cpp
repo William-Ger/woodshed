@@ -599,3 +599,120 @@ int runMixTest (const juce::StringArray&)
     std::cout << (failures == 0 ? "all mix checks passed\n" : juce::String (failures) + " mix checks failed\n");
     return failures == 0 ? 0 : 1;
 }
+
+/** woodshed-bench demo-mix <folder>: a song using the mixing features, for screenshots and UI
+    work: a summing stack of drums, a folder stack of keys, two groups, a VCA, a frozen lead and
+    an Autopunch range. */
+int writeMixDemoProject (const juce::File& folder);
+int writeMixDemoProject (const juce::File& folder)
+{
+    juce::ScopedJuceInitialiser_GUI init;
+    folder.deleteRecursively();
+    auto project = Project::createIn (folder, rate);
+    project->state.setProperty (ids::name, "Mix Demo", nullptr);
+    project->state.setProperty (ids::tempo, 100.0, nullptr);
+    const auto grid = project->grid();
+    const auto bar = (juce::int64) std::llround (grid.samplesPerBar());
+    constexpr int q = woodshed::daw::ticksPerQuarter;
+
+    auto addInstrument = [&] (const juce::String& name, const juce::String& type, const juce::String& patchName)
+    {
+        auto* t = woodshed::InstrumentRegistry::get().find (type);
+        const woodshed::InstrumentInfo::Patch* patch = nullptr;
+        if (t != nullptr)
+            for (auto& p : t->info.patches)
+                if (p.name == patchName)
+                    patch = &p;
+        return project->addInstrumentTrack (name, type, patch != nullptr ? patch->name : juce::String(),
+                                            t != nullptr ? woodshed::patchValues (t->info, patch) : std::vector<float>());
+    };
+    auto defaults = [] (const juce::String& type)
+    {
+        std::vector<float> values;
+        if (auto* pt = woodshed::Registry::get().find (type))
+            for (auto& k : pt->info.knobs)
+                values.push_back (k.def);
+        return values;
+    };
+
+    // Drums: kick and snare on their own tracks, summed through a compressed stack main.
+    auto kick = addInstrument ("Kick", "drums.kit", {});
+    auto snare = addInstrument ("Snare", "drums.kit", {});
+    auto kickRegion = project->addMidiRegion (kick, 0, bar * 8, "Kick");
+    auto snareRegion = project->addMidiRegion (snare, 0, bar * 8, "Snare");
+    for (int b = 0; b < 8; ++b)
+        for (int s = 0; s < 16; s += 2)
+        {
+            const auto at = (juce::int64) (b * 16 + s) * q / 4;
+            if (s == 0 || s == 10)  project->addNote (kickRegion, { 36, 115, at, q / 4 });
+            if (s == 4 || s == 12)  project->addNote (snareRegion, { 38, 110, at, q / 4 });
+        }
+
+    // Keys: chords and bass, in a folder stack.
+    const std::vector<std::vector<int>> chords { { 60, 64, 67 }, { 57, 60, 64 }, { 53, 57, 60 }, { 55, 59, 62 } };
+    auto pads = addInstrument ("Pads", "synth.analog", "Classic Poly");
+    auto bass = addInstrument ("Bass", "synth.analog", "Sub Bass");
+    auto padRegion = project->addMidiRegion (pads, 0, bar * 8, "Chords");
+    auto bassRegion = project->addMidiRegion (bass, 0, bar * 8, "Bass");
+    for (int b = 0; b < 8; ++b)
+    {
+        for (int pitch : chords[(size_t) (b % 4)])
+            project->addNote (padRegion, { pitch, 90, (juce::int64) b * 4 * q, (juce::int64) q * 4 - 60 });
+        project->addNote (bassRegion, { chords[(size_t) (b % 4)][0] - 24, 110, (juce::int64) b * 4 * q, (juce::int64) q * 2 });
+    }
+
+    auto lead = addInstrument ("Lead", "synth.analog", "Saw Lead");
+    auto leadRegion = project->addMidiRegion (lead, bar * 4, bar * 4, "Melody");
+    const int melody[] { 72, 74, 76, 79, 76, 74, 72, 69, 72, 76, 77, 76, 74, 71, 74, 79 };
+    for (int i = 0; i < 16; ++i)
+        project->addNote (leadRegion, { melody[i], 100, (juce::int64) i * q, (juce::int64) q - 60 });
+    project->addInsert (lead, "dyn.limiter", defaults ("dyn.limiter"));
+
+    auto drums = stacks::create (*project, { (int) kick[ids::id], (int) snare[ids::id] }, stacks::Type::summing, "Drums");
+    project->addInsert (drums, "dyn.compressor", defaults ("dyn.compressor"));
+    auto keys = stacks::create (*project, { (int) pads[ids::id], (int) bass[ids::id] }, stacks::Type::folder, "Keys");
+    keys.setProperty (ids::volume, -3.0, nullptr);
+
+    const int rhythm = groups::add (*project, "Rhythm");
+    groups::assign (*project, kick, rhythm);
+    groups::assign (*project, snare, rhythm);
+    const int harmony = groups::add (*project, "Harmony");
+    groups::assign (*project, pads, harmony);
+    groups::assign (*project, bass, harmony);
+
+    auto vca = stacks::addVca (*project, "Band VCA");
+    for (auto t : { kick, snare, bass })
+        t.setProperty (ids::vca, vca[ids::id], nullptr);
+    project->setAutomation (vca, "volume", { { 0, -12.0f }, { bar * 2, 0.0f } });
+
+    // Autopunch over bars 3 and 4.
+    project->state.setProperty (ids::punchOn, true, nullptr);
+    project->state.setProperty (ids::punchIn, grid.barStartSample (2), nullptr);
+    project->state.setProperty (ids::punchOut, grid.barStartSample (4), nullptr);
+
+    // The lead, frozen.
+    {
+        juce::AudioDeviceManager devices;
+        Engine engine (devices, {}, [] (const juce::String& type) -> std::unique_ptr<woodshed::Instrument>
+                       {
+                           if (auto* t = woodshed::InstrumentRegistry::get().find (type))
+                               return t->create();
+                           return nullptr;
+                       });
+        engine.prepare (rate, 512);
+        engine.setProject (project.get());
+        const auto file = engine.freezeFileFor (lead);
+        if (engine.renderFreeze (lead, file))
+        {
+            lead.setProperty (ids::freezeFile, file.getRelativePathFrom (project->folder).replaceCharacter ('\\', '/'), nullptr);
+            lead.setProperty (ids::frozen, true, nullptr);
+        }
+        engine.setProject (nullptr);
+    }
+
+    project->state.setProperty (ids::selectedTrack, kick[ids::id], nullptr);
+    if (! project->save())
+        return 1;
+    std::cout << "wrote " << project->projectFile().getFullPathName() << "\n";
+    return 0;
+}

@@ -124,6 +124,10 @@ if(NOT WOODSHED_BENCH_ONLY)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
 
+    # --- mixing ---
+    target_sources(WoodshedStudio PRIVATE Source/app/MixCommands.cpp)
+    # --- end mixing ---
+
     # The studio's typefaces: Inter and JetBrains Mono (both SIL Open Font License; see art/fonts).
     file(GLOB WOODSHED_FONTS CONFIGURE_DEPENDS art/fonts/*.ttf)
     juce_add_binary_data(WoodshedFonts HEADER_NAME FontData.h NAMESPACE FontData SOURCES ${WOODSHED_FONTS})

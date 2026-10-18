@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Project.h"
+#include <map>
+#include <optional>
 
 namespace woodshed::daw
 {
