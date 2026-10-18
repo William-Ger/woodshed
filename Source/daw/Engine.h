@@ -7,6 +7,8 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
+namespace woodshed::flex { class Renderer; }
+
 namespace woodshed::daw
 {
 
@@ -23,6 +25,12 @@ public:
     void clear()                                    { cache.clear(); }
 
     juce::AudioFormatManager formats;
+
+    /** Time Stretch and Pitch Edit (Source/flex): what an audio region plays instead of its
+        file's audio (or that audio itself). `wait` renders now instead of in the background
+        (bounces). Unset, every region plays its file as it is. */
+    std::function<Audio (const juce::ValueTree& region, const juce::File&, const Audio&, bool wait)> regionAudio;
+    bool waitForRenders = false;
 
 private:
     std::map<juce::String, Audio> cache;
@@ -312,6 +320,8 @@ public:
     std::function<void (juce::AudioProcessor&)> settleRig;
 
     AudioPool& getAudioPool()                               { return pool; }
+    /** Time Stretch and Pitch Edit renders, and the analyses behind them (Source/flex). */
+    flex::Renderer& getFlexRenderer()                       { return *flexRenderer; }
     juce::AudioDeviceManager& getDeviceManager()            { return deviceManager; }
 
     /** Builds a snapshot of `project` using the given runtimes (by track id); used by tests too. */
@@ -371,6 +381,7 @@ private:
     static void restorePluginState (juce::AudioPluginInstance&, const juce::ValueTree& node);
     Project* project = nullptr;
     AudioPool pool;
+    std::unique_ptr<flex::Renderer> flexRenderer;
 
     std::map<int, std::shared_ptr<TrackRuntime>> runtimes;      // message thread
     std::shared_ptr<TrackRuntime> masterRuntime;                // the master's inserts

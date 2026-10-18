@@ -22,6 +22,12 @@ feel familiar), but it's its own program, written from scratch.
 - Cycle recording into take folders, with swipe comping
 - Markers, tempo and time signature changes, count-in and click
 - Live waveforms (and notes) while you record; latency-compensated takes
+- Time Stretch: flex markers on transients, Monophonic, Polyphonic, Rhythmic (slicing) and
+  Speed modes, quantize audio to the grid, and audio that follows tempo changes
+- Pitch Edit: the notes of a voice or solo as blobs to drag, with fine pitch, drift, vibrato,
+  gain, formants and quantize to a scale, rendered with a formant-preserving pitch shift
+- Tempo Detect: finds a recording's tempo and downbeat; an empty song can take it, or the
+  recording is conformed to the song's tempo
 - Bounce to WAV, AIFF or FLAC at 16, 24 or 32-bit float, with normalize, or every track as a stem
 
 **Instruments and MIDI**
@@ -49,8 +55,7 @@ feel familiar), but it's its own program, written from scratch.
 
 ## Not there yet
 
-Woodshed is young. Things the big DAWs have that it doesn't yet: Live Loops, Flex Time and
-Flex Pitch (time-stretching and editing audio pitch), Smart Tempo, a sampler instrument,
+Woodshed is young. Things the big DAWs have that it doesn't yet: Live Loops, a sampler instrument,
 track stacks, groups and VCAs, punch in/out, track freeze, plug-in delay compensation, a
 mastering assistant, surround and spatial audio, and video. Contributions are very welcome.
 
@@ -91,7 +96,7 @@ build-bench/WoodshedBench_artefacts/Release/WoodshedBench project      # the eng
 build-bench/WoodshedBench_artefacts/Release/WoodshedBench instruments  # every instrument and sound
 ```
 
-`presets`, `drummer`, `score` and `pitchcorrect` test the rest; `demo-midi <folder>` and
+`presets`, `drummer`, `score`, `pitchcorrect` and `flex` test the rest; `demo-midi <folder>` and
 `render-project <folder> <out.wav>` make and render a short song.
 
 ## Contributing
@@ -107,4 +112,7 @@ must pass the bench before it ships.
 Woodshed is free software: you can redistribute it and modify it under the terms of the GNU
 Affero General Public License, version 3 (see [LICENSE](LICENSE)). Built with
 [JUCE](https://juce.com) under the AGPLv3. The bundled fonts, Inter and JetBrains Mono, are
-under the SIL Open Font License (see `art/fonts/`).
+under the SIL Open Font License (see `art/fonts/`). Time Stretch and Pitch Edit use
+[Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) and its
+[Linear](https://github.com/Signalsmith-Audio/linear) library by Geraint Luff / Signalsmith
+Audio, under the MIT License (see `third_party/`).
