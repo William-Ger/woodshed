@@ -45,6 +45,14 @@ set(WOODSHED_DAW_SOURCES
     Source/daw/Drummer.cpp
     Source/daw/StepPattern.cpp)
 
+# --- loopgrid ---
+# The Loop Grid (clip launching): its model, the engine's audio-thread player and the controller.
+list(APPEND WOODSHED_DAW_SOURCES
+    Source/loops/LoopModel.cpp
+    Source/loops/LoopPlayer.cpp
+    Source/loops/LoopGrid.cpp)
+# --- end loopgrid ---
+
 # The Score editor's notation layout and drawing (no Component code); shared with the bench.
 set(WOODSHED_SCORE_SOURCES
     Source/app/ScoreLayout.cpp
@@ -119,6 +127,10 @@ if(NOT WOODSHED_BENCH_ONLY)
     if(APPLE)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
+
+    # --- loopgrid ---
+    target_sources(WoodshedStudio PRIVATE Source/app/LoopGridView.cpp)
+    # --- end loopgrid ---
 
     # The studio's typefaces: Inter and JetBrains Mono (both SIL Open Font License; see art/fonts).
     file(GLOB WOODSHED_FONTS CONFIGURE_DEPENDS art/fonts/*.ttf)
@@ -216,6 +228,9 @@ juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
 target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp tools/bench/ScoreTest.cpp tools/bench/DrummerTest.cpp
     ${WOODSHED_SCORE_SOURCES} ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+# --- loopgrid ---
+target_sources(WoodshedBench PRIVATE tools/bench/LoopGridTest.cpp)
+# --- end loopgrid ---
 target_link_libraries(WoodshedBench
     PRIVATE
         juce::juce_dsp
