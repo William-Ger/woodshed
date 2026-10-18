@@ -1,11 +1,12 @@
 #include "MainComponent.h"
 #include "PluginHost.h"
+#include "MixCommands.h"
 
 namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), loopGridView (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), loopGridView (s), samplerEditor (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -19,6 +20,7 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (typing);
     addChildComponent (takesEditor);
     addChildComponent (loopGridView);
+    addChildComponent (samplerEditor);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
     // Tracks above, the pane below; the divider between them can be dragged.
@@ -58,6 +60,7 @@ juce::Component* MainComponent::paneComponent()
         case Studio::Pane::drummer: return &drummer;
         case Studio::Pane::stepSequencer: return &stepSequencer;
         case Studio::Pane::loopGrid: return &loopGridView;
+        case Studio::Pane::sampler: return &samplerEditor;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
         default:                   return nullptr;
@@ -67,7 +70,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &loopGridView })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &samplerEditor, &loopGridView })
         c->setVisible (c == shown);
 }
 
@@ -123,6 +126,9 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
 
     // Loop Grid.
     c.addArray ({ cmd::showLoopGrid, cmd::loopGridStopAll, cmd::copyToLoopGrid, cmd::loopGridPerformRecord, cmd::loopGridAddScene });
+    // The Sampler.
+    c.addArray ({ cmd::showSampler, cmd::newSamplerTrack, cmd::convertToSampler, cmd::convertToSamplerSlice });
+    mixui::getCommands (c);     // Track Stacks, freeze, VCAs, Autopunch
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -132,6 +138,8 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
     const auto shift = juce::ModifierKeys::shiftModifier;
     auto& p = studio.project();
     auto& s = p.state;
+    if (mixui::getCommandInfo (studio, id, info))
+        return;
 
     switch (id)
     {
@@ -244,6 +252,14 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
                                    info.setInfo ("Perform Recording", "Write what the Loop Grid plays into the arrange", "Transport", 0);
                                    info.setTicked (studio.loopGrid().isPerformRecording()); break;
         case cmd::loopGridAddScene: info.setInfo ("Add Scene", "A new column in the Loop Grid", "View", 0); break;
+        // The Sampler.
+        case cmd::showSampler:     info.setInfo ("Sampler", {}, "View", 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::sampler); break;
+        case cmd::newSamplerTrack: info.setInfo ("New Sampler Track", {}, "Track", 0); break;
+        case cmd::convertToSampler: info.setInfo ("Convert to Sampler Track", {}, "Track", 0);
+                                   info.setActive (SamplerEditor::canConvertSelection (studio)); break;
+        case cmd::convertToSamplerSlice: info.setInfo ("Convert to Sampler Track (Slice)", {}, "Track", 0);
+                                   info.setActive (SamplerEditor::canConvertSelection (studio)); break;
         default: break;
     }
 }
@@ -254,6 +270,11 @@ bool MainComponent::perform (const InvocationInfo& info)
     auto& p = studio.project();
     auto& s = p.state;
     auto toggle = [&s] (const juce::Identifier& id) { s.setProperty (id, ! (bool) s[id], nullptr); };
+    if (mixui::perform (studio, info.commandID))
+    {
+        studio.commands.commandStatusChanged();
+        return true;
+    }
 
     switch (info.commandID)
     {
@@ -367,6 +388,11 @@ bool MainComponent::perform (const InvocationInfo& info)
             p.undo.beginNewTransaction ("Add Scene");
             loops::addScene (p);
             break;
+        // The Sampler.
+        case cmd::showSampler:     studio.setPane (studio.getPane() == Studio::Pane::sampler ? Studio::Pane::none : Studio::Pane::sampler); break;
+        case cmd::newSamplerTrack: SamplerEditor::newSamplerTrack (studio); break;
+        case cmd::convertToSampler: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::classic); break;
+        case cmd::convertToSamplerSlice: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::slice); break;
         case cmd::quantize:
             if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
                 pianoRoll.quantizeSelection();
@@ -447,6 +473,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::newInstrumentTrack);
             m.addCommandItem (cm, cmd::newDrumTrack);
             m.addCommandItem (cm, cmd::newDrummerTrack);
+            m.addCommandItem (cm, cmd::newSamplerTrack);
+            m.addCommandItem (cm, cmd::convertToSampler);
+            m.addCommandItem (cm, cmd::convertToSamplerSlice);
+            m.addCommandItem (cm, cmd::newVca);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::createTrackStack);
+            m.addCommandItem (cm, cmd::freezeTrack);
             m.addSeparator();
             m.addCommandItem (cm, cmd::duplicateTrack);
             m.addCommandItem (cm, cmd::deleteTrack);
@@ -463,6 +496,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::loopToSelection);
             m.addCommandItem (cm, cmd::toggleClick);
             m.addCommandItem (cm, cmd::toggleCountIn);
+            m.addCommandItem (cm, cmd::toggleAutopunch);
+            m.addCommandItem (cm, cmd::punchToCycle);
             m.addSeparator();
             m.addCommandItem (cm, cmd::createMarker);
             m.addCommandItem (cm, cmd::nextMarker);
@@ -477,6 +512,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::showScore);
             m.addCommandItem (cm, cmd::showStepSequencer);
             m.addCommandItem (cm, cmd::showDrummer);
+            m.addCommandItem (cm, cmd::showSampler);
             m.addCommandItem (cm, cmd::showMixer);
             m.addCommandItem (cm, cmd::showLoopGrid);
             m.addCommandItem (cm, cmd::showAutomation);

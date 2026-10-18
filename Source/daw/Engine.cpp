@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "Stacks.h"
 
 namespace woodshed::daw
 {
@@ -8,6 +9,7 @@ namespace
 constexpr int edgeFadeSamples = 96;            // de-click every region start and end (2 ms at 48k)
 constexpr double bounceTailSeconds = 4.0;      // let delays and reverbs ring out past the last note
 constexpr int bounceBlock = 512;
+constexpr int punchCrossfade = 480;            // Autopunch's crossfades at each locator (10 ms at 48k)
 
 float dbToGain (double db)                     { return db <= -96.0 ? 0.0f : juce::Decibels::decibelsToGain ((float) db); }
 
@@ -21,6 +23,48 @@ void clampFades (juce::int64 length, juce::int64 wantIn, juce::int64 wantOut, ju
     const auto edge = juce::jmin ((juce::int64) edgeFadeSamples, length / 2);
     out = juce::jlimit (edge, juce::jmax (edge, length - edge), wantOut);
     in = juce::jlimit (edge, juce::jmax (edge, length - out), wantIn);
+}
+
+/** Autopunch: the new take replaces what was on its track inside its range. Each older region
+    keeps its audio outside, cut so it fades out over the take's fade-in and back in over its
+    fade-out (equal-power crossfades of `crossfade` samples); a region wholly inside goes. */
+void punchInTake (Project& p, juce::ValueTree take, int crossfade)
+{
+    const auto from = (juce::int64) take[ids::start];
+    const auto to = from + (juce::int64) take[ids::length];
+    const auto fade = (juce::int64) juce::jmin ((juce::int64) crossfade, (to - from) / 2);
+    take.setProperty (ids::fadeIn, fade, &p.undo);
+    take.setProperty (ids::fadeOut, fade, &p.undo);
+    const auto leftEnd = from + fade, rightStart = to - fade;
+
+    auto track = take.getParent();
+    juce::Array<juce::ValueTree> older;
+    for (auto r : track)
+        if (r.hasType (ids::REGION) && r != take && ! Project::isMidiRegion (r))
+            older.add (r);
+
+    for (auto r : older)
+    {
+        const auto start = (juce::int64) r[ids::start];
+        const auto end = start + (juce::int64) r[ids::length];
+        if (end <= from || start >= to)
+            continue;
+
+        // The part after the range.
+        if (start < rightStart && end > rightStart)
+            if (auto right = p.splitRegion (r, rightStart); right.isValid())
+                right.setProperty (ids::fadeIn, fade, &p.undo);
+
+        // The part before it, and what's left in between.
+        if (start < leftEnd)
+        {
+            if (auto middle = p.splitRegion (r, leftEnd); middle.isValid())
+                track.removeChild (middle, &p.undo);
+            r.setProperty (ids::fadeOut, fade, &p.undo);
+        }
+        else if (start < rightStart)
+            track.removeChild (r, &p.undo);
+    }
 }
 
 void restoreRig (juce::AudioProcessor& rig, const juce::ValueTree& track)
@@ -85,9 +129,63 @@ AudioPool::Audio AudioPool::get (const juce::File& file)
     return audio;
 }
 
+AudioPool::Audio AudioPool::getStereo (const juce::File& file)
+{
+    const auto key = "stereo:" + file.getFullPathName();
+    if (auto it = cache.find (key); it != cache.end())
+        return it->second;
+
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+    if (reader == nullptr || reader->lengthInSamples <= 0 || reader->lengthInSamples > std::numeric_limits<int>::max())
+        return nullptr;
+
+    const int length = (int) reader->lengthInSamples;
+    auto stereo = std::make_shared<juce::AudioBuffer<float>> (2, length);
+    reader->read (stereo.get(), 0, length, 0, true, true);      // a mono file fills both channels
+
+    Audio audio = std::move (stereo);
+    cache[key] = audio;
+    return audio;
+}
+
 void AudioPool::forget (const juce::File& file)
 {
     cache.erase (file.getFullPathName());
+    cache.erase ("stereo:" + file.getFullPathName());
+}
+
+//==============================================================================
+void DelayRing::push (const float* left, const float* right, int n) noexcept
+{
+    if (! isAllocated())
+        return;
+    auto* l = data.getWritePointer (0);
+    auto* r = data.getWritePointer (1);
+    constexpr int mask = capacity - 1;
+    for (int i = 0; i < n; ++i)
+    {
+        const int at = (write + i) & mask;
+        l[at] = left[i];
+        r[at] = right[i];
+    }
+    write = (write + n) & mask;
+}
+
+void DelayRing::addDelayed (int delay, float* left, float* right, int n, float gain) const noexcept
+{
+    if (! isAllocated())
+        return;
+    delay = juce::jlimit (0, capacity - n, delay);
+    const auto* l = data.getReadPointer (0);
+    const auto* r = data.getReadPointer (1);
+    constexpr int mask = capacity - 1;
+    const int from = write - n - delay;
+    for (int i = 0; i < n; ++i)
+    {
+        const int at = (from + i) & mask;
+        left[i] += l[at] * gain;
+        right[i] += r[at] * gain;
+    }
 }
 
 //==============================================================================
@@ -188,7 +286,20 @@ void Mixer::render (const Snapshot& snap, const Block& b)
         float* c = rt.work.getWritePointer (1);
         juce::FloatVectorOperations::clear (a, n);
 
-        if (track.aux)
+        if (track.frozen != nullptr)
+        {
+            // Frozen: its render plays instead (pre-fader, from sample 0); none of its devices run.
+            juce::FloatVectorOperations::clear (c, n);
+            const auto& f = *track.frozen;
+            const auto from = juce::jlimit ((juce::int64) 0, (juce::int64) n, -b.position);
+            const auto to = juce::jlimit ((juce::int64) 0, (juce::int64) n, (juce::int64) f.getNumSamples() - b.position);
+            if (b.playing && to > from)
+            {
+                juce::FloatVectorOperations::copy (a + from, f.getReadPointer (0) + b.position + from, (int) (to - from));
+                juce::FloatVectorOperations::copy (c + from, f.getReadPointer (juce::jmin (1, f.getNumChannels() - 1)) + b.position + from, (int) (to - from));
+            }
+        }
+        else if (track.aux)
         {
             // What the sends brought in this block.
             if (rt.busInput.getNumSamples() >= n)
@@ -277,7 +388,8 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             }
         }
 
-        runInserts (track, a, c, n, b.position);
+        if (track.frozen == nullptr)
+            runInserts (track, a, c, n, b.position);
 
         // Volume and pan follow their automation lines, if they have them.
         float gain = track.gain, pan = track.pan;
@@ -286,6 +398,9 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             if (line.target == TrackPlayback::AutoLine::volume) gain = dbToGain ((double) Project::evaluate (line.points, b.position));
             else if (line.target == TrackPlayback::AutoLine::pan) pan = Project::evaluate (line.points, b.position);
         }
+        // VCAs and folder stack mains scale the fader.
+        for (auto& scale : track.scalers)
+            gain *= scale.points.empty() ? scale.gain : dbToGain ((double) Project::evaluate (scale.points, b.position));
 
         // Constant-power pan, unity in the middle.
         const float angle = (juce::jlimit (-1.0f, 1.0f, pan) + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
@@ -302,6 +417,13 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             if (line.target == TrackPlayback::AutoLine::sendLevel && juce::isPositiveAndBelow (line.knob, (int) numSends))
                 sendGains[(size_t) line.knob] = track.audible ? dbToGain ((double) Project::evaluate (line.points, b.position)) : 0.0f;
 
+        // Delay compensation: a send or output that must wait reads the signal back from the
+        // track's ring (pre- or post-fader) instead of taking it as it is.
+        auto delayed = [] (int delay, const DelayRing& ring) { return delay > 0 && ring.isAllocated(); };
+        bool ringPre = false, ringPost = delayed (track.outputDelay, rt.postFader) && track.toMaster;
+        for (size_t i = 0; i < numSends; ++i)
+            (track.sends[i].pre ? ringPre : ringPost) |= delayed (track.sends[i].delay, track.sends[i].pre ? rt.preFader : rt.postFader);
+
         auto sendTo = [&] (size_t i)
         {
             const auto& send = track.sends[i];
@@ -310,13 +432,23 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             auto& bus = snap.tracks[(size_t) send.target].runtime->busInput;
             if (bus.getNumSamples() < n)
                 return;
-            juce::FloatVectorOperations::addWithMultiply (bus.getWritePointer (0), a, sendGains[i], n);
-            juce::FloatVectorOperations::addWithMultiply (bus.getWritePointer (1), c, sendGains[i], n);
+            const auto& ring = send.pre ? rt.preFader : rt.postFader;
+            if (delayed (send.delay, ring))
+                ring.addDelayed (send.delay, bus.getWritePointer (0), bus.getWritePointer (1), n, sendGains[i]);
+            else
+            {
+                juce::FloatVectorOperations::addWithMultiply (bus.getWritePointer (0), a, sendGains[i], n);
+                juce::FloatVectorOperations::addWithMultiply (bus.getWritePointer (1), c, sendGains[i], n);
+            }
         };
+        if (ringPre)
+            rt.preFader.push (a, c, n);
         for (size_t i = 0; i < numSends; ++i)
             if (track.sends[i].pre)
                 sendTo (i);
 
+        // A summing stack's member reaches the Stereo Out only through its main (a send).
+        const bool direct = track.toMaster && ! (track.outputDelay > 0 && rt.postFader.isAllocated());
         float peakL = 0.0f, peakR = 0.0f;
         for (int i = 0; i < n; ++i)
         {
@@ -324,12 +456,19 @@ void Mixer::render (const Snapshot& snap, const Block& b)
             const float r = c[i] * rt.gainRight.getNextValue();
             a[i] = l;
             c[i] = r;
-            b.left[i] += l;
-            b.right[i] += r;
+            if (direct)
+            {
+                b.left[i] += l;
+                b.right[i] += r;
+            }
             peakL = juce::jmax (peakL, std::abs (l));
             peakR = juce::jmax (peakR, std::abs (r));
         }
 
+        if (ringPost)
+            rt.postFader.push (a, c, n);
+        if (track.toMaster && ! direct)
+            rt.postFader.addDelayed (track.outputDelay, b.left, b.right, n, 1.0f);
         for (size_t i = 0; i < numSends; ++i)
             if (! track.sends[i].pre)
                 sendTo (i);
@@ -586,10 +725,11 @@ void Engine::record()
     if (takes.empty())
         return;
 
-    latencyAtRecord = getRecordLatencySamples();
-    midiLatencyAtRecord = 0;
+    // What you hear comes late by the interface and by delay compensation; takes move back by both.
+    latencyAtRecord = getRecordLatencySamples() + playbackLatency.load();
+    midiLatencyAtRecord = playbackLatency.load();
     if (auto* device = deviceManager.getCurrentAudioDevice())
-        midiLatencyAtRecord = device->getOutputLatencyInSamples();
+        midiLatencyAtRecord += device->getOutputLatencyInSamples();
     for (auto& t : takes)
         if (t.midi)
             midiRecordTrack = t.trackId;
@@ -598,11 +738,17 @@ void Engine::record()
     const auto& grid = project->grid();
     auto from = getPosition();
 
+    // Autopunch (below) wins over the cycle: it records its range once.
+    const auto punchIn = (juce::int64) project->state.getProperty (ids::punchIn, 0);
+    const auto punchOut = (juce::int64) project->state.getProperty (ids::punchOut, 0);
+    punching = (bool) project->state[ids::punchOn] && punchOut > punchIn;
+    punchDone = false;
+
     // Cycle recording: with the cycle on, recording loops it, a take per pass. It starts at the
     // cycle's start if the playhead is outside the cycle.
     const auto loopStart = (juce::int64) project->state.getProperty (ids::loopStart, 0);
     const auto loopEnd = (juce::int64) project->state.getProperty (ids::loopEnd, 0);
-    cycleRecording = (bool) project->state[ids::loopOn] && loopEnd > loopStart;
+    cycleRecording = (bool) project->state[ids::loopOn] && loopEnd > loopStart && ! punching.load();
     if (cycleRecording.load())
     {
         cycleStart = loopStart;
@@ -614,10 +760,27 @@ void Engine::record()
                 requestedPosition = from;
         }
     }
+
+    // Autopunch: only the range between the punch locators records (a little either side, for the
+    // crossfades); the song plays up to it as a pre-roll, from the playhead if that's before the
+    // range, else from a bar before it.
+    if (punching.load())
+    {
+        punchFrom = juce::jmax ((juce::int64) 0, punchIn - punchCrossfade / 2);
+        punchTo = punchOut + punchCrossfade / 2;
+        from = punchFrom.load();
+        if (getPosition() >= from)
+        {
+            const double tick = grid.tickAt ((double) punchIn);
+            const auto preroll = juce::jmax ((juce::int64) 0, (juce::int64) std::llround (grid.sampleAt (tick - grid.meterAt (tick).ticksPerBar())));
+            requestedPosition = preroll;
+            position = preroll;
+        }
+    }
     recordStart = from;
 
     // Recording from a stop gets a bar of count-in (when it's on); punching in while playing doesn't.
-    if (! isPlaying() && (bool) project->state[ids::countIn])
+    if (! isPlaying() && ! punching.load() && (bool) project->state[ids::countIn])
     {
         const auto preroll = (juce::int64) std::llround (grid.sampleAt (grid.tickAt ((double) from) - grid.meterAt (grid.tickAt ((double) from)).ticksPerBar()));
         requestedPosition = preroll;
@@ -710,9 +873,12 @@ void Engine::finishRecording()
             continue;
         }
 
-        project->addRegion (track, relative, start, offset, length, track[ids::name].toString());
+        auto take = project->addRegion (track, relative, start, offset, length, track[ids::name].toString());
+        if (punching.load())
+            punchInTake (*project, take, punchCrossfade);
     }
     cycleRecording = false;
+    punching = false;
 
     takes.clear();
     sendChangeMessage();
@@ -760,6 +926,13 @@ void Engine::finishMidiTake (int trackId, juce::int64 stopAt)
     for (auto n : recordedNotes)
     {
         if (n.end < 0) n.end = stopAt;
+        if (punching.load())
+        {
+            // Autopunch: only notes that start inside the range, cut off at its end.
+            if (n.start < punchFrom.load() || n.start >= punchTo.load())
+                continue;
+            n.end = juce::jmin (n.end, punchTo.load());
+        }
         n.start = juce::jmax ((juce::int64) 0, n.start - midiLatencyAtRecord);
         n.end = juce::jmax (n.start + 1, n.end - midiLatencyAtRecord);
         last = juce::jmax (last, n.end);
@@ -934,6 +1107,10 @@ void Engine::prepareRig (TrackRuntime& rt)
 {
     rt.work.setSize (2, blockSize, false, true, true);
     rt.busInput.setSize (2, blockSize, false, true, true);
+    if (! rt.preFader.isAllocated()) rt.preFader.allocate();
+    if (! rt.postFader.isAllocated()) rt.postFader.allocate();
+    rt.preFader.clear();
+    rt.postFader.clear();
     rt.gainLeft.reset (sampleRate, 0.03);
     rt.gainRight.reset (sampleRate, 0.03);
 
@@ -1118,13 +1295,51 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
     snap->loopStart = (juce::int64) s.getProperty (ids::loopStart, 0);
     snap->loopEnd = (juce::int64) s.getProperty (ids::loopEnd, 0);
 
+    // Solo and mute through stacks and VCAs: a stack main or VCA soloed (or muted) solos (mutes)
+    // its tracks, and a summing main plays while anything inside it is soloed.
+    auto controllers = [&project] (const juce::ValueTree& t)
+    {
+        juce::Array<juce::ValueTree> list;      // folder and summing mains above it, then its VCA
+        int guard = 0;
+        for (auto up = stacks::mainOf (project, t); up.isValid() && guard < 32; up = stacks::mainOf (project, up), ++guard)
+            list.add (up);
+        if (auto vca = project.trackById ((int) t.getProperty (ids::vca, -1)); stacks::isVca (vca))
+            list.add (vca);
+        return list;
+    };
+    auto soloed = [&] (const juce::ValueTree& t)
+    {
+        if ((bool) t[ids::solo])
+            return true;
+        for (auto& c : controllers (t))
+            if ((bool) c[ids::solo])
+                return true;
+        if (stacks::isSumming (t))
+            for (auto& m : stacks::descendants (project, t))
+                if ((bool) m[ids::solo])
+                    return true;
+        return false;
+    };
+    auto muted = [&] (const juce::ValueTree& t)
+    {
+        if ((bool) t[ids::mute])
+            return true;
+        for (auto& c : controllers (t))
+            if ((bool) c[ids::mute] && ! stacks::isSumming (c))     // a summing main's own mute silences it, and so them
+                return true;
+        return false;
+    };
+
     bool anySolo = false;
     for (auto t : s)
-        anySolo = anySolo || (t.hasType (ids::TRACK) && (bool) t[ids::solo]);
+        anySolo = anySolo || (t.hasType (ids::TRACK) && soloed (t));
 
     for (auto t : s)
     {
         if (! t.hasType (ids::TRACK))
+            continue;
+        // VCAs and folder stack mains have no audio: they only scale their tracks (below).
+        if (stacks::isVca (t) || stacks::isFolder (t))
             continue;
 
         auto it = runtimes.find ((int) t[ids::id]);
@@ -1135,7 +1350,12 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         tp.runtime = it->second;
         tp.gain = dbToGain ((double) t.getProperty (ids::volume, 0.0));
         tp.pan = (float) (double) t.getProperty (ids::pan, 0.0);
-        tp.audible = ! (bool) t[ids::mute] && (! anySolo || (bool) t[ids::solo]);
+        tp.audible = ! muted (t) && (! anySolo || soloed (t));
+        for (auto& c : controllers (t))
+            if (stacks::isFolder (c) || stacks::isVca (c))
+                tp.scalers.push_back ({ dbToGain ((double) c.getProperty (ids::volume, 0.0)), Project::getAutomation (c, "volume") });
+        if ((bool) t[ids::frozen] && t[ids::freezeFile].toString().isNotEmpty())
+            tp.frozen = pool.getStereo (project.resolve (t[ids::freezeFile].toString()));
         tp.armed = (bool) t[ids::arm];
         tp.monitor = (bool) t[ids::monitor];
         tp.rigOn = (bool) t.getProperty (ids::rigOn, true);
@@ -1173,6 +1393,18 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                             if (ip.pedal == rt.inserts[i].pedal)
                                 sorted.push_back (ip);
             tp.inserts = std::move (sorted);
+        }
+
+        // How late its own chain makes it (a frozen track's render is already lined up).
+        if (tp.frozen == nullptr)
+        {
+            for (auto& ip : tp.inserts)
+                if (ip.on && ip.pedal != nullptr)
+                    tp.latency += juce::jmax (0, ip.pedal->getLatencySamples());
+            if (Project::isInstrumentTrack (t) && rt.instrument != nullptr)
+                tp.latency += juce::jmax (0, rt.instrument->getLatencySamples());
+            if (tp.rigOn && rt.rig != nullptr && ! Project::isInstrumentTrack (t))
+                tp.latency += juce::jmax (0, rt.rig->getLatencySamples());
         }
 
         for (auto node : t)
@@ -1227,6 +1459,9 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         if (Project::isInstrumentTrack (t))
         {
             tp.instrument = rt.instrument;
+            // Zones, samples and anything else an instrument keeps beyond its knobs.
+            if (tp.instrument != nullptr)
+                tp.instrument->syncState (t.getChildWithName (ids::INSTRUMENT), project.folder);
             // Stored values, with the instrument's defaults for any knob the project doesn't have
             // (a project saved before the instrument grew that knob).
             const auto inst = t.getChildWithName (ids::INSTRUMENT);
@@ -1370,10 +1605,63 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         snap->tracks.push_back (std::move (tp));
     }
 
-    // Aux tracks play after every other track (so their sends have arrived), in project order;
-    // then each send finds its aux. A send to an aux that plays earlier (aux to aux, upwards) is
-    // dropped, so there are never loops.
+    // Aux tracks play after every other track (so their sends have arrived), in project order
+    // except that a bus feeding another (a summing stack inside another, an aux sending to an
+    // aux above it) plays first; then each send finds its aux. A send to an aux that still plays
+    // earlier (a loop) is dropped.
     std::stable_partition (snap->tracks.begin(), snap->tracks.end(), [] (const TrackPlayback& t) { return ! t.aux; });
+    {
+        const auto firstAux = (size_t) std::distance (snap->tracks.begin(),
+                                                      std::find_if (snap->tracks.begin(), snap->tracks.end(), [] (auto& t) { return t.aux; }));
+        const size_t numAux = snap->tracks.size() - firstAux;
+        std::map<int, size_t> auxAt;
+        for (size_t i = firstAux; i < snap->tracks.size(); ++i)
+            auxAt[snap->tracks[i].runtime->id] = i - firstAux;
+
+        // Which buses each bus feeds: its sends and, for a stack main inside another, its main.
+        std::vector<std::vector<size_t>> feeds (numAux);
+        std::vector<int> waiting (numAux, 0);
+        for (size_t i = 0; i < numAux; ++i)
+        {
+            const auto t = project.trackById (snap->tracks[firstAux + i].runtime->id);
+            juce::Array<int> to;
+            for (auto send : Project::sends (t))
+                to.add ((int) send[ids::bus]);
+            if (auto main = stacks::mainOf (project, t); stacks::isSumming (main))
+                to.add ((int) main[ids::id]);
+            for (int id : to)
+                if (auto it = auxAt.find (id); it != auxAt.end() && it->second != i)
+                {
+                    feeds[i].push_back (it->second);
+                    ++waiting[it->second];
+                }
+        }
+
+        // Kahn's sort, earliest in the project first; whatever is left in a loop keeps its order.
+        std::vector<size_t> order;
+        std::vector<bool> placed (numAux, false);
+        while (order.size() < numAux)
+        {
+            size_t next = numAux;
+            for (size_t i = 0; i < numAux && next == numAux; ++i)
+                if (! placed[i] && waiting[i] == 0)
+                    next = i;
+            if (next == numAux)
+                for (size_t i = 0; i < numAux && next == numAux; ++i)
+                    if (! placed[i])
+                        next = i;
+            placed[next] = true;
+            order.push_back (next);
+            for (auto f : feeds[next])
+                --waiting[f];
+        }
+
+        std::vector<TrackPlayback> buses;
+        for (auto i : order)
+            buses.push_back (std::move (snap->tracks[firstAux + i]));
+        for (size_t i = 0; i < numAux; ++i)
+            snap->tracks[firstAux + i] = std::move (buses[i]);
+    }
 
     if (master != nullptr)
         snap->masterInserts = insertsFor (s.getChildWithName (ids::MASTER), *master);
@@ -1394,9 +1682,58 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
                 sp.target = it->second;
             tp.sends.push_back (sp);
         }
+
+        // A summing stack's member goes out through its main: a last, unity, post-fader send.
+        if (auto main = stacks::mainOf (project, project.trackById (tp.runtime->id)); stacks::isSumming (main))
+            if (auto it = indexOfTrack.find ((int) main[ids::id]); it != indexOfTrack.end() && it->second > (int) i)
+            {
+                TrackPlayback::Send out;
+                out.target = it->second;
+                tp.sends.push_back (out);
+                tp.toMaster = false;
+            }
     }
 
+    snap->alignLatencies();
     return snap;
+}
+
+void Snapshot::alignLatencies()
+{
+    // Tracks are in playing order, so every source comes before the buses it feeds. Each path's
+    // arrival is where its input lines up plus its own latency; every input to a bus (or to the
+    // Stereo Out) waits for the latest one.
+    const auto count = tracks.size();
+    std::vector<int> inputAt (count, 0), outputAt (count, 0);
+    auto feeds = [count] (const TrackPlayback::Send& send, size_t from)
+    {
+        return send.target > (int) from && send.target < (int) count;
+    };
+
+    int masterAt = 0;
+    for (size_t i = 0; i < count; ++i)
+    {
+        auto& t = tracks[i];
+        outputAt[i] = (t.aux ? inputAt[i] : 0) + t.latency;
+        for (auto& send : t.sends)
+            if (feeds (send, i))
+                inputAt[(size_t) send.target] = juce::jmax (inputAt[(size_t) send.target], outputAt[i]);
+        if (t.toMaster)
+            masterAt = juce::jmax (masterAt, outputAt[i]);
+    }
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        auto& t = tracks[i];
+        t.outputDelay = t.toMaster ? masterAt - outputAt[i] : 0;
+        for (auto& send : t.sends)
+            send.delay = feeds (send, i) ? inputAt[(size_t) send.target] - outputAt[i] : 0;
+    }
+
+    latency = masterAt;
+    for (auto& fx : masterInserts)
+        if (fx.on && fx.pedal != nullptr)
+            latency += juce::jmax (0, fx.pedal->getLatencySamples());
 }
 
 void Engine::handleAsyncUpdate()
@@ -1409,6 +1746,8 @@ void Engine::handleAsyncUpdate()
 void Engine::publish()
 {
     auto snap = project != nullptr ? buildSnapshot (*project, pool, runtimes, masterRuntime.get()) : std::make_unique<Snapshot>();
+    playbackLatency = snap->latency;
+    publishedLatencyKey = latencyKey();
     // An unclaimed older snapshot was never seen by the audio thread, so it can go right away.
     delete pending.exchange (snap.release());
     freeRetired();
@@ -1421,9 +1760,29 @@ void Engine::freeRetired()
     for (int i = 0; i < scope.blockSize2; ++i) { delete retired[(size_t) (scope.startIndex2 + i)]; retired[(size_t) (scope.startIndex2 + i)] = nullptr; }
 }
 
+int Engine::latencyKey() const
+{
+    int key = 0;
+    auto add = [&key] (int v) { key = key * 31 + v; };
+    for (auto& [id, rt] : runtimes)
+    {
+        if (rt->rig != nullptr)         add (rt->rig->getLatencySamples());
+        if (rt->instrument != nullptr)  add (rt->instrument->getLatencySamples());
+        for (auto& fx : rt->inserts)    add (fx.pedal != nullptr ? fx.pedal->getLatencySamples() : 0);
+    }
+    if (masterRuntime != nullptr)
+        for (auto& fx : masterRuntime->inserts)
+            add (fx.pedal != nullptr ? fx.pedal->getLatencySamples() : 0);
+    return key;
+}
+
 void Engine::timerCallback()
 {
     freeRetired();
+    // A rig or plug-in that changed its latency (a new board, a plug-in setting) without the
+    // project changing: line everything up again.
+    if (project != nullptr && latencyKey() != publishedLatencyKey)
+        publish();
     if (isRecording())
         drainRecordedMidi();
 
@@ -1532,12 +1891,22 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
     const int liveTarget = midiTarget.load();
     const int recordingMidiInto = midiRecordTrack.load();
     size_t liveIndex = 0;
+    const bool punch = isRec && punching.load();
+    const auto punchStart = punchFrom.load(), punchEnd = punchTo.load();
 
     for (int done = 0; done < numSamples;)
     {
         int n = juce::jmin (numSamples - done, mixBuffer.getNumSamples());
         if (looping && pos < snap.loopEnd && pos + n > snap.loopEnd)
             n = (int) (snap.loopEnd - pos);
+
+        // Autopunch: blocks break at the locators, and only the ones between them record.
+        if (punch && isPlaying)
+        {
+            if (pos < punchStart && pos + n > punchStart)    n = (int) (punchStart - pos);
+            else if (pos < punchEnd && pos + n > punchEnd)   n = (int) (punchEnd - pos);
+        }
+        const bool punchedIn = ! punch || (isPlaying && pos >= punchStart && pos < punchEnd && ! punchDone.load());
 
         const int numIns = juce::jmin (numInputs, (int) ins.size());
         for (int ch = 0; ch < numIns; ++ch)
@@ -1547,7 +1916,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         b.position = pos;
         b.numSamples = n;
         b.playing = isPlaying;
-        b.recording = isRec;
+        b.recording = isRec && punchedIn;
         b.inputs = ins.data();
         b.numInputs = numIns;
         b.monitorInputs = ! feedbackProtection.load (std::memory_order_relaxed);
@@ -1564,7 +1933,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         b.numLiveEvents = (int) (liveIndex - firstLive);
 
         // Recording MIDI: the live notes, at timeline samples, from the record start on.
-        if (isRec && isPlaying && recordingMidiInto == liveTarget && recordingMidiInto >= 0)
+        if (isRec && punchedIn && isPlaying && recordingMidiInto == liveTarget && recordingMidiInto >= 0)
         {
             for (int i = 0; i < b.numLiveEvents; ++i)
             {
@@ -1585,7 +1954,7 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
         Mixer::render (snap, b);
 
         // Recording: the dry input of every armed track, from the record start onwards.
-        if (isRec && isPlaying)
+        if (isRec && isPlaying && punchedIn)
         {
             // Until the first sample is in, wait for the record start (the count-in plays first);
             // after that every block counts, wherever the cycle has taken the playhead.
@@ -1605,9 +1974,16 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
                 recordedSamples.fetch_add (n - from);
             }
         }
+        if (punch && isPlaying && pos + n >= punchEnd)
+            punchDone = true;           // a jump back doesn't record over the take again
 
-        if (isPlaying && (snap.click || (isRec && pos < recordStart.load())))
-            Mixer::addClick (snap, b, clickLevel.load (std::memory_order_relaxed));
+        // The click keeps time with what you hear: as late as delay compensation makes the mix.
+        if (isPlaying && (snap.click || (isRec && ! punch && pos < recordStart.load())))
+        {
+            auto clickBlock = b;
+            clickBlock.position = pos - snap.latency;
+            Mixer::addClick (snap, clickBlock, clickLevel.load (std::memory_order_relaxed));
+        }
 
         for (int i = 0; i < n; ++i)
         {
@@ -1698,51 +2074,9 @@ public:
 private:
     bool render (Job& job, float progressFrom, float progressSpan)
     {
-        const auto tail = (juce::int64) (sampleRate * bounceTailSeconds);
-        const auto total = juce::jmax ((juce::int64) 1, end + tail - start);
-        juce::AudioBuffer<float> out (2, bounceBlock);
-
-        // Normalising needs the whole thing first; otherwise it streams to the file.
-        juce::AudioBuffer<float> whole;
-        if (options.normalize)
-            whole.setSize (2, (int) juce::jmin (total, (juce::int64) std::numeric_limits<int>::max() / 2));
-
-        auto writer = makeWriter (job.file, options, sampleRate);
-        if (writer == nullptr)
-            return false;
-
-        bool ok = true;
-        for (auto pos = start; pos < end + tail && ! threadShouldExit(); pos += bounceBlock)
-        {
-            const int n = (int) juce::jmin ((juce::int64) bounceBlock, end + tail - pos);
-            Mixer::Block b;
-            b.position = pos;
-            b.numSamples = n;
-            b.playing = true;
-            b.left = out.getWritePointer (0);
-            b.right = out.getWritePointer (1);
-            Mixer::render (*job.snap, b);
-            out.applyGain (0, n, job.snap->masterGain);
-            if (options.normalize)
-            {
-                const auto at = (int) (pos - start);
-                if (at + n <= whole.getNumSamples())
-                    for (int ch = 0; ch < 2; ++ch)
-                        whole.copyFrom (ch, at, out, ch, 0, n);
-            }
-            else
-                ok = ok && writer->writeFromAudioSampleBuffer (out, 0, n);
-            progress = progressFrom + progressSpan * (float) (pos - start) / (float) total;
-        }
-
-        if (options.normalize && ! threadShouldExit())
-        {
-            const auto peak = whole.getMagnitude (0, whole.getNumSamples());
-            if (peak > 0.0f)
-                whole.applyGain (juce::Decibels::decibelsToGain (-0.1f) / peak);
-            ok = writer->writeFromAudioSampleBuffer (whole, 0, whole.getNumSamples());
-        }
-        return ok;
+        return Engine::renderToFile (*job.snap, job.file, start, end + (juce::int64) (sampleRate * bounceTailSeconds), options, sampleRate,
+                                     [&] (float p) { progress = progressFrom + progressSpan * p; },
+                                     [this] { return threadShouldExit(); });
     }
 
     BounceOptions options;
@@ -1751,6 +2085,66 @@ private:
     std::atomic<float>& progress;
     std::function<void (bool)> onFinished;
 };
+}
+
+bool Engine::renderToFile (Snapshot& snap, const juce::File& file, juce::int64 start, juce::int64 end, const BounceOptions& options,
+                           double sampleRate, const std::function<void (float)>& progress, const std::function<bool()>& shouldStop)
+{
+    // Delay compensation makes the whole mix `latency` late: render that much further and drop
+    // the start, so the file lines up with the timeline.
+    const auto skip = (juce::int64) juce::jmax (0, snap.latency);
+    const auto total = juce::jmax ((juce::int64) 1, end - start);
+    juce::AudioBuffer<float> out (2, bounceBlock);
+    auto stopping = [&] { return shouldStop && shouldStop(); };
+
+    // Normalising needs the whole thing first; otherwise it streams to the file.
+    juce::AudioBuffer<float> whole;
+    if (options.normalize)
+        whole.setSize (2, (int) juce::jmin (total, (juce::int64) std::numeric_limits<int>::max() / 2));
+
+    auto writer = makeWriter (file, options, sampleRate);
+    if (writer == nullptr)
+        return false;
+
+    bool ok = true;
+    for (auto pos = start; pos < end + skip && ! stopping(); pos += bounceBlock)
+    {
+        const int n = (int) juce::jmin ((juce::int64) bounceBlock, end + skip - pos);
+        Mixer::Block b;
+        b.position = pos;
+        b.numSamples = n;
+        b.playing = true;
+        b.left = out.getWritePointer (0);
+        b.right = out.getWritePointer (1);
+        Mixer::render (snap, b);
+        out.applyGain (0, n, snap.masterGain);
+
+        // The part of this block that belongs in the file.
+        const auto keepFrom = (int) juce::jlimit ((juce::int64) 0, (juce::int64) n, start + skip - pos);
+        const auto at = pos + keepFrom - start - skip;
+        if (keepFrom < n)
+        {
+            if (options.normalize)
+            {
+                if (at + (n - keepFrom) <= whole.getNumSamples())
+                    for (int ch = 0; ch < 2; ++ch)
+                        whole.copyFrom (ch, (int) at, out, ch, keepFrom, n - keepFrom);
+            }
+            else
+                ok = ok && writer->writeFromAudioSampleBuffer (out, keepFrom, n - keepFrom);
+        }
+        if (progress)
+            progress ((float) juce::jlimit (0.0, 1.0, (double) (pos - start) / (double) (total + skip)));
+    }
+
+    if (options.normalize && ! stopping())
+    {
+        const auto peak = whole.getMagnitude (0, whole.getNumSamples());
+        if (peak > 0.0f)
+            whole.applyGain (juce::Decibels::decibelsToGain (-0.1f) / peak);
+        ok = writer->writeFromAudioSampleBuffer (whole, 0, whole.getNumSamples());
+    }
+    return ok && ! stopping();
 }
 
 std::unique_ptr<Snapshot> Engine::makeBounceSnapshot (int onlyTrackId, bool withMasterEffects)
@@ -1766,6 +2160,8 @@ std::unique_ptr<Snapshot> Engine::makeBounceSnapshot (int onlyTrackId, bool with
         rt->id = (int) t[ids::id];
         rt->work.setSize (2, bounceBlock);
         rt->busInput.setSize (2, bounceBlock);
+        rt->preFader.allocate();
+        rt->postFader.allocate();
         rt->gainLeft.reset (sampleRate, 0.03);
         rt->gainRight.reset (sampleRate, 0.03);
         syncTrackDevices (*rt, t, sampleRate, bounceBlock);
@@ -1795,15 +2191,43 @@ std::unique_ptr<Snapshot> Engine::makeBounceSnapshot (int onlyTrackId, bool with
     if (withMasterEffects)
         syncTrackDevices (freshMaster, project->state.getChildWithName (ids::MASTER), sampleRate, bounceBlock);
     auto snap = buildSnapshot (*project, pool, fresh, withMasterEffects ? &freshMaster : nullptr);
+
+    // A stem of a summing stack's main has its members in it; a member's own stem goes straight out.
+    const auto only = project->trackById (onlyTrackId);
+    const auto inside = stacks::isSumming (only) ? stacks::descendants (*project, only) : juce::Array<juce::ValueTree>();
     for (auto& t : snap->tracks)
     {
         t.armed = t.monitor = false;      // a bounce plays the song, never the live input
-        if (onlyTrackId >= 0 && t.runtime->id != onlyTrackId)
+        const bool member = inside.contains (project->trackById (t.runtime->id));
+        if (onlyTrackId >= 0 && t.runtime->id != onlyTrackId && ! member)
             t.audible = false;            // a stem: just this track (its sends go nowhere)
+        if (t.runtime->id == onlyTrackId && ! t.toMaster)
+        {
+            t.sends.pop_back();           // its way into the stack main
+            t.toMaster = true;
+        }
         t.runtime->gainLeft.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
         t.runtime->gainRight.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);
     }
+    snap->alignLatencies();
     return snap;
+}
+
+void Engine::startRender (std::unique_ptr<Snapshot> snap, const juce::File& file, juce::int64 start, juce::int64 end,
+                          const BounceOptions& options, std::function<void (bool)> done)
+{
+    std::vector<BounceThread::Job> jobs;
+    jobs.push_back ({ std::move (snap), file });
+    bounceProgress = 0.0f;
+    bounceThread = std::make_unique<BounceThread> (std::move (jobs), options, start, end, sampleRate, bounceProgress,
+                                                   [this, done] (bool ok)
+                                                   {
+                                                       if (bounceThread != nullptr)
+                                                           bounceThread->stopThread (2000);
+                                                       bounceThread.reset();   // frees the private rigs here, on the message thread
+                                                       if (done) done (ok);
+                                                   });
+    bounceThread->startThread();
 }
 
 void Engine::startBounce (const juce::File& target, juce::int64 start, juce::int64 end, const BounceOptions& options,
@@ -1825,8 +2249,8 @@ void Engine::startBounce (const juce::File& target, juce::int64 start, juce::int
         target.createDirectory();
         for (auto t : project->state)
         {
-            if (! t.hasType (ids::TRACK))
-                continue;
+            if (! t.hasType (ids::TRACK) || stacks::isVca (t) || stacks::isFolder (t))
+                continue;       // no audio of their own
             const auto index = project->state.indexOf (t) + 1;
             auto name = juce::String (index).paddedLeft ('0', 2) + " " + juce::File::createLegalFileName (t[ids::name].toString());
             jobs.push_back ({ makeBounceSnapshot ((int) t[ids::id], false), target.getChildFile (name + extension) });

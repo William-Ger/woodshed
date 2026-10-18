@@ -2,6 +2,8 @@
 #include "ArrangeHeader.h"
 #include "ArrangeView.h"
 #include "ChannelStrip.h"
+#include "SamplerEditor.h"
+#include "MixCommands.h"
 
 namespace woodshed::app::arrange
 {
@@ -846,6 +848,10 @@ void Lanes::mouseDown (const juce::MouseEvent& e)
         studio.setSelectedRegions ({ id });
     }
 
+    // A frozen track's regions can be selected, not moved or trimmed (unfreeze first).
+    if (hit.trackIndex >= 0 && mixui::blockedByFreeze (studio, view.project().track (hit.trackIndex)))
+        return;
+
     grabbed = hit.region;
     grabbedTrack = hit.trackIndex;
     grabbedPart = hit.part;
@@ -1413,6 +1419,13 @@ void Lanes::showRegionMenu()
                     studio.quantizeNotes (studio.findRegion (id), {}, t);
             });
         m.addSubMenu ("Quantize Notes", q);
+    }
+    // Audio regions: play them from a Sampler track.
+    if (SamplerEditor::canConvertSelection (studio))
+    {
+        m.addSeparator();
+        m.addItem ("Convert to Sampler Track", [&studio] { SamplerEditor::convertSelectedRegion (studio, sampler::Mode::classic); });
+        m.addItem ("Convert to Sampler Track (Slice)", [&studio] { SamplerEditor::convertSelectedRegion (studio, sampler::Mode::slice); });
     }
     m.addSeparator();
     m.addItem ("Delete", [&studio] { studio.deleteSelectedRegions(); });

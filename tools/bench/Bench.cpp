@@ -9,6 +9,8 @@
 //   woodshed-bench instruments [type ...] [--render dir] [--analyse]   (see InstrumentTest.cpp)
 //   woodshed-bench pitchcorrect [--wav guitar.wav] [--render outDir]   (PLUMB accuracy in cents)
 //   woodshed-bench loopgrid     (Loop Grid clip launching checks; see LoopGridTest.cpp)
+//   woodshed-bench sampler      (the Sampler instrument; see SamplerTest.cpp)
+//   woodshed-bench mix          (stacks, groups, VCAs, delay compensation, freeze, punch; see MixTest.cpp)
 //
 // Each pedal runs alone at 48 kHz in 64-sample blocks, through the same Chain
 // code the app uses. A pedal fails if it produces NaN/inf, makes noise from
@@ -878,6 +880,8 @@ void printKnobs (const juce::StringArray& only)
 } // namespace
 
 int runProjectTest();
+int runMixTest (const juce::StringArray&);
+int writeMixDemoProject (const juce::File& folder);
 int runScoreTest();
 int renderScoreSamples (const juce::File&);
 int runInstrumentTest (const juce::StringArray& args);
@@ -888,6 +892,8 @@ int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
 int runLoopGridTest();
 int writeLoopGridDemoProject (const juce::File&);
+int runSamplerTest (const juce::StringArray&);          // SamplerTest.cpp
+int writeSamplerDemoProject (const juce::File&);
 
 int main (int argc, char* argv[])
 {
@@ -938,6 +944,8 @@ int main (int argc, char* argv[])
 
     if (args[0] == "project")
         return runProjectTest();
+    if (args[0] == "mix")
+        return runMixTest (args);
 
     if (args[0] == "score")
         return runScoreTest();
@@ -961,11 +969,16 @@ int main (int argc, char* argv[])
         return runDrummerTest (args);
     }
 
+    if (args[0] == "sampler")          return runSamplerTest (args);
+    if (args[0] == "demo-sampler" && args.size() > 1) return writeSamplerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+
     if (args[0] == "demo-drummer" && args.size() > 1)
         return writeDrummerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
 
     if (args[0] == "loopgrid") return runLoopGridTest();
     if (args[0] == "demo-loopgrid" && args.size() > 1) return writeLoopGridDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+    if (args[0] == "demo-mix" && args.size() > 1)
+        return writeMixDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
 
     if (args[0] == "demo-midi" && args.size() > 1)
         return writeMidiDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
@@ -987,8 +1000,10 @@ int main (int argc, char* argv[])
                      " | presets [file.json ...] [--wav file] [--render dir]"
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
-                     " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>"
-                     " | loopgrid | demo-loopgrid <folder>\n";
+                     " | loopgrid | demo-loopgrid <folder>"
+                     " | mix"
+                     " | demo-midi <folder> | demo-drummer <folder> | demo-mix <folder> | render-project <folder> <out.wav>"
+                     " | sampler | demo-sampler <folder>\n";
         return 2;
     }
 

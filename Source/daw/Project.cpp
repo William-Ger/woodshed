@@ -1,6 +1,7 @@
 #include "Project.h"
 #include "../instruments/Instrument.h"
 #include "../engine/Registry.h"
+#include "Stacks.h"
 
 namespace woodshed::daw
 {
@@ -207,6 +208,9 @@ bool Project::saveAs (const juce::File& newFolder)
 
     // Copy the recordings this project uses; region paths are relative, so they stay valid.
     if (audioFolder().isDirectory() && ! audioFolder().copyDirectoryTo (newFolder.getChildFile ("Audio")))
+        return false;
+    // Frozen tracks' renders too.
+    if (const auto frozen = folder.getChildFile ("Freeze"); frozen.isDirectory() && ! frozen.copyDirectoryTo (newFolder.getChildFile ("Freeze")))
         return false;
 
     folder = newFolder;
@@ -519,6 +523,7 @@ std::vector<float> Project::decodeValues (const juce::String& text)
 
 void Project::removeTrack (const juce::ValueTree& track)
 {
+    stacks::forget (*this, track);      // a stack main's members un-stack; a VCA's tracks lose it
     state.removeChild (track, &undo);
 }
 
