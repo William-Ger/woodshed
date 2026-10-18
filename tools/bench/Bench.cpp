@@ -887,7 +887,7 @@ int writeDrummerDemoProject (const juce::File&);
 int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
 int runSpatialTest();
-int writeSpatialDemoProject (const juce::File&);
+int writeSpatialDemoProject (const juce::File&, const juce::File& movie);
 
 int main (int argc, char* argv[])
 {
@@ -962,7 +962,9 @@ int main (int argc, char* argv[])
     }
 
     if (args[0] == "spatial") return runSpatialTest();
-    if (args[0] == "demo-spatial" && args.size() > 1) return writeSpatialDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
+    if (args[0] == "demo-spatial" && args.size() > 1)
+        return writeSpatialDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]),
+                                        args.size() > 2 ? juce::File::getCurrentWorkingDirectory().getChildFile (args[2]) : juce::File());
 
     if (args[0] == "demo-drummer" && args.size() > 1)
         return writeDrummerDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]));
@@ -987,7 +989,7 @@ int main (int argc, char* argv[])
                      " | presets [file.json ...] [--wav file] [--render dir]"
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
-                     " | spatial | demo-spatial <folder>"
+                     " | spatial | demo-spatial <folder> [movie]"
                      " | demo-midi <folder> | demo-drummer <folder> | render-project <folder> <out.wav>\n";
         return 2;
     }

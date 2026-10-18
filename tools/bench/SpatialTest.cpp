@@ -342,11 +342,11 @@ int runSpatialTest()
         const double expected = spatial::woodworthItd (az, 0.0) * rate;     // positive: right ear first
         const int lag = lagOf (ir.left, ir.right, 60);                      // positive: right ear later
         const int onsetGap = onset (ir.right) - onset (ir.left);
-        const double near = energyDb (az < 0 ? ir.left : ir.right), far = energyDb (az < 0 ? ir.right : ir.left);
-        check (std::abs (-lag - expected) <= 2.0 && std::abs (-onsetGap - expected) <= 2.0 && near - far > 3.0,
+        const double nearEar = energyDb (az < 0 ? ir.left : ir.right), farEar = energyDb (az < 0 ? ir.right : ir.left);
+        check (std::abs (-lag - expected) <= 2.0 && std::abs (-onsetGap - expected) <= 2.0 && nearEar - farEar > 3.0,
                "azimuth " + juce::String (az, 0) + ": Woodworth " + juce::String (expected, 1) + " samples, measured "
                + juce::String (-lag) + " (correlation) / " + juce::String (-onsetGap) + " (onset); near ear "
-               + db (near - far) + " louder");
+               + db (nearEar - farEar) + " louder");
     }
     {
         const auto left = pan (impulse (2048), { -90.0f, 0.0f, 1.0f, 0.0f });
@@ -428,8 +428,8 @@ int runSpatialTest()
     std::cout << "distance\n";
     {
         const auto src = noise (96000, 3);
-        const auto near = pan (src, { 0.0f, 0.0f, 1.0f, 0.0f }), far = pan (src, { 0.0f, 0.0f, 10.0f, 0.0f });
-        const auto ns = spectrum (near.left), fs = spectrum (far.left);
+        const auto close = pan (src, { 0.0f, 0.0f, 1.0f, 0.0f }), distant = pan (src, { 0.0f, 0.0f, 10.0f, 0.0f });
+        const auto ns = spectrum (close.left), fs = spectrum (distant.left);
         const double low = bandDb (fs, 100.0, 1000.0) - bandDb (ns, 100.0, 1000.0);
         const double high = bandDb (fs, 10000.0, 16000.0) - bandDb (ns, 10000.0, 16000.0);
         check (std::abs (low + 20.0) < 1.0 && high < low - 1.5,
@@ -474,6 +474,23 @@ int runSpatialTest()
         check (ratio < 1.25 && leftRatio < 1.25 && stepRatio < 1.25,
                "azimuth -90 to 90, elevation -30 to 60, distance 1 to 4 m over 1 s: worst second difference "
                + juce::String (juce::jmax (ratio, leftRatio), 3) + "x a still source's, worst step " + juce::String (stepRatio, 3) + "x");
+
+        // The control: the same sweep with the smoothing defeated (the panner reset every 64-sample
+        // block, so each position lands at once) must show up on this metric.
+        {
+            spatial::Panner jumpy;
+            jumpy.prepare (rate);
+            Stereo s { std::vector<float> (sine.begin(), sine.begin() + (long) rate), std::vector<float> (sine.begin(), sine.begin() + (long) rate) };
+            for (int at = 0; at < (int) rate; at += 64)
+            {
+                const float t = (float) at / (float) rate;
+                jumpy.reset();
+                jumpy.setTarget ({ -90.0f + 180.0f * t, -30.0f + 90.0f * t, 1.0f + 3.0f * t, 0.0f });
+                jumpy.render (s.left.data() + at, s.right.data() + at, 64, spatial::Monitoring::binaural);
+            }
+            const double zipper = worstRelative (s.right, from, to, maxSecondDifference) / worstRelative (still.right, from, to, maxSecondDifference);
+            check (zipper > 3.0, "control: the same sweep jumping every block scores " + juce::String (zipper, 2) + "x (a zipper)");
+        }
 
         // Afterwards it's where the automation left it: right, 60 degrees up (30 degrees from the
         // median plane). On this 220 Hz tone the head-shadow filters add phase to the time
@@ -634,8 +651,8 @@ int runSpatialTest()
 }
 
 /** A song with one source that circles the listener, rises and falls, for listening on headphones. */
-int writeSpatialDemoProject (const juce::File& folder);
-int writeSpatialDemoProject (const juce::File& folder)
+int writeSpatialDemoProject (const juce::File& folder, const juce::File& movie);
+int writeSpatialDemoProject (const juce::File& folder, const juce::File& movie)
 {
     juce::ScopedJuceInitialiser_GUI init;
     const int length = (int) rate * 16;
@@ -672,6 +689,12 @@ int writeSpatialDemoProject (const juce::File& folder)
     track.setProperty (ids::autoParam, "spatial:azimuth", nullptr);
     project->state.setProperty (ids::spatialOutput, "binaural", nullptr);
     project->state.setProperty (ids::selectedTrack, track[ids::id], nullptr);
+    if (movie != juce::File())
+    {
+        // A movie for the strip and the movie window, starting at bar 2.
+        project->state.setProperty (ids::movie, movie.getFullPathName(), nullptr);
+        project->state.setProperty (ids::movieOffset, project->grid().barStartSample (1), nullptr);
+    }
     bool ok = project->save();
     std::cout << (ok ? "wrote " : "couldn't write ") << project->projectFile().getFullPathName() << "\n";
 

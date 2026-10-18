@@ -450,7 +450,7 @@ void MovieStrip::timerCallback()
         repaint();
     }
     else if (playhead != lastPlayhead)
-        repaint (0, 0, ArrangeView::headerWidth, getHeight());
+        repaint();      // the timecode and the playhead line
     lastPlayhead = playhead;
 }
 
