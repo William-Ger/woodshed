@@ -2,6 +2,7 @@
 
 #include "Studio.h"
 #include "Theme.h"
+#include "FlexLane.h"
 
 namespace woodshed::app
 {
@@ -118,6 +119,8 @@ private:
 
     juce::Rectangle<int> rubber;
     juce::Array<int> selectionAtDown;
+
+    FlexLane flex;      // Time Stretch markers
 
     bool dropping = false;
     int dropTrack = -1;

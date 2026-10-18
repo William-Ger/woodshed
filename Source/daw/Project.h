@@ -63,6 +63,8 @@ namespace woodshed::daw
                   origin), and comp ("from:to:take;..." from the content origin: which take plays
                   where; empty means the last take throughout).
 
+      Time Stretch, Pitch Edit and Tempo Detect add flexOn and flexMode to a TRACK and
+      flexMarkers, followTempo, sourceTempo and pitchNotes to an audio REGION (see Source/flex/Flex.h).
         LOOPGRID   the track's Loop Grid cells (see loops/LoopModel.h; scenes are the PROJECT's loopScenes)
 
       MASTER  the Stereo Out's insert effects: FX children as on a track (mastering EQ, a limiter...)
@@ -222,8 +224,9 @@ public:
     void setMeterChange (int bar, int beatsPerBar, int beatUnit);
     void removeMeterChange (int bar);
     /** After the tempo map changed from `before`: puts every region, marker, automation point
-        and the cycle back on the bar and beat it was on (audio isn't stretched; a MIDI region's
-        notes keep their ticks, so the region's length follows the tempo). */
+        and the cycle back on the bar and beat it was on (audio isn't stretched, unless the region
+        follows the tempo (Time Stretch, Source/flex); a MIDI region's notes keep their ticks, so
+        the region's length follows the tempo). */
     void keepMusicalPositions (const TimeGrid& before);
 
     // Tracks -------------------------------------------------------------------

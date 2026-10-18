@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "PluginHost.h"
+#include "FlexCommands.h"
 #include "SpatialPanner.h"
 #include "MixCommands.h"
 
@@ -7,7 +8,7 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), loopGridView (s), samplerEditor (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), pitchEditor (s), loopGridView (s), samplerEditor (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -20,6 +21,7 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (stepSequencer);
     addChildComponent (typing);
     addChildComponent (takesEditor);
+    addChildComponent (pitchEditor);
     addChildComponent (loopGridView);
     addChildComponent (samplerEditor);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
@@ -64,6 +66,7 @@ juce::Component* MainComponent::paneComponent()
         case Studio::Pane::score:  return &scoreView;
         case Studio::Pane::drummer: return &drummer;
         case Studio::Pane::stepSequencer: return &stepSequencer;
+        case Studio::Pane::pitchEdit: return &pitchEditor;
         case Studio::Pane::loopGrid: return &loopGridView;
         case Studio::Pane::sampler: return &samplerEditor;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
@@ -75,7 +78,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &samplerEditor, &loopGridView })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &samplerEditor, &loopGridView, &pitchEditor })
         c->setVisible (c == shown);
 }
 
@@ -128,6 +131,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
                   cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions, cmd::showScore,
                   cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
+    flexui::getAllCommands (c);     // Time Stretch, Pitch Edit, Tempo Detect
 
     // Loop Grid.
     c.addArray ({ cmd::showLoopGrid, cmd::loopGridStopAll, cmd::copyToLoopGrid, cmd::loopGridPerformRecord, cmd::loopGridAddScene });
@@ -145,7 +149,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
     const auto shift = juce::ModifierKeys::shiftModifier;
     auto& p = studio.project();
     auto& s = p.state;
-    if (mixui::getCommandInfo (studio, id, info))
+    if (flexui::getCommandInfo (studio, id, info) || mixui::getCommandInfo (studio, id, info))     // Time Stretch / mixing
         return;
 
     switch (id)
@@ -287,7 +291,7 @@ bool MainComponent::perform (const InvocationInfo& info)
     auto& p = studio.project();
     auto& s = p.state;
     auto toggle = [&s] (const juce::Identifier& id) { s.setProperty (id, ! (bool) s[id], nullptr); };
-    if (mixui::perform (studio, info.commandID))
+    if (flexui::perform (studio, info.commandID) || mixui::perform (studio, info.commandID))      // Time Stretch / mixing
     {
         studio.commands.commandStatusChanged();
         return true;
@@ -499,6 +503,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::nudgeLeft);
             m.addCommandItem (cm, cmd::nudgeRight);
             m.addCommandItem (cm, cmd::quantize);
+            m.addSeparator();
+            flexui::addMenuItems (m, cm);
             m.addCommandItem (cm, cmd::copyToLoopGrid);
             break;
         case 2:
@@ -549,6 +555,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::showScore);
             m.addCommandItem (cm, cmd::showStepSequencer);
             m.addCommandItem (cm, cmd::showDrummer);
+            m.addCommandItem (cm, cmd::showPitchEdit);
             m.addCommandItem (cm, cmd::showSampler);
             m.addCommandItem (cm, cmd::showMixer);
             m.addCommandItem (cm, cmd::showLoopGrid);

@@ -11,6 +11,7 @@
 #include "StepSequencer.h"
 #include "MusicalTyping.h"
 #include "TakesEditor.h"
+#include "PitchEditor.h"
 #include "LoopGridView.h"
 #include "SamplerEditor.h"
 #include "Movie.h"
@@ -57,6 +58,7 @@ private:
     StepSequencer stepSequencer;
     MusicalTyping typing;
     TakesEditor takesEditor;
+    PitchEditor pitchEditor;
     LoopGridView loopGridView;
     SamplerEditor samplerEditor;
     std::unique_ptr<MovieController> movie;         // spatial and video

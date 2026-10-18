@@ -49,6 +49,23 @@ set(WOODSHED_DAW_SOURCES
     Source/daw/Drummer.cpp
     Source/daw/StepPattern.cpp)
 
+# --- flex (Time Stretch, Pitch Edit, Tempo Detect) ---
+# Rendering, analysis and the song edits behind them, in the multitrack engine (Source/flex).
+# Stretching uses Signalsmith Stretch and Signalsmith Linear (MIT, header-only, third_party/).
+set(WOODSHED_FLEX_SOURCES
+    Source/flex/Flex.cpp
+    Source/flex/Analysis.cpp
+    Source/flex/Stretcher.cpp
+    Source/flex/Renderer.cpp
+    Source/flex/Edits.cpp)
+list(APPEND WOODSHED_DAW_SOURCES ${WOODSHED_FLEX_SOURCES})
+include_directories(SYSTEM third_party/signalsmith-stretch third_party/signalsmith-linear)
+# The arrange view's flex markers, the Pitch Edit pane and the commands.
+set(WOODSHED_FLEX_APP_SOURCES
+    Source/app/FlexLane.cpp
+    Source/app/PitchEditor.cpp
+    Source/app/FlexCommands.cpp)
+# --- end flex ---
 # --- loopgrid ---
 # The Loop Grid (clip launching): its model, the engine's audio-thread player and the controller.
 list(APPEND WOODSHED_DAW_SOURCES
@@ -286,6 +303,12 @@ target_link_libraries(WoodshedBench
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
 
+# --- flex (Time Stretch, Pitch Edit, Tempo Detect) ---
+target_sources(WoodshedBench PRIVATE tools/bench/FlexTest.cpp)
+if(NOT WOODSHED_BENCH_ONLY)
+    target_sources(WoodshedStudio PRIVATE ${WOODSHED_FLEX_APP_SOURCES})
+endif()
+# --- end flex ---
 # --- spatial ---
 target_sources(WoodshedBench PRIVATE tools/bench/SpatialTest.cpp)
 # --- end spatial ---

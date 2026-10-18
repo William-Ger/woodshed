@@ -1,6 +1,7 @@
 #include "Project.h"
 #include "../instruments/Instrument.h"
 #include "../engine/Registry.h"
+#include "../flex/Edits.h"
 #include "Stacks.h"
 
 namespace woodshed::daw
@@ -263,7 +264,11 @@ void Project::keepMusicalPositions (const TimeGrid& before)
             continue;
         for (auto r : t)
         {
-            if (r.hasType (ids::REGION))
+            if (r.hasType (ids::REGION) && (bool) r[flex::ids::followTempo] && ! isMidiRegion (r) && ! isTakeFolder (r))
+            {
+                flex::retimeForTempo (r, before, after, &undo);     // Time Stretch: the audio stretches with its bars
+            }
+            else if (r.hasType (ids::REGION))
             {
                 const auto start = (juce::int64) r[ids::start];
                 const auto length = (juce::int64) r[ids::length];

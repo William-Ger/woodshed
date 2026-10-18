@@ -5,6 +5,7 @@
 //   woodshed-bench run [type ...] [--wav guitar.wav] [--render outDir]
 //   woodshed-bench presets [file.json ...] [--wav guitar.wav] [--render outDir]
 //   woodshed-bench project      (multitrack engine checks; see ProjectTest.cpp)
+//   woodshed-bench flex         (Time Stretch, Pitch Edit, Tempo Detect; see FlexTest.cpp)
 //   woodshed-bench score        (Score editor notation layout checks; see ScoreTest.cpp)
 //   woodshed-bench spatial      (3D panner, surround bounce and movie sync checks; see SpatialTest.cpp)
 //   woodshed-bench instruments [type ...] [--render dir] [--analyse]   (see InstrumentTest.cpp)
@@ -891,6 +892,7 @@ int runDrummerTest (const juce::StringArray&);
 int writeDrummerDemoProject (const juce::File&);
 int renderProject (const juce::File&, const juce::File&);
 int writeDemoProject (const juce::File& folder, const juce::File& di);
+int runFlexTest(); int writeFlexDemoProject (const juce::File&);
 int runLoopGridTest();
 int writeLoopGridDemoProject (const juce::File&);
 int runSamplerTest (const juce::StringArray&);          // SamplerTest.cpp
@@ -949,6 +951,8 @@ int main (int argc, char* argv[])
         return runProjectTest();
     if (args[0] == "mix")
         return runMixTest (args);
+
+    if (args[0] == "flex" || args[0] == "demo-flex") { return args[0] == "flex" ? runFlexTest() : writeFlexDemoProject (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])); }
 
     if (args[0] == "score")
         return runScoreTest();
@@ -1011,7 +1015,7 @@ int main (int argc, char* argv[])
                      " | spatial | demo-spatial <folder> [movie]"
                      " | mix"
                      " | demo-midi <folder> | demo-drummer <folder> | demo-mix <folder> | render-project <folder> <out.wav>"
-                     " | sampler | demo-sampler <folder>\n";
+                     " | sampler | demo-sampler <folder> | flex | demo-flex <folder>\n";
         return 2;
     }
 
