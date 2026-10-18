@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "../flex/Renderer.h"
 #include "Stacks.h"
 
 namespace woodshed::daw
@@ -599,6 +600,15 @@ void Mixer::addClick (const Snapshot& snap, const Block& b, float level)
 Engine::Engine (juce::AudioDeviceManager& dm, RigFactory factory, InstrumentFactory instruments)
     : deviceManager (dm), makeRig (std::move (factory)), makeInstrument (std::move (instruments))
 {
+    // Time Stretch and Pitch Edit: regions play renders made in the background; each finished
+    // one rebuilds the snapshot.
+    flexRenderer = std::make_unique<flex::Renderer>();
+    flexRenderer->onRendered = [this] { triggerAsyncUpdate(); };
+    pool.regionAudio = [this] (const juce::ValueTree& region, const juce::File& file, const AudioPool::Audio& audio, bool wait)
+    {
+        return flexRenderer->audioFor (region, file, audio, project != nullptr ? project->grid().sampleRate : sampleRate, wait);
+    };
+
     liveMidi.reset (sampleRate);
     liveBuffer.ensureSize (4096);
     liveEvents.reserve (1024);
@@ -612,6 +622,7 @@ Engine::Engine (juce::AudioDeviceManager& dm, RigFactory factory, InstrumentFact
 Engine::~Engine()
 {
     stopTimer();
+    pool.regionAudio = nullptr;
     if (bounceThread != nullptr)
         bounceThread->stopThread (5000);
 
@@ -645,6 +656,7 @@ void Engine::setProject (Project* p)
     runtimes.clear();
     masterRuntime.reset();
     pool.clear();
+    flexRenderer->clear();
 
     if (project != nullptr)
         project->state.addListener (this);
@@ -1669,6 +1681,8 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
             rp.audio = pool.get (project.resolve (r[ids::file].toString()));
             if (rp.audio == nullptr)
                 continue;
+            if (pool.regionAudio)       // Time Stretch / Pitch Edit: the region's offset is into the render
+                rp.audio = pool.regionAudio (r, project.resolve (r[ids::file].toString()), rp.audio, pool.waitForRenders);
 
             rp.start = (juce::int64) r[ids::start];
             rp.offset = juce::jlimit ((juce::int64) 0, (juce::int64) rp.audio->getNumSamples(), (juce::int64) r[ids::offset]);
@@ -2283,7 +2297,9 @@ std::unique_ptr<Snapshot> Engine::makeBounceSnapshot (int onlyTrackId, bool with
     TrackRuntime freshMaster;
     if (withMasterEffects)
         syncTrackDevices (freshMaster, project->state.getChildWithName (ids::MASTER), sampleRate, bounceBlock);
+    pool.waitForRenders = true;         // a bounce plays the finished Time Stretch renders
     auto snap = buildSnapshot (*project, pool, fresh, withMasterEffects ? &freshMaster : nullptr);
+    pool.waitForRenders = false;
 
     // A stem of a summing stack's main has its members in it; a member's own stem goes straight out.
     const auto only = project->trackById (onlyTrackId);

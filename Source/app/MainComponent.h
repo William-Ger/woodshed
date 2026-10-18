@@ -12,6 +12,7 @@
 #include "MusicalTyping.h"
 #include "TakesEditor.h"
 #include "MasteringPanel.h"
+#include "PitchEditor.h"
 #include "LoopGridView.h"
 #include "SamplerEditor.h"
 #include "Movie.h"
@@ -59,6 +60,7 @@ private:
     MusicalTyping typing;
     TakesEditor takesEditor;
     MasteringPanel masteringPanel;
+    PitchEditor pitchEditor;
     LoopGridView loopGridView;
     SamplerEditor samplerEditor;
     std::unique_ptr<MovieController> movie;         // spatial and video
