@@ -11,6 +11,7 @@
 #include "StepSequencer.h"
 #include "MusicalTyping.h"
 #include "TakesEditor.h"
+#include "SamplerEditor.h"
 
 namespace woodshed::app
 {
@@ -54,6 +55,7 @@ private:
     StepSequencer stepSequencer;
     MusicalTyping typing;
     TakesEditor takesEditor;
+    SamplerEditor samplerEditor;
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */
     juce::Component* paneComponent();

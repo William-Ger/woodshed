@@ -2,6 +2,7 @@
 #include "ArrangeHeader.h"
 #include "ArrangeView.h"
 #include "ChannelStrip.h"
+#include "SamplerEditor.h"
 #include "MixCommands.h"
 
 namespace woodshed::app::arrange
@@ -1414,6 +1415,13 @@ void Lanes::showRegionMenu()
                     studio.quantizeNotes (studio.findRegion (id), {}, t);
             });
         m.addSubMenu ("Quantize Notes", q);
+    }
+    // Audio regions: play them from a Sampler track.
+    if (SamplerEditor::canConvertSelection (studio))
+    {
+        m.addSeparator();
+        m.addItem ("Convert to Sampler Track", [&studio] { SamplerEditor::convertSelectedRegion (studio, sampler::Mode::classic); });
+        m.addItem ("Convert to Sampler Track (Slice)", [&studio] { SamplerEditor::convertSelectedRegion (studio, sampler::Mode::slice); });
     }
     m.addSeparator();
     m.addItem ("Delete", [&studio] { studio.deleteSelectedRegions(); });

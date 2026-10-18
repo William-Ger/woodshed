@@ -35,7 +35,11 @@ set(WOODSHED_ENGINE_SOURCES
     Source/instruments/Synths.cpp
     Source/instruments/Drums.cpp
     Source/instruments/Orchestral.cpp
-    Source/instruments/Plucked.cpp)
+    Source/instruments/Plucked.cpp
+    # --- sampler ---
+    Source/instruments/Sampler.cpp
+    # --- end sampler ---
+    )
 
 # The multitrack engine (song model, playback, recording, bounce); no UI.
 set(WOODSHED_DAW_SOURCES
@@ -114,6 +118,10 @@ if(NOT WOODSHED_BENCH_ONLY)
         Source/app/MusicalTyping.cpp
         Source/app/PluginHost.cpp
         Source/app/TakesEditor.cpp
+        # --- sampler ---
+        Source/app/SamplerEditor.cpp
+        Source/instruments/SamplerTrack.cpp
+        # --- end sampler ---
         Source/app/StudioLookAndFeel.cpp
         Source/app/WindowStyle_other.cpp
         ${WOODSHED_RIG_SOURCES}
@@ -223,6 +231,9 @@ endif()
 juce_add_console_app(WoodshedBench PRODUCT_NAME "woodshed-bench")
 target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTest.cpp tools/bench/InstrumentTest.cpp tools/bench/ScoreTest.cpp tools/bench/DrummerTest.cpp
     ${WOODSHED_SCORE_SOURCES} ${WOODSHED_ENGINE_SOURCES} ${WOODSHED_DAW_SOURCES})
+# --- sampler ---
+target_sources(WoodshedBench PRIVATE tools/bench/SamplerTest.cpp Source/instruments/SamplerTrack.cpp)
+# --- end sampler ---
 # --- mixing ---
 target_sources(WoodshedBench PRIVATE tools/bench/MixTest.cpp)
 # --- end mixing ---

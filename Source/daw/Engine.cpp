@@ -1428,6 +1428,9 @@ std::unique_ptr<Snapshot> Engine::buildSnapshot (const Project& project, AudioPo
         if (Project::isInstrumentTrack (t))
         {
             tp.instrument = rt.instrument;
+            // Zones, samples and anything else an instrument keeps beyond its knobs.
+            if (tp.instrument != nullptr)
+                tp.instrument->syncState (t.getChildWithName (ids::INSTRUMENT), project.folder);
             // Stored values, with the instrument's defaults for any knob the project doesn't have
             // (a project saved before the instrument grew that knob).
             const auto inst = t.getChildWithName (ids::INSTRUMENT);

@@ -27,6 +27,8 @@ namespace cmd
         newDrummerTrack, showDrummer, showStepSequencer, visitWebsite
     };
 
+    // The Sampler (SamplerEditor.cpp).
+    enum : juce::CommandID { showSampler = 0x3000, newSamplerTrack, convertToSampler, convertToSamplerSlice };
     // Mixing and recording: Track Stacks, groups and VCAs, freeze, Autopunch (MixCommands.cpp).
     enum : juce::CommandID
     {
@@ -183,7 +185,7 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer };
+    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer, sampler };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
 
