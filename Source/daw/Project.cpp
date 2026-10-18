@@ -1,6 +1,7 @@
 #include "Project.h"
 #include "../instruments/Instrument.h"
 #include "../engine/Registry.h"
+#include "Stacks.h"
 
 namespace woodshed::daw
 {
@@ -519,6 +520,7 @@ std::vector<float> Project::decodeValues (const juce::String& text)
 
 void Project::removeTrack (const juce::ValueTree& track)
 {
+    stacks::forget (*this, track);      // a stack main's members un-stack; a VCA's tracks lose it
     state.removeChild (track, &undo);
 }
 
