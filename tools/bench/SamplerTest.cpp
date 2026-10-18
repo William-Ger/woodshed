@@ -689,6 +689,7 @@ int writeSamplerDemoProject (const juce::File& folder)
     auto slices = convertToSamplerTrack (*p, region, Mode::slice);
     if (slices.isValid())
     {
+        slices.setProperty (daw::ids::volume, -4.0, nullptr);
         auto midi = slices.getChild (slices.getNumChildren() - 1);
         midi.setProperty (daw::ids::length, bar * 4, nullptr);
         midi.removeAllChildren (nullptr);
@@ -697,29 +698,35 @@ int writeSamplerDemoProject (const juce::File& folder)
             p->addNote (midi, { order[i % 16], i % 4 == 0 ? 120 : 96, (juce::int64) i * 240, 240 });
     }
 
-    // The guitar DI (or a generated tone) as a Classic sampler, playing a line across the keyboard.
-    auto keys = addSamplerTrack (*p, "Guitar Sampler");
-    const auto di = juce::File::getCurrentWorkingDirectory().getChildFile ("tools/testdata/guitar-di-48k.wav");
-    const auto tone = folder.getChildFile ("tone.wav");
-    if (! di.existsAsFile())
-        writeWav (tone, sine (220.0, 2.0), rate);
-    loadFileIntoTrack (*p, keys, di.existsAsFile() ? di : tone, Mode::classic);
-    tone.deleteFile();
+    // A plucked tone at A2, generated, as a Classic sampler: its root is found, its sustain looped.
+    auto keys = addSamplerTrack (*p, "Pluck Sampler");
+    keys.setProperty (daw::ids::volume, -9.0, nullptr);
+    juce::AudioBuffer<float> tone (2, (int) (2.5 * rate));
+    for (int c = 0; c < 2; ++c)
+        for (int i = 0; i < tone.getNumSamples(); ++i)
+        {
+            const double t = i / rate;
+            double v = 0.0;
+            for (int h = 1; h <= 12; ++h)
+                v += std::exp (-t * (0.6 + 0.5 * h)) / h * std::sin (juce::MathConstants<double>::twoPi * 220.0 * h * t + c * 0.3 * h);
+            tone.setSample (c, i, (float) (0.35 * v * juce::jmin (1.0, t * 500.0)));
+        }
+    const auto toneFile = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("Pluck A2.wav");
+    writeWav (toneFile, tone, rate);
+    loadFileIntoTrack (*p, keys, toneFile, Mode::classic);
+    toneFile.deleteFile();
     auto zone = keys.getChildWithName (daw::ids::INSTRUMENT).getChildWithName (sampler::ids::SAMPLER).getChild (0);
     if (zone.isValid())
     {
-        const auto len = (juce::int64) zone.getProperty (sampler::ids::end, -1);
-        const auto total = len > 0 ? len : (juce::int64) (4.0 * rate);
-        zone.setProperty (sampler::ids::end, juce::jmin (total, (juce::int64) (3.0 * rate)), nullptr);
         zone.setProperty (sampler::ids::loop, "forward", nullptr);
-        zone.setProperty (sampler::ids::loopStart, (juce::int64) (0.6 * rate), nullptr);
-        zone.setProperty (sampler::ids::loopEnd, (juce::int64) (1.4 * rate), nullptr);
-        zone.setProperty (sampler::ids::crossfade, (juce::int64) (0.08 * rate), nullptr);
+        zone.setProperty (sampler::ids::loopStart, (juce::int64) (0.8 * rate), nullptr);
+        zone.setProperty (sampler::ids::loopEnd, (juce::int64) (1.6 * rate), nullptr);
+        zone.setProperty (sampler::ids::crossfade, (juce::int64) (0.1 * rate), nullptr);
     }
     auto line = p->addMidiRegion (keys, 0, bar * 4, "Line");
     const int notes[] { 0, 3, 5, 7, 10, 7, 5, 3 };
     for (int i = 0; i < 8; ++i)
-        p->addNote (line, { 52 + notes[i], 100, (juce::int64) i * 1920, 1800 });
+        p->addNote (line, { 57 + notes[i], 100, (juce::int64) i * 1920, 1800 });
     p->state.setProperty (daw::ids::selectedTrack, keys[daw::ids::id], nullptr);
 
     if (! p->save())
