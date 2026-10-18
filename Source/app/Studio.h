@@ -25,6 +25,13 @@ namespace cmd
         importMidi, exportMidi, pluginManager, loopRegions, showScore,
         newDrummerTrack, showDrummer, showStepSequencer, visitWebsite
     };
+
+    // Time Stretch, Pitch Edit and Tempo Detect (FlexCommands.cpp).
+    enum : juce::CommandID
+    {
+        flexTrack = 0x3100, flexMono, flexPoly, flexRhythmic, flexSpeed, quantizeAudio, followTempo, resetTiming,
+        detectTempo, conformTempo, showPitchEdit, importTempoAsk, importTempoAlways, importTempoNever, conformImports
+    };
 }
 
 /**
@@ -122,6 +129,9 @@ public:
     /** The same region in the Drummer or Step Sequencer pane. */
     void openInDrummer (int regionId);
     void openInStepSequencer (int regionId);
+    /** Pitch Edit: the audio region opened in it, else the first selected audio region. */
+    juce::ValueTree getPitchEditRegion() const;
+    void openInPitchEdit (int regionId);
     /** Opens a region where it was made: a Drummer region in the Drummer, a step pattern in the
         Step Sequencer, anything else in the piano roll (double-click). */
     void openRegion (int regionId);
@@ -169,7 +179,7 @@ public:
     }
 
     // Panes below the tracks.
-    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer };
+    enum class Pane { none, rig, mixer, editor, takes, score, drummer, stepSequencer, pitchEdit };
     Pane getPane() const                                    { return pane; }
     void setPane (Pane);
 
@@ -210,7 +220,7 @@ private:
     juce::Array<int> selectedRegions;
     juce::ValueTree clipboard;
     Pane pane = Pane::rig;
-    int editorRegionId = -1, takeFolderId = -1;
+    int editorRegionId = -1, takeFolderId = -1, pitchEditRegionId = -1;
     bool automationShown = false, importing = false;
     int quantizeTicks = daw::ticksPerQuarter / 4;
     int midiScanTicks = 0;

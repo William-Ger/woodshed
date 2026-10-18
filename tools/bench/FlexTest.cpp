@@ -842,7 +842,8 @@ int writeFlexDemoProject (const juce::File& folder)
     auto project = Project::createIn (folder, rate);
     project->audioFolder().createDirectory();
 
-    const auto loop = beatLoop (90.0, 4, true, 0.0);
+    auto loop = beatLoop (90.0, 4, true, 0.0);
+    for (auto& v : loop) v *= 0.6f;     // headroom for the melody on top
     writeWav (project->audioFolder().getChildFile ("Drum Loop 90.wav"), loop);
     auto drums = project->addTrack ("Drums");
     auto loopRegion = project->addRegion (drums, "Audio/Drum Loop 90.wav", 0, 0, (juce::int64) loop.size(), "Drum Loop");

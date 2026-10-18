@@ -1,11 +1,12 @@
 #include "MainComponent.h"
 #include "PluginHost.h"
+#include "FlexCommands.h"
 
 namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), pitchEditor (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -18,6 +19,7 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (stepSequencer);
     addChildComponent (typing);
     addChildComponent (takesEditor);
+    addChildComponent (pitchEditor);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
     // Tracks above, the pane below; the divider between them can be dragged.
@@ -56,6 +58,7 @@ juce::Component* MainComponent::paneComponent()
         case Studio::Pane::score:  return &scoreView;
         case Studio::Pane::drummer: return &drummer;
         case Studio::Pane::stepSequencer: return &stepSequencer;
+        case Studio::Pane::pitchEdit: return &pitchEditor;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
         default:                   return nullptr;
@@ -65,7 +68,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &pitchEditor })
         c->setVisible (c == shown);
 }
 
@@ -118,6 +121,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
                   cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions, cmd::showScore,
                   cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
+    flexui::getAllCommands (c);     // Time Stretch, Pitch Edit, Tempo Detect
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -127,6 +131,8 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
     const auto shift = juce::ModifierKeys::shiftModifier;
     auto& p = studio.project();
     auto& s = p.state;
+    if (flexui::getCommandInfo (studio, id, info))     // Time Stretch, Pitch Edit, Tempo Detect
+        return;
 
     switch (id)
     {
@@ -236,6 +242,11 @@ bool MainComponent::perform (const InvocationInfo& info)
     auto& p = studio.project();
     auto& s = p.state;
     auto toggle = [&s] (const juce::Identifier& id) { s.setProperty (id, ! (bool) s[id], nullptr); };
+    if (flexui::perform (studio, info.commandID))      // Time Stretch, Pitch Edit, Tempo Detect
+    {
+        studio.commands.commandStatusChanged();
+        return true;
+    }
 
     switch (info.commandID)
     {
@@ -409,6 +420,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::nudgeLeft);
             m.addCommandItem (cm, cmd::nudgeRight);
             m.addCommandItem (cm, cmd::quantize);
+            m.addSeparator();
+            flexui::addMenuItems (m, cm);
             break;
         case 2:
             m.addCommandItem (cm, cmd::newTrack);
@@ -443,6 +456,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::showScore);
             m.addCommandItem (cm, cmd::showStepSequencer);
             m.addCommandItem (cm, cmd::showDrummer);
+            m.addCommandItem (cm, cmd::showPitchEdit);
             m.addCommandItem (cm, cmd::showMixer);
             m.addCommandItem (cm, cmd::showAutomation);
             m.addCommandItem (cm, cmd::hideBottom);

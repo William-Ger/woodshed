@@ -76,6 +76,7 @@ Studio::Studio (juce::ApplicationProperties& s) : appSettings (s)
     else if (testPane == "score") pane = Pane::score;
     else if (testPane == "none") pane = Pane::none;
     else if (testPane == "takes") pane = Pane::takes;
+    else if (testPane == "pitchEdit") pane = Pane::pitchEdit;
     if (const auto r = juce::SystemStats::getEnvironmentVariable ("WOODSHED_TEST_REGION", {}).getIntValue(); r > 0)
         selectedRegions = { r };
     else if (testPane == "drummer") pane = Pane::drummer;
@@ -966,10 +967,35 @@ void Studio::openInStepSequencer (int regionId)
     sendChangeMessage();
 }
 
+juce::ValueTree Studio::getPitchEditRegion() const
+{
+    auto isAudio = [] (const juce::ValueTree& r)
+    {
+        return r.isValid() && r.hasProperty (daw::ids::file) && ! daw::Project::isMidiRegion (r) && ! daw::Project::isTakeFolder (r);
+    };
+    if (auto r = findRegion (pitchEditRegionId); isAudio (r))
+        return r;
+    for (int id : selectedRegions)
+        if (auto r = findRegion (id); isAudio (r))
+            return r;
+    return {};
+}
+
+void Studio::openInPitchEdit (int regionId)
+{
+    pitchEditRegionId = regionId;
+    if (auto r = findRegion (regionId); r.isValid())
+        selectTrack ((int) r.getParent()[daw::ids::id]);
+    pane = Pane::pitchEdit;
+    sendChangeMessage();
+}
+
 void Studio::openRegion (int regionId)
 {
     const auto r = findRegion (regionId);
-    if (daw::drummer::isDrummerRegion (r))
+    if (r.hasProperty (daw::ids::file) && ! daw::Project::isMidiRegion (r) && ! daw::Project::isTakeFolder (r))
+        openInPitchEdit (regionId);     // an audio region: its notes in Pitch Edit
+    else if (daw::drummer::isDrummerRegion (r))
         openInDrummer (regionId);
     else if (r.hasProperty (daw::StepPattern::property))
         openInStepSequencer (regionId);

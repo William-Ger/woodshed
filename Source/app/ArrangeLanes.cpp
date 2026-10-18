@@ -2,6 +2,7 @@
 #include "ArrangeHeader.h"
 #include "ArrangeView.h"
 #include "ChannelStrip.h"
+#include "FlexCommands.h"
 
 namespace woodshed::app::arrange
 {
@@ -34,7 +35,7 @@ namespace
     }
 }
 
-Lanes::Lanes (ArrangeView& v) : view (v)
+Lanes::Lanes (ArrangeView& v) : view (v), flex (v)
 {
     setOpaque (true);
 }
@@ -106,7 +107,7 @@ juce::int64 Lanes::fileLengthOf (const juce::ValueTree& region)
 {
     if (daw::Project::isMidiRegion (region) || daw::Project::isTakeFolder (region))
         return 0;       // no end to run into
-    return view.waveforms.info (view.project().resolve (region[ids::file].toString())).length;
+    return flex.playedLength (region, view.waveforms.info (view.project().resolve (region[ids::file].toString())).length);
 }
 
 juce::int64 Lanes::minimumLength() const
@@ -389,11 +390,12 @@ void Lanes::drawRegion (juce::Graphics& g, const juce::ValueTree& region, int tr
             }
         }
     }
-    else
+    else if (! flex.drawWave (g, region, rect, wave, colour, look.start, look.offset))     // a stretched region draws what it plays
     {
         drawWave (g, view.project().resolve (region[ids::file].toString()), look.offset, wave.withX (rect.getX()).withRight (wave.getRight()),
                   colour, look, region);
     }
+    flex.drawMarkers (g, region, rect, wave, look.start, look.offset);
 
     drawFades (g, rect, body.withTrimmedTop (nameBarHeight), look);
     }
@@ -791,6 +793,9 @@ void Lanes::mouseDown (const juce::MouseEvent& e)
 
     auto& studio = view.studio;
     const auto hit = regionAt (e.getPosition());
+    if (hit.region.isValid() && flex.mouseDown (e, hit.region, regionRect (hit.trackIndex, (juce::int64) hit.region[ids::start],
+                                                                          (juce::int64) hit.region[ids::length]), nameBarHeight))
+        return;     // a flex marker added, moved or removed
     shiftAtDown = e.mods.isShiftDown();
     downSample = view.sampleAtX (e.x);
     moveDelta = 0;
@@ -857,6 +862,11 @@ void Lanes::mouseDown (const juce::MouseEvent& e)
 
 void Lanes::mouseDrag (const juce::MouseEvent& e)
 {
+    if (flex.isDragging())
+    {
+        flex.mouseDrag (e);
+        return;
+    }
     if (gesture == Gesture::automation)
     {
         automationDrag (e);
@@ -972,6 +982,11 @@ void Lanes::mouseDrag (const juce::MouseEvent& e)
 
 void Lanes::mouseUp (const juce::MouseEvent& e)
 {
+    if (flex.isDragging())
+    {
+        flex.mouseUp (e);
+        return;
+    }
     switch (gesture)
     {
         case Gesture::move:      commitMove (e.mods.isAltDown()); break;
@@ -1372,6 +1387,8 @@ void Lanes::showRegionMenu()
     m.addItem ("Region Settings...", [this] { showRegionSettings(); });
     m.addItem ("Loop These Regions", [&studio] { studio.commands.invokeDirectly (cmd::loopToSelection, false); });
     m.addItem ("Remove Fades", [this] { removeFadesFromSelection(); });
+    if (const auto first = studio.findRegion (studio.getSelectedRegions()[0]); first.isValid())
+        flex.addMenuItems (m, first);
 
     // Take folders: comp them, or make the comp plain regions.
     for (int id : studio.getSelectedRegions())
@@ -1568,6 +1585,7 @@ void Lanes::filesDropped (const juce::StringArray& files, int x, int y)
     p.audioFolder().createDirectory();
 
     p.undo.beginNewTransaction ("Import Audio");
+    const bool songWasEmpty = p.contentEnd() <= 0;
     auto track = dropTrack >= 0 ? p.track (dropTrack) : juce::ValueTree();
     auto at = dropAt;
     juce::Array<int> added;
@@ -1620,6 +1638,8 @@ void Lanes::filesDropped (const juce::StringArray& files, int x, int y)
         studio.flash (problem);
     else if (! added.isEmpty())
         studio.flash (added.size() == 1 ? "Imported 1 file" : "Imported " + juce::String (added.size()) + " files");
+    if (problem.isEmpty())
+        flexui::audioImported (studio, added, songWasEmpty);    // Tempo Detect: adopt the file's tempo, or conform it
 
     repaint();
 }
