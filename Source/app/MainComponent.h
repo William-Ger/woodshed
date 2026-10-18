@@ -59,10 +59,10 @@ private:
     StepSequencer stepSequencer;
     MusicalTyping typing;
     TakesEditor takesEditor;
-    MasteringPanel masteringPanel;
     PitchEditor pitchEditor;
     LoopGridView loopGridView;
     SamplerEditor samplerEditor;
+    MasteringPanel masteringPanel;
     std::unique_ptr<MovieController> movie;         // spatial and video
 
     /** The component for the current pane: the rig, or an instrument track's sound in its place. */
