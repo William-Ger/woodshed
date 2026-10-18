@@ -2,6 +2,8 @@
 
 #include "../engine/Pedal.h"
 
+namespace juce { class ValueTree; }
+
 namespace woodshed
 {
 
@@ -66,6 +68,11 @@ public:
 
     float knob (int index) const                                { return knobValues[(size_t) index]; }
     void setKnob (int index, float realValue)                   { knobValues[(size_t) index] = realValue; }
+
+    /** State beyond the knobs (the Sampler's zones and samples): the track's INSTRUMENT node and
+        the project folder its files are relative to. Called on the message thread whenever a
+        snapshot of the song is built, so return quickly when nothing changed. */
+    virtual void syncState (const juce::ValueTree& /*instrumentNode*/, const juce::File& /*projectFolder*/) {}
 
 protected:
     /** Allocate buffers here. sampleRate and maxBlock are valid. */
@@ -309,5 +316,6 @@ void registerSynthInstruments (InstrumentRegistry&);
 void registerKeyboardInstruments (InstrumentRegistry&);
 void registerDrumInstruments (InstrumentRegistry&);
 void registerOrchestralInstruments (InstrumentRegistry&);
+void registerSamplerInstruments (InstrumentRegistry&);       // Sampler.cpp
 
 } // namespace woodshed

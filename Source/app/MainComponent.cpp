@@ -5,7 +5,7 @@ namespace woodshed::app
 {
 
 MainComponent::MainComponent (Studio& s)
-    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s)
+    : studio (s), controlBar (s), arrange (s), mixer (s), rig (s), instrument (s), pianoRoll (s), scoreView (s), drummer (s), stepSequencer (s), typing (s), takesEditor (s), samplerEditor (s)
 {
     addAndMakeVisible (controlBar);
     addAndMakeVisible (arrange);
@@ -18,6 +18,7 @@ MainComponent::MainComponent (Studio& s)
     addChildComponent (stepSequencer);
     addChildComponent (typing);
     addChildComponent (takesEditor);
+    addChildComponent (samplerEditor);
     instrument.onMusicalTyping = [this] { typing.isOpen() ? typing.close() : typing.open(); };
 
     // Tracks above, the pane below; the divider between them can be dragged.
@@ -56,6 +57,7 @@ juce::Component* MainComponent::paneComponent()
         case Studio::Pane::score:  return &scoreView;
         case Studio::Pane::drummer: return &drummer;
         case Studio::Pane::stepSequencer: return &stepSequencer;
+        case Studio::Pane::sampler: return &samplerEditor;
         case Studio::Pane::rig:    return shownInstrument ? static_cast<juce::Component*> (&instrument) : &rig;
         case Studio::Pane::none:
         default:                   return nullptr;
@@ -65,7 +67,7 @@ juce::Component* MainComponent::paneComponent()
 void MainComponent::showPaneComponents()
 {
     auto* shown = paneComponent();
-    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer })
+    for (auto* c : std::initializer_list<juce::Component*> { &mixer, &rig, &instrument, &pianoRoll, &takesEditor, &scoreView, &drummer, &stepSequencer, &samplerEditor })
         c->setVisible (c == shown);
 }
 
@@ -118,6 +120,8 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::zoomToFit, cmd::toggleFullScreen, cmd::showTuner,
                   cmd::newAudioTrack, cmd::newInstrumentTrack, cmd::newDrumTrack, cmd::showEditor, cmd::musicalTyping, cmd::quantize, cmd::showAutomation, cmd::importMidi, cmd::exportMidi, cmd::pluginManager, cmd::loopRegions, cmd::showScore,
                   cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
+    // The Sampler.
+    c.addArray ({ cmd::showSampler, cmd::newSamplerTrack, cmd::convertToSampler, cmd::convertToSamplerSlice });
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -226,6 +230,15 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
         case cmd::pluginManager:   info.setInfo ("Plug-in Manager...", {}, "View", 0); break;
         case cmd::showAutomation:  info.setInfo ("Show Automation", {}, "View", 0); info.addDefaultKeypress ('a', 0);
                                    info.setTicked (studio.isShowingAutomation()); break;
+
+        // The Sampler.
+        case cmd::showSampler:     info.setInfo ("Sampler", {}, "View", 0);
+                                   info.setTicked (studio.getPane() == Studio::Pane::sampler); break;
+        case cmd::newSamplerTrack: info.setInfo ("New Sampler Track", {}, "Track", 0); break;
+        case cmd::convertToSampler: info.setInfo ("Convert to Sampler Track", {}, "Track", 0);
+                                   info.setActive (SamplerEditor::canConvertSelection (studio)); break;
+        case cmd::convertToSamplerSlice: info.setInfo ("Convert to Sampler Track (Slice)", {}, "Track", 0);
+                                   info.setActive (SamplerEditor::canConvertSelection (studio)); break;
         default: break;
     }
 }
@@ -337,6 +350,12 @@ bool MainComponent::perform (const InvocationInfo& info)
         case cmd::pluginManager:   studio.plugins().showManager(); break;
         case cmd::loopRegions:     studio.toggleLoopSelectedRegions(); break;
         case cmd::showAutomation:  studio.setShowingAutomation (! studio.isShowingAutomation()); break;
+
+        // The Sampler.
+        case cmd::showSampler:     studio.setPane (studio.getPane() == Studio::Pane::sampler ? Studio::Pane::none : Studio::Pane::sampler); break;
+        case cmd::newSamplerTrack: SamplerEditor::newSamplerTrack (studio); break;
+        case cmd::convertToSampler: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::classic); break;
+        case cmd::convertToSamplerSlice: SamplerEditor::convertSelectedRegion (studio, sampler::Mode::slice); break;
         case cmd::quantize:
             if (studio.getPane() == Studio::Pane::editor && pianoRoll.isShowing())
                 pianoRoll.quantizeSelection();
@@ -416,6 +435,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::newInstrumentTrack);
             m.addCommandItem (cm, cmd::newDrumTrack);
             m.addCommandItem (cm, cmd::newDrummerTrack);
+            m.addCommandItem (cm, cmd::newSamplerTrack);
+            m.addCommandItem (cm, cmd::convertToSampler);
+            m.addCommandItem (cm, cmd::convertToSamplerSlice);
             m.addSeparator();
             m.addCommandItem (cm, cmd::duplicateTrack);
             m.addCommandItem (cm, cmd::deleteTrack);
@@ -443,6 +465,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::showScore);
             m.addCommandItem (cm, cmd::showStepSequencer);
             m.addCommandItem (cm, cmd::showDrummer);
+            m.addCommandItem (cm, cmd::showSampler);
             m.addCommandItem (cm, cmd::showMixer);
             m.addCommandItem (cm, cmd::showAutomation);
             m.addCommandItem (cm, cmd::hideBottom);
