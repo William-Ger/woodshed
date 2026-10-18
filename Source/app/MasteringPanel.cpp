@@ -565,8 +565,8 @@ void MasteringPanel::paintMeters (juce::Graphics& g, juce::Rectangle<int> area)
             if (auto* m = dynamic_cast<MasteringProcessor*> (pedal.get()))
             {
                 r.removeFromTop (4);
-                row ("Limiter", "-" + juce::String (m->getLimiterReduction(), 1) + " dB", theme::text);
-                row ("Compressor", "-" + juce::String (m->getCompressorReduction(), 1) + " dB", theme::text);
+                row ("Limiter", juce::String (-std::abs (m->getLimiterReduction()), 1) + " dB", theme::text);
+                row ("Compressor", juce::String (-std::abs (m->getCompressorReduction()), 1) + " dB", theme::text);
             }
 }
 

@@ -28,6 +28,7 @@
 #include "../../Source/engine/Chain.h"
 #include "../../Source/engine/PitchDetector.h"
 #include "../../Source/engine/Presets.h"
+#include "../../Source/mastering/Loudness.h"
 #include <deque>
 #include <juce_audio_formats/juce_audio_formats.h>
 
@@ -1011,6 +1012,28 @@ int main (int argc, char* argv[])
         return 0;
     }
 
+    if (args[0] == "loudness" && args.size() > 1)
+    {
+        // EBU R128 numbers for a file: integrated, range and true peak.
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr)
+        {
+            std::cerr << "can't read " << args[1] << "\n";
+            return 1;
+        }
+        juce::AudioBuffer<float> buf ((int) reader->numChannels, (int) reader->lengthInSamples);
+        reader->read (&buf, 0, buf.getNumSamples(), 0, true, true);
+        const int count = args.size() > 2 ? juce::jmin (buf.getNumSamples(), (int) (args[2].getDoubleValue() * reader->sampleRate))
+                                          : buf.getNumSamples();     // optional: only the first N seconds
+        mastering::LoudnessMeter meter;
+        meter.prepare (reader->sampleRate);
+        meter.process (buf.getReadPointer (0), buf.getReadPointer (juce::jmin (1, buf.getNumChannels() - 1)), count);
+        std::cout << "integrated " << meter.integrated() << " LUFS, range " << meter.loudnessRange()
+                  << " LU, true peak " << meter.truePeakDb() << " dBTP\n";
+        return 0;
+    }
     if (args[0] != "run" && args[0] != "presets" && args[0] != "pitchcorrect")
     {
         std::cerr << "usage: woodshed-bench list | knobs [type ...] | run [type ...] [--wav file] [--render dir]"
@@ -1018,7 +1041,7 @@ int main (int argc, char* argv[])
                      " | instruments [type ...] [--render dir] [--analyse] | project | score | score-render dir | drummer"
                      " | pitchcorrect [--wav file] [--render dir]"
                      " | loopgrid | demo-loopgrid <folder>"
-                     " | spatial | demo-spatial <folder> [movie]"
+                     " | spatial | demo-spatial <folder> [movie] | loudness <file> [seconds]"
                      " | mix"
                      " | mastering | demo-mastering <folder>"
                      " | demo-midi <folder> | demo-drummer <folder> | demo-mix <folder> | render-project <folder> <out.wav>"

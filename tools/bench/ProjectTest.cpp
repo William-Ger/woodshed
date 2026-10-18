@@ -1130,7 +1130,18 @@ int renderProject (const juce::File& folder, const juce::File& out)
         runtimes[rt->id] = rt;
     }
 
-    auto snap = Engine::buildSnapshot (*project, pool, runtimes);
+    // The Stereo Out's effects (mastering included), with their non-knob settings.
+    TrackRuntime masterRt;
+    for (auto fx : Project::inserts (project->state.getChildWithName (ids::MASTER)))
+        if (auto* type = woodshed::Registry::get().find (fx[ids::type].toString()))
+        {
+            std::shared_ptr<woodshed::Pedal> pedal = type->create();
+            pedal->prepare (rate, block);
+            pedal->setState (fx[ids::state].toString());
+            masterRt.inserts.push_back ({ (int) fx[ids::id], fx[ids::type].toString(), pedal });
+        }
+
+    auto snap = Engine::buildSnapshot (*project, pool, runtimes, &masterRt);
     for (auto& t : snap->tracks)
     {
         t.runtime->gainLeft.setCurrentAndTargetValue (t.audible ? t.gain : 0.0f);

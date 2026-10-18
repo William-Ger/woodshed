@@ -20,9 +20,13 @@ feel familiar), but it's its own program, written from scratch.
 - Regions: move, trim, split, copy and paste (between projects too), repeat, loop, mute, nudge,
   fades and crossfades
 - Cycle recording into take folders, with swipe comping
+- Autopunch with punch locators and pre-roll, and quick punch while playing
+- Track stacks (folder and summing), track groups, VCA faders and track freeze
+- Loop Grid: a grid of loops and scenes to launch in time, record into cells, and record the
+  performance back into the arrangement
 - Markers, tempo and time signature changes, count-in and click
 - Live waveforms (and notes) while you record; latency-compensated takes
-- Time Stretch: flex markers on transients, Monophonic, Polyphonic, Rhythmic (slicing) and
+- Time Stretch: stretch markers on transients, Monophonic, Polyphonic, Rhythmic (slicing) and
   Speed modes, quantize audio to the grid, and audio that follows tempo changes
 - Pitch Edit: the notes of a voice or solo as blobs to drag, with fine pitch, drift, vibrato,
   gain, formants and quantize to a scale, rendered with a formant-preserving pitch shift
@@ -31,10 +35,12 @@ feel familiar), but it's its own program, written from scratch.
 - Bounce to WAV, AIFF or FLAC at 16, 24 or 32-bit float, with normalize, or every track as a stem
 
 **Instruments and MIDI**
-- 18 built-in instruments with 111 sounds, all synthesized: grand piano, electric piano,
+- 19 built-in instruments with 117 sounds, synthesized or sampled: grand piano, electric piano,
   tonewheel organ, clavinet, analog, mono, FM and pad synths, strings, brass, choir, plucked
-  strings, electric bass, mallets and a drum kit (studio, 808, 909, electronic, lo-fi)
-- Audio Unit and VST3 plug-ins, instruments and effects
+  strings, electric bass, mallets, a drum kit (studio, 808, 909, electronic, lo-fi) and the sampler
+- Sampler: multi-zone, with Classic, One Shot and Slice modes, loops with crossfades, filter,
+  envelopes and LFO; drop in a file or convert any audio region into a sampler track
+- Audio Unit and VST3 plug-ins, instruments and effects, with plug-in delay compensation
 - Piano roll, score (notation) editor, step sequencer and a Drummer that plays grooves in
   16 styles, with complexity, loudness, swing and fills
 - MIDI keyboards, and Musical Typing on the computer keyboard (Cmd-K)
@@ -46,7 +52,7 @@ feel familiar), but it's its own program, written from scratch.
   true peak), correlation and a spectrum, and an assistant that masters the song to a
   loudness target (streaming, podcast, CD, club) with a matching EQ, bus compression, width
   and a true-peak limiter
-- 92 effects: dynamics, EQ, drive, amps and cabinets, modulation, pitch (including vocal pitch
+- 93 effects: dynamics, EQ, drive, amps and cabinets, modulation, pitch (including vocal pitch
   correction), delay, reverb and a drawer full of strange ones
 - Automation for volume, pan, sends and every instrument and effect knob
 - 215 factory guitar rig presets
@@ -66,12 +72,16 @@ feel familiar), but it's its own program, written from scratch.
 | ![Instrument](docs/screenshots/instrument.png) | ![Piano roll](docs/screenshots/piano-roll.png) |
 | ![Mixer](docs/screenshots/mixer.png) | ![Drummer](docs/screenshots/drummer.png) |
 | ![Takes](docs/screenshots/takes.png) | ![Score](docs/screenshots/score.png) |
+| ![Loop Grid](docs/screenshots/loop-grid.png) | ![Sampler](docs/screenshots/sampler.png) |
+| ![Track stacks and VCA](docs/screenshots/stacks-mixer.png) | ![Mastering](docs/screenshots/mastering.png) |
+| ![Pitch Edit](docs/screenshots/pitch-edit.png) | ![Time Stretch](docs/screenshots/time-stretch.png) |
 
 ## Not there yet
 
-Woodshed is young. Things the big DAWs have that it doesn't yet: Live Loops, a sampler
-instrument, track stacks, groups and VCAs, punch in/out, track freeze, plug-in delay
-compensation. Contributions are very welcome.
+Woodshed is young, and every feature above is new and lightly used. Bug reports and
+contributions are very welcome. Known gaps: the sampler can't record straight from an input
+yet, Loop Grid cells play at the song's starting tempo and aren't time-stretched, and the
+Windows and Linux builds are tested by CI but not yet by people.
 
 Surround is bounce-only: the engine plays in stereo, so while you work you hear 3D tracks
 binaurally on headphones (or panned in stereo), and the 5.1 and 7.1.4 mixes exist only as
@@ -116,8 +126,10 @@ build-bench/WoodshedBench_artefacts/Release/WoodshedBench project      # the eng
 build-bench/WoodshedBench_artefacts/Release/WoodshedBench instruments  # every instrument and sound
 ```
 
-`presets`, `drummer`, `score`, `pitchcorrect`, `spatial` and `flex` test the rest; `demo-midi <folder>` and
-`render-project <folder> <out.wav>` make and render a short song.
+`presets`, `drummer`, `score`, `pitchcorrect`, `mix`, `sampler`, `loopgrid`, `spatial`, `flex` and
+`mastering` test the rest. `demo-midi <folder>` (and `demo-mix`, `demo-sampler`, `demo-loopgrid`,
+`demo-spatial`, `demo-flex`, `demo-mastering`) write example songs, `render-project <folder>
+<out.wav>` renders one, and `loudness <file>` measures a file's loudness.
 
 ## Contributing
 

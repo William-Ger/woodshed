@@ -127,7 +127,7 @@ if(NOT WOODSHED_BENCH_ONLY)
         COMPANY_COPYRIGHT "Built by willgerstung.com. Free software under the GNU AGPLv3."
         BUNDLE_ID com.willgerstung.woodshed
         PRODUCT_NAME "Woodshed"
-        VERSION 0.3.0
+        VERSION 0.4.0
         ICON_BIG art/icon/woodshed-icon.png
         MICROPHONE_PERMISSION_ENABLED TRUE
         MICROPHONE_PERMISSION_TEXT "Woodshed needs audio input to hear and record your guitar through your interface.")
