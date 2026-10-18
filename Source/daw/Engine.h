@@ -19,6 +19,8 @@ public:
 
     /** Loads the file the first time it's asked for (mono or the first channel). Null if unreadable. */
     Audio get (const juce::File&);
+    /** The same file in stereo (a mono file on both channels), for frozen tracks. */
+    Audio getStereo (const juce::File&);
     void forget (const juce::File&);
     void clear()                                    { cache.clear(); }
 
@@ -85,6 +87,28 @@ private:
 };
 
 //==============================================================================
+/** A stereo history of a track's signal for delay compensation: written once per block, read
+    back at any delay up to its capacity less the block. Fixed size, so the audio thread never
+    allocates; one that was never allocated reads as no delay. */
+struct DelayRing
+{
+    /** The longest compensation, in samples (about 340 ms at 48 kHz); longer latencies are clamped. */
+    static constexpr int capacity = 1 << 14;
+
+    void allocate()                                 { data.setSize (2, capacity); data.clear(); write = 0; }
+    bool isAllocated() const noexcept               { return data.getNumSamples() == capacity; }
+    void clear() noexcept                           { if (isAllocated()) data.clear(); write = 0; }
+
+    /** Audio thread: appends a block. */
+    void push (const float* left, const float* right, int n) noexcept;
+    /** Audio thread: adds the block just pushed, `delay` samples late, times `gain`. */
+    void addDelayed (int delay, float* left, float* right, int n, float gain) const noexcept;
+
+    juce::AudioBuffer<float> data;
+    int write = 0;
+};
+
+//==============================================================================
 /** One insert effect's pedal, kept while its FX node keeps its id and type. */
 struct InsertRuntime
 {
@@ -106,6 +130,7 @@ struct TrackRuntime
     bool notesSounding = false;                                         // audio thread
     juce::AudioBuffer<float> work;                                      // audio thread scratch
     juce::AudioBuffer<float> busInput;                                  // aux tracks: the sends they receive
+    DelayRing preFader, postFader;                                      // delay compensation (audio thread)
     juce::SmoothedValue<float> gainLeft, gainRight;
     std::atomic<float> peakLeft { 0.0f }, peakRight { 0.0f };          // audio thread accumulates
     float shownLeft = 0.0f, shownRight = 0.0f;                          // message thread: last 30 Hz frame
@@ -149,9 +174,22 @@ struct TrackPlayback
 
     /** A send: this track's signal also goes to the aux at `target` (an index into the snapshot's
         tracks, always later than this one, so it plays after every track feeding it). */
-    struct Send { int target = -1; float gain = 1.0f; bool pre = false; };
+    struct Send { int target = -1; float gain = 1.0f; bool pre = false; int delay = 0; };
     std::vector<Send> sends;
     bool aux = false;
+
+    // Mixing: stacks, VCAs, delay compensation and freeze.
+    /** False for a summing stack's member: it reaches the Stereo Out through its main, the last of
+        its sends (post-fader, unity). */
+    bool toMaster = true;
+    /** Gains on the fader from VCAs and folder stack mains: a fixed one, or a line (in dB). */
+    struct Scale { float gain = 1.0f; std::vector<AutoPoint> points; };
+    std::vector<Scale> scalers;
+    /** How late the track's own chain makes its signal (rig, instrument, inserts), and how much
+        more its output is delayed so every path reaches the Stereo Out together. */
+    int latency = 0, outputDelay = 0;
+    /** A frozen track: plays this stereo render (pre-fader, from sample 0) instead of itself. */
+    AudioPool::Audio frozen;
 
     /** An automation line and what it drives. */
     struct AutoLine
@@ -176,6 +214,14 @@ struct Snapshot
     float masterGain = 1.0f;
     bool click = true, loopOn = false;
     juce::int64 loopStart = 0, loopEnd = 0;
+    /** How late the mix reaches the output once every path is lined up (the longest path plus the
+        master's inserts). The click and recordings are moved by the same amount. */
+    int latency = 0;
+
+    /** Delay compensation: works out each track's output and send delays from the tracks'
+        `latency`, so every path reaches the Stereo Out (and each bus) at the same time, and sets
+        `latency`. buildSnapshot calls it; call it again after changing the routing. */
+    void alignLatencies();
 };
 
 /** Mixes one block of a snapshot. Shared by live playback and offline bounces. */
@@ -307,6 +353,20 @@ public:
     bool isBouncing() const                                 { return bounceThread != nullptr; }
     float getBounceProgress() const                         { return bounceProgress.load(); }
 
+    // Freeze: a track's instrument, rig and inserts rendered (pre-fader) to a file in the
+    // project's Freeze folder, which it then plays instead, for none of their CPU.
+    /** Renders `track` to `file` right here (the bench uses this; the UI uses freezeTrack). */
+    bool renderFreeze (const juce::ValueTree& track, const juce::File& file);
+    /** Renders the track on a background thread, then freezes it (one undo step). */
+    void freezeTrack (juce::ValueTree track, std::function<void (bool ok)> done = {});
+    /** Plays the track live again (one undo step); its freeze file stays for undo. */
+    void unfreezeTrack (juce::ValueTree track);
+    /** Where a track's freeze file goes. */
+    juce::File freezeFileFor (const juce::ValueTree& track) const;
+
+    /** How late playback reaches the output because of plug-in latency (delay compensation). */
+    int getPlaybackLatency() const                          { return playbackLatency.load(); }
+
     /** Called on each bounce's private rigs after their first block, to make a restored board
         take effect immediately (the rig otherwise does it on its own timer). */
     std::function<void (juce::AudioProcessor&)> settleRig;
@@ -326,6 +386,12 @@ public:
         [loopStart, loopEnd): the passes it made, the first one from recordStart. */
     static std::vector<Pass> cyclePasses (juce::int64 recordStart, juce::int64 loopStart, juce::int64 loopEnd,
                                           juce::int64 recorded, int latency);
+
+    /** Renders [start, end) of a snapshot to a stereo file, dropping its first snap.latency
+        samples so it lines up with the timeline; `progress` gets 0..1, `shouldStop` aborts. */
+    static bool renderToFile (Snapshot&, const juce::File&, juce::int64 start, juce::int64 end, const BounceOptions&,
+                              double sampleRate, const std::function<void (float)>& progress = {},
+                              const std::function<bool()>& shouldStop = {});
 
     /** Where a recording that started at `recordStart` belongs once latency is taken out. */
     static void placeRecording (juce::int64 recordStart, int latency, juce::int64& start, juce::int64& offset);
@@ -356,6 +422,14 @@ private:
     void syncTrackDevices (TrackRuntime&, const juce::ValueTree& track, double rate, int block);
     /** A snapshot of the song with private rigs and plug-ins for a bounce: everything, or one track. */
     std::unique_ptr<Snapshot> makeBounceSnapshot (int onlyTrackId, bool withMasterEffects);
+    /** A bounce snapshot of one track pre-fader, straight to the output: what freezing renders. */
+    std::unique_ptr<Snapshot> makeFreezeSnapshot (int trackId);
+    /** Renders one snapshot to a file on the bounce thread (start to end plus the tail); `done`
+        runs on the message thread. */
+    void startRender (std::unique_ptr<Snapshot>, const juce::File&, juce::int64 start, juce::int64 end,
+                      const BounceOptions&, std::function<void (bool ok)> done);
+    /** Every runtime's reported latencies, summed: when it changes the snapshot is rebuilt. */
+    int latencyKey() const;
     void drainRecordedMidi();
     void finishMidiTake (int trackId, juce::int64 stopAt);
     void publish();
@@ -417,6 +491,14 @@ private:
     int latencyAtRecord = 0;
     std::atomic<bool> cycleRecording { false };
     juce::int64 cycleStart = 0, cycleEnd = 0;
+
+    // Autopunch: while recording, input is only written (and heard) in [punchFrom, punchTo).
+    std::atomic<bool> punching { false };
+    std::atomic<juce::int64> punchFrom { 0 }, punchTo { 0 };
+    std::atomic<bool> punchDone { false };                          // set by the audio thread once past punchTo
+    // Delay compensation: the current snapshot's latency, and what it was built from.
+    std::atomic<int> playbackLatency { 0 };
+    int publishedLatencyKey = 0;
     juce::TimeSliceThread writerThread { "Woodshed recorder" };
 
     std::unique_ptr<juce::Thread> bounceThread;

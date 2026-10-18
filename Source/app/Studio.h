@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../daw/Engine.h"
+#include "../daw/Groups.h"
 #include <juce_audio_utils/juce_audio_utils.h>
 
 namespace woodshed::app
@@ -28,6 +29,11 @@ namespace cmd
 
     // The Sampler (SamplerEditor.cpp).
     enum : juce::CommandID { showSampler = 0x3000, newSamplerTrack, convertToSampler, convertToSamplerSlice };
+    // Mixing and recording: Track Stacks, groups and VCAs, freeze, Autopunch (MixCommands.cpp).
+    enum : juce::CommandID
+    {
+        createTrackStack = 0x3200, freezeTrack, newVca, toggleAutopunch, punchToCycle
+    };
 }
 
 /**
@@ -90,6 +96,13 @@ public:
     const juce::Array<int>& getSelectedRegions() const      { return selectedRegions; }
     void setSelectedRegions (const juce::Array<int>& regionIds);
     juce::ValueTree findRegion (int regionId) const;
+    /** Tracks selected together (Shift-click or Cmd-click in the headers, or a track group):
+        the selected track and any others. For Track Stacks. */
+    juce::Array<int> getSelectedTrackIds() const;
+    bool isTrackSelected (int trackId) const                { return trackId == getSelectedTrackId() || trackSelection.contains (trackId); }
+    /** Adds a track to the selection or takes it out (Cmd-click), or selects the run of tracks
+        from the selected one to it (Shift-click). */
+    void extendTrackSelection (int trackId, bool range);
 
     // Edits that several views trigger.
     /** An audio track after the selected one: through the guitar rig, or straight (a voice or
@@ -211,6 +224,8 @@ private:
 
     juce::ListenerList<ProjectSwapListener> swapListeners;
     juce::Array<int> selectedRegions;
+    juce::Array<int> trackSelection;                        // besides the selected track
+    std::unique_ptr<daw::groups::Linker> groupLinker;       // grouped tracks move together
     juce::ValueTree clipboard;
     Pane pane = Pane::rig;
     int editorRegionId = -1, takeFolderId = -1;

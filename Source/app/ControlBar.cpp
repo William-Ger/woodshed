@@ -514,7 +514,7 @@ void ControlBar::MasterLook::drawLinearSlider (juce::Graphics& g, int x, int y, 
 //==============================================================================
 ControlBar::ControlBar (Studio& s) : studio (s)
 {
-    for (auto* b : { &toStart, &barBack, &barForward, &play, &stop, &record, &loop })
+    for (auto* b : { &toStart, &barBack, &barForward, &play, &stop, &record, &loop, &punch })
         addAndMakeVisible (b);
     addAndMakeVisible (readout);
     for (auto* b : { &rigPane, &mixerPane })
@@ -537,6 +537,7 @@ ControlBar::ControlBar (Studio& s) : studio (s)
     };
     record.onClick     = [this] { invoke (cmd::record); };
     loop.onClick       = [this] { invoke (cmd::toggleLoop); };
+    punch.onClick      = [this] { invoke (cmd::toggleAutopunch); };
 
     readout.click.onClick   = [this] { invoke (cmd::toggleClick); };
     readout.countIn.onClick = [this] { invoke (cmd::toggleCountIn); };
@@ -707,7 +708,7 @@ void ControlBar::resized()
     int available = right - (left + minTitle + 16);
 
     bool showBarButtons = true;
-    int transportW = 7 * bw + 5 * gap + 9;
+    int transportW = 8 * bw + 6 * gap + 9;
     int readoutW = Readout::preferredWidth;
     if (transportW + 12 + readoutW > available)
         readoutW = juce::jmax (Readout::minimumWidth, available - transportW - 12);
@@ -733,7 +734,8 @@ void ControlBar::resized()
     }
     x += 7;
     place (loop, x, bw);
-    x = loop.getRight() + 12;
+    place (punch, loop.getRight() + gap, bw);
+    x = punch.getRight() + 12;
     readout.setBounds (x, midY - 20, readoutW, 40);
 
     titleBounds = { left, 0, juce::jmax (0, toStart.getX() - 16 - left), h };
@@ -784,6 +786,7 @@ void ControlBar::refreshFromProject()
 {
     const auto& s = studio.project().state;
     loop.setLit ((bool) s.getProperty (daw::ids::loopOn, false));
+    punch.setLit ((bool) s.getProperty (daw::ids::punchOn, false));
     master.setValue ((double) s.getProperty (daw::ids::masterVolume, 0.0), juce::dontSendNotification);
     master.setTooltip ("Master volume: " + formatDb (master.getValue()) + " (double-click: 0 dB)");
     readout.projectChanged();
@@ -860,7 +863,7 @@ void ControlBar::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Id
 
     using namespace daw::ids;
     if (id == tempo || id == beatsPerBar || id == beatUnit || id == click || id == countIn
-        || id == loopOn || id == masterVolume || id == name || id == sampleRate)
+        || id == loopOn || id == masterVolume || id == name || id == sampleRate || id == punchOn)
         refreshFromProject();
 }
 

@@ -49,6 +49,10 @@ set(WOODSHED_DAW_SOURCES
     Source/daw/Drummer.cpp
     Source/daw/StepPattern.cpp)
 
+# --- mixing (track stacks, groups and VCAs, delay compensation, freeze, punch) ---
+list(APPEND WOODSHED_DAW_SOURCES Source/daw/Stacks.cpp Source/daw/Groups.cpp Source/daw/Freeze.cpp)
+# --- end mixing ---
+
 # The Score editor's notation layout and drawing (no Component code); shared with the bench.
 set(WOODSHED_SCORE_SOURCES
     Source/app/ScoreLayout.cpp
@@ -127,6 +131,10 @@ if(NOT WOODSHED_BENCH_ONLY)
     if(APPLE)
         target_sources(WoodshedStudio PRIVATE Source/app/WindowStyle_mac.mm)
     endif()
+
+    # --- mixing ---
+    target_sources(WoodshedStudio PRIVATE Source/app/MixCommands.cpp)
+    # --- end mixing ---
 
     # The studio's typefaces: Inter and JetBrains Mono (both SIL Open Font License; see art/fonts).
     file(GLOB WOODSHED_FONTS CONFIGURE_DEPENDS art/fonts/*.ttf)
@@ -226,6 +234,9 @@ target_sources(WoodshedBench PRIVATE tools/bench/Bench.cpp tools/bench/ProjectTe
 # --- sampler ---
 target_sources(WoodshedBench PRIVATE tools/bench/SamplerTest.cpp Source/instruments/SamplerTrack.cpp)
 # --- end sampler ---
+# --- mixing ---
+target_sources(WoodshedBench PRIVATE tools/bench/MixTest.cpp)
+# --- end mixing ---
 target_compile_definitions(WoodshedBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(WoodshedBench
     PRIVATE

@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "PluginHost.h"
+#include "MixCommands.h"
 
 namespace woodshed::app
 {
@@ -122,6 +123,7 @@ void MainComponent::getAllCommands (juce::Array<juce::CommandID>& c)
                   cmd::newDrummerTrack, cmd::showDrummer, cmd::showStepSequencer, cmd::visitWebsite });
     // The Sampler.
     c.addArray ({ cmd::showSampler, cmd::newSamplerTrack, cmd::convertToSampler, cmd::convertToSamplerSlice });
+    mixui::getCommands (c);     // Track Stacks, freeze, VCAs, Autopunch
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
@@ -131,6 +133,8 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
     const auto shift = juce::ModifierKeys::shiftModifier;
     auto& p = studio.project();
     auto& s = p.state;
+    if (mixui::getCommandInfo (studio, id, info))
+        return;
 
     switch (id)
     {
@@ -249,6 +253,11 @@ bool MainComponent::perform (const InvocationInfo& info)
     auto& p = studio.project();
     auto& s = p.state;
     auto toggle = [&s] (const juce::Identifier& id) { s.setProperty (id, ! (bool) s[id], nullptr); };
+    if (mixui::perform (studio, info.commandID))
+    {
+        studio.commands.commandStatusChanged();
+        return true;
+    }
 
     switch (info.commandID)
     {
@@ -438,6 +447,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::newSamplerTrack);
             m.addCommandItem (cm, cmd::convertToSampler);
             m.addCommandItem (cm, cmd::convertToSamplerSlice);
+            m.addCommandItem (cm, cmd::newVca);
+            m.addSeparator();
+            m.addCommandItem (cm, cmd::createTrackStack);
+            m.addCommandItem (cm, cmd::freezeTrack);
             m.addSeparator();
             m.addCommandItem (cm, cmd::duplicateTrack);
             m.addCommandItem (cm, cmd::deleteTrack);
@@ -454,6 +467,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int index, const juce::String&)
             m.addCommandItem (cm, cmd::loopToSelection);
             m.addCommandItem (cm, cmd::toggleClick);
             m.addCommandItem (cm, cmd::toggleCountIn);
+            m.addCommandItem (cm, cmd::toggleAutopunch);
+            m.addCommandItem (cm, cmd::punchToCycle);
             m.addSeparator();
             m.addCommandItem (cm, cmd::createMarker);
             m.addCommandItem (cm, cmd::nextMarker);

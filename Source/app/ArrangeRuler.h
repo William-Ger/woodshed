@@ -14,7 +14,8 @@ namespace woodshed::app::arrange
 /**
     Bar numbers (and beats when zoomed in) over the lanes. Click or drag in the numbers to move
     the playhead. The strip underneath holds the loop range: drag in empty space to make one,
-    drag it to move it, drag its edges to resize, click it to switch looping on or off.
+    drag it to move it, drag its edges to resize, click it to switch looping on or off. With
+    Autopunch on, the punch range is a red band along the strip's bottom edge, dragged the same way.
     At the bottom is the marker lane: double-click to add a marker, click one to go there,
     drag it to move it, double-click it to rename it, right-click for more.
 */
@@ -38,7 +39,8 @@ public:
     void playheadMoved (float oldX, float newX);
 
 private:
-    enum class Mode { none, scrub, loopCreate, loopMove, loopStart, loopEnd, markerEmpty, markerDrag };
+    enum class Mode { none, scrub, loopCreate, loopMove, loopStart, loopEnd, markerEmpty, markerDrag,
+                      punchMove, punchStart, punchEnd };
 
     Mode loopModeAt (juce::Point<int>) const;
     bool inMarkerLane (juce::Point<int> p) const          { return p.y >= getHeight() - markerHeight; }
@@ -51,6 +53,9 @@ private:
     void startRename (int markerId);
     void finishRename (bool commit);
     void setLoop (juce::int64 start, juce::int64 end, bool turnOn);
+    /** Autopunch's range: a red band along the bottom of the loop strip, dragged like the loop. */
+    juce::Rectangle<float> punchBand() const;
+    void setPunch (juce::int64 start, juce::int64 end);
     void scrubTo (float x);
 
     ArrangeView& view;
