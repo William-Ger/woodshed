@@ -8,9 +8,31 @@ free for anyone to use, study and improve, under the GNU AGPLv3.
 
 ![The arrange view with the guitar rig](docs/screenshots/guitar-rig.jpg)
 
-Woodshed started as a guitar pedalboard and grew into a full digital audio workstation. It's
-modelled on the workflow of the big professional DAWs (if you know them, the key commands will
-feel familiar), but it's its own program, written from scratch.
+## Why I built it
+
+I have an electric guitar, but I didn't have the money for the pedals, amps and cabinets that
+make it sound like the records I love. A single good pedal can cost a hundred dollars or more,
+and a real amp and a full pedalboard cost thousands. So I wanted an app where I could make any
+kind of pedal I could think of, chain as many as I want, and run them through any amp.
+
+That's how Woodshed started: a pedalboard on my laptop. Once I could get the tone, I wanted to
+record with it and write songs around it, so it grew into a full studio. Music shouldn't sit
+behind a paywall, so all of it is free.
+
+How I use it:
+
+- I plug my guitar into a small USB audio interface, put on headphones and play through the rig
+  live, building a board out of the 93 effects and amps.
+- When I learn a song, I rebuild its tone as a preset. "Paranoid" in the factory presets (a
+  treble booster into a cranked British-style head) came from learning that riff.
+- When the sound I want doesn't exist yet, I make a new pedal for it.
+- I record my playing into tracks, then add drums, bass and keys around it with the Drummer and
+  the built-in instruments.
+- Every effect in the app is tested against a recording of my own guitar
+  (`tools/testdata/guitar-di-48k.wav`).
+
+Woodshed is modelled on the workflow of the big professional DAWs (if you know them, the key
+commands will feel familiar), but it's its own program, written from scratch.
 
 ## What it does
 
@@ -137,7 +159,7 @@ Pedals (effects) are the easiest place to start: `.claude/skills/create-pedal/SK
 through designing one, registering it and getting it past the bench. Every effect and instrument
 must pass the bench before it ships.
 
-`tools/testdata/guitar-di-48k.wav` is a short guitar DI used by the bench.
+`tools/testdata/guitar-di-48k.wav` is a short DI recording of my guitar, used by the bench.
 
 ## License
 
