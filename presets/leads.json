@@ -165,5 +165,17 @@
         {"type": "dyn.compressor", "spot": 0, "on": true, "knobs": {"sustain": 0.4, "attack": 20}},
         {"type": "dyn.boost", "spot": 1, "on": false, "knobs": {"boost": 4, "tilt": 0.1, "voice": "Fat"}},
         {"type": "weird.feedback", "spot": 3, "on": true, "knobs": {"harmonic": "Octave", "bloom": 1800, "level": 0.25, "sustain": -46, "wobble": 0.3, "drive": 0.25, "width": 0.3}},
-        {"type": "reverb.spring", "spot": 9, "on": true, "knobs": {"decay": 1800, "tone": 3200, "drip": 0.3, "boing": 0.2, "mix": 0.16}} ] }
+        {"type": "reverb.spring", "spot": 9, "on": true, "knobs": {"decay": 1800, "tone": 3200, "drip": 0.3, "boing": 0.2, "mix": 0.16}} ] },
+
+    { "name": "Cliffs Of Dover",
+      "description": "The 1990 instrumental's violin lead: a neck pickup into a tube-buffered low-gain overdrive, then a loud non-master British stack through a ribbon-miked 4x12 with the top end rolled off, so fast runs stay round and held notes sing. A long tape echo trails every phrase. Stomp 1 is a fat push for the climbing runs, 3 stacks a woolly two-transistor fuzz on top that cleans up from the guitar's volume, 5 layers a second echo under the long bends.",
+      "amp":   {"type": "amp.stadium", "knobs": {"input": "Bridged", "volume": 0.68, "bass": 0.55, "mid": 0.55, "treble": 0.38, "presence": 0.3, "sag": 0.4}},
+      "cab":   {"type": "cab.hangar", "knobs": {"cabinet": "Warm 4x12", "mic": "Ribbon", "position": 0.5, "distance": 0.3, "lowcut": 90, "highcut": 6000, "level": -6.5}},
+      "board": [
+        {"type": "dyn.boost", "spot": 0, "on": false, "knobs": {"boost": 4, "tilt": -0.1, "voice": "Fat"}},
+        {"type": "drive.touch", "spot": 1, "on": true, "knobs": {"gain": 0.62, "tone": 0.4, "level": 2, "body": 0.6}},
+        {"type": "drive.vintage", "spot": 2, "on": false, "knobs": {"fuzz": 0.65, "bias": 0.55, "volume": -2, "guitar": 0.85}},
+        {"type": "delay.tape", "spot": 7, "on": true, "knobs": {"time": 400, "repeats": 0.38, "mix": 0.24, "wow": 0.2, "drive": 0.3, "age": 0.45, "heads": "Long"}},
+        {"type": "delay.analog", "spot": 8, "on": false, "knobs": {"time": 560, "repeats": 0.4, "mix": 0.2}},
+        {"type": "reverb.hall", "spot": 9, "on": true, "knobs": {"decay": 2200, "size": 0.55, "predelay": 30, "damp": 0.55, "mod": 0.3, "lowcut": 150, "mix": 0.14}} ] }
   ] }
