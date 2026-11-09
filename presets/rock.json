@@ -1078,6 +1078,90 @@
           }
         }
       ]
+    },
+    {
+      "name": "Cult Of Personality",
+      "description": "The 1988 funk-metal riff: a hard-clipping op-amp distortion pedal into a cranked non-master British stack, a close-miked 4x12 and the ambience of a big live room. Bridge humbucker, palm-muted and bitten. Stomp 1 brings in the wah for the solos, 3 is a fat push for the outro, and the echo sits on an eighth at the song's tempo.",
+      "amp": {
+        "type": "amp.stadium",
+        "knobs": {
+          "input": "Bridged",
+          "volume": 0.62,
+          "bass": 0.4,
+          "mid": 0.6,
+          "treble": 0.6,
+          "presence": 0.5,
+          "sag": 0.3
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.35,
+          "distance": 0.2,
+          "lowcut": 90,
+          "highcut": 7000,
+          "level": -4.8
+        }
+      },
+      "board": [
+        {
+          "type": "filter.wah",
+          "spot": 0,
+          "on": false,
+          "knobs": {
+            "position": 0.6,
+            "voice": "Vintage",
+            "resonance": 0.6,
+            "level": 0
+          }
+        },
+        {
+          "type": "drive.distortion",
+          "spot": 1,
+          "on": true,
+          "knobs": {
+            "distortion": 0.6,
+            "filter": 0.45,
+            "volume": 0,
+            "clip": "Silicon"
+          }
+        },
+        {
+          "type": "dyn.boost",
+          "spot": 2,
+          "on": false,
+          "knobs": {
+            "boost": 4,
+            "tilt": 0.1,
+            "voice": "Fat"
+          }
+        },
+        {
+          "type": "delay.digital",
+          "spot": 7,
+          "on": true,
+          "knobs": {
+            "time": 640,
+            "repeats": 0.25,
+            "mix": 0.14,
+            "division": "1/8",
+            "tone": 7000
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.5,
+            "damp": 0.5,
+            "mix": 0.12
+          }
+        }
+      ]
     }
   ]
 }
