@@ -1162,6 +1162,69 @@
           }
         }
       ]
+    },
+    {
+      "name": "Bulls On Parade",
+      "description": "The 1996 rap-metal riff: a master-volume lead channel with the gain kept honest, a close-miked 4x12 and almost no room, with the wah parked mid and rocked in time. Stomp 1 drops the wah for the straight riff, 4 is the turntable scratch for the toggle-switch solo.",
+      "amp": {
+        "type": "amp.head",
+        "knobs": {
+          "voice": "Hot Lead",
+          "gain": 0.5,
+          "bass": 0.55,
+          "mid": 0.6,
+          "treble": 0.55,
+          "presence": 0.45,
+          "master": 0.6
+        }
+      },
+      "cab": {
+        "type": "cab.hangar",
+        "knobs": {
+          "cabinet": "Warm 4x12",
+          "mic": "Dynamic",
+          "position": 0.3,
+          "distance": 0.15,
+          "lowcut": 90,
+          "highcut": 6500,
+          "level": 0
+        }
+      },
+      "board": [
+        {
+          "type": "filter.wah",
+          "spot": 0,
+          "on": true,
+          "knobs": {
+            "position": 0.5,
+            "voice": "Vintage",
+            "resonance": 0.65,
+            "level": 0
+          }
+        },
+        {
+          "type": "glitch.stylus",
+          "spot": 3,
+          "on": false,
+          "knobs": {
+            "rate": 5.5,
+            "depth": 120,
+            "hand": "Tear",
+            "fader": 0.6,
+            "mix": 0.9
+          }
+        },
+        {
+          "type": "reverb.room",
+          "spot": 9,
+          "on": true,
+          "knobs": {
+            "size": 0.35,
+            "damp": 0.6,
+            "mix": 0.08
+          }
+        }
+      ]
     }
   ]
 }
